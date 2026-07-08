@@ -11,9 +11,15 @@ The player should read each caption aloud using the browser's built-in text-to-s
 
 ## Decisions made during brainstorming
 
-- **Timeline is master.** The film plays exactly as now (scrubbable, fixed duration). Speech
-  follows the caption changes; it never drives the clock. A long sentence may be cut off when
-  the next caption arrives — accepted.
+- **Speech-gated timeline** (revised 2026-07-08 after user feedback — pure timeline-master
+  cut sentences off constantly because the default voice reads slower than the authored
+  caption slots). The timeline remains the coordinate system: scrubbing, seeking, and the
+  141.5 s logical duration are unchanged. But during playback, when the clock reaches the
+  next caption boundary while the voice is still reading the current caption, the film
+  **holds on that frame** until the utterance finishes, then rolls on. Wall-clock runtime
+  therefore exceeds the logical duration and varies by voice. Failsafe: a hold never lasts
+  more than 15 s (protects against stuck browser speech engines); after that the film rolls
+  on regardless.
 - **On by default, with a mute toggle.** Speech starts with Play (the click satisfies browser
   autoplay rules). A speaker button next to Play toggles it. Pause and scrubbing silence
   speech immediately.
@@ -55,9 +61,17 @@ bookkeeping — the caption timeline decides what happens next).
 - Hook call: `const speechSupported = useSpeechNarration(caption, playing && !muted, endedNaturally)`.
 - New button beside Play, rendered only when `speechSupported`:
   `🔊 Voice` / `🔇 Muted`, `aria-pressed={!muted}`, toggles `muted`.
-- No other player behavior changes. Scrubbing while playing: the seek cancels nothing itself;
-  speech switches when the derived caption changes (and pause-during-scrub already silences
-  via `speaking` going false — scrubbing while paused stays silent).
+- **Speech gating in `tick()`** (the revised sync model): the clock re-anchors
+  (`tStart`/`wallStart`) at every caption-boundary crossing so `tStart` always lies within
+  the current caption's span. When the frame's computed time would cross the next boundary
+  (`captions.find(c => c.at > tStart && c.at <= next)`) while
+  `window.speechSynthesis.speaking` is true, the clock freezes at `boundary − 0.001`
+  (keeping the current caption active) and re-anchors there each frame until speech ends
+  or the 15 s hold failsafe trips. Muted or unsupported speech never gates (no utterance →
+  `speaking` false → film plays straight through at authored pace).
+- Scrubbing while playing: the seek cancels nothing itself; speech switches when the derived
+  caption changes (and pause-during-scrub already silences via `speaking` going false —
+  scrubbing while paused stays silent).
 
 Note: this file carries the user's staged annotation-comment edit; the feature commit
 includes it deliberately.

@@ -25,6 +25,7 @@ export function CanvasSlide({ slide, title, tag, notes }: CanvasSlideProps) {
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(false);
   const endedNaturally = useRef(false);
+  const holdSince = useRef(0); // wall time when a speech-gate hold began (0 = not holding)
 
   /** Paint the frame for time `seconds` — HiDPI-aware, scaled to the slide's view space. */
   const draw = useCallback(
@@ -59,6 +60,7 @@ export function CanvasSlide({ slide, title, tag, notes }: CanvasSlideProps) {
 
   const pause = useCallback(() => {
     endedNaturally.current = false;
+    holdSince.current = 0;
     setPlaying(false);
     cancelAnimationFrame(clockRef.current.raf);
   }, []);
@@ -67,6 +69,32 @@ export function CanvasSlide({ slide, title, tag, notes }: CanvasSlideProps) {
     (now: number) => {
       const clock = clockRef.current;
       let next = clock.tStart + (now - clock.wallStart) / 1000;
+
+      // Speech-gated sync: the clock re-anchors at every caption boundary, so
+      // tStart always lies inside the current caption's span. If this frame
+      // would cross into the next caption while the voice is still reading,
+      // hold just before the boundary until the utterance ends (max 15 s).
+      const boundary = slide.captions?.find((c) => c.at > clock.tStart && c.at <= next)?.at;
+      if (boundary !== undefined) {
+        const voiceBusy =
+          "speechSynthesis" in window &&
+          window.speechSynthesis.speaking &&
+          (holdSince.current === 0 || now - holdSince.current < 15000);
+        if (voiceBusy) {
+          if (holdSince.current === 0) holdSince.current = now;
+          next = Math.max(clock.tStart, boundary - 0.001);
+          clock.tStart = next; // freeze: elapsed time restarts from the held frame
+          clock.wallStart = now;
+        } else {
+          holdSince.current = 0;
+          // crossed cleanly — re-anchor at the boundary, preserving overshoot
+          clock.tStart = boundary;
+          clock.wallStart = now - (next - boundary) * 1000;
+        }
+      } else {
+        holdSince.current = 0;
+      }
+
       if (next >= slide.duration) {
         next = slide.duration;
         endedNaturally.current = true; // let the final utterance finish
@@ -77,11 +105,12 @@ export function CanvasSlide({ slide, title, tag, notes }: CanvasSlideProps) {
       draw(next);
       if (!scrubbing.current) setT(next);
     },
-    [slide.duration, draw],
+    [slide.duration, slide.captions, draw],
   );
 
   const play = useCallback(() => {
     endedNaturally.current = false;
+    holdSince.current = 0;
     const startAt = t >= slide.duration ? 0 : t;
     setT(startAt);
     setPlaying(true);
@@ -92,6 +121,7 @@ export function CanvasSlide({ slide, title, tag, notes }: CanvasSlideProps) {
   const seek = useCallback(
     (value: number) => {
       endedNaturally.current = false;
+      holdSince.current = 0;
       setT(value); // update the state with the new time to show in ui
       clockRef.current = { ...clockRef.current, wallStart: performance.now(), tStart: value }; // update the clockRef with the new time and wallStart
       draw(value); // draw immediately, even if paused 
