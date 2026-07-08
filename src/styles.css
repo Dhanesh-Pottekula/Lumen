@@ -107,6 +107,12 @@ h1 {
   transform: translateY(1px);
 }
 
+.player button.voice.is-muted {
+  background: transparent;
+  color: var(--muted);
+  box-shadow: inset 0 0 0 1px var(--muted);
+}
+
 .player input[type="range"] {
   flex: 1;
   accent-color: var(--accent);

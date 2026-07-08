@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
 import type { CanvasSlideDefinition } from "../slides/types";
+import { useSpeechNarration } from "./useSpeechNarration";
 
 interface CanvasSlideProps {
   slide: CanvasSlideDefinition;
@@ -22,6 +23,8 @@ export function CanvasSlide({ slide, title, tag, notes }: CanvasSlideProps) {
   const scrubbing = useRef(false);// to know if the user is dragging the timeline slider to change the time of video or not
   const [t, setT] = useState(0);
   const [playing, setPlaying] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const endedNaturally = useRef(false);
 
   /** Paint the frame for time `seconds` — HiDPI-aware, scaled to the slide's view space. */
   const draw = useCallback(
@@ -55,6 +58,7 @@ export function CanvasSlide({ slide, title, tag, notes }: CanvasSlideProps) {
   }, [draw]);
 
   const pause = useCallback(() => {
+    endedNaturally.current = false;
     setPlaying(false);
     cancelAnimationFrame(clockRef.current.raf);
   }, []);
@@ -65,6 +69,7 @@ export function CanvasSlide({ slide, title, tag, notes }: CanvasSlideProps) {
       let next = clock.tStart + (now - clock.wallStart) / 1000;
       if (next >= slide.duration) {
         next = slide.duration;
+        endedNaturally.current = true; // let the final utterance finish
         setPlaying(false);
       } else {
         clock.raf = requestAnimationFrame(tick);
@@ -76,6 +81,7 @@ export function CanvasSlide({ slide, title, tag, notes }: CanvasSlideProps) {
   );
 
   const play = useCallback(() => {
+    endedNaturally.current = false;
     const startAt = t >= slide.duration ? 0 : t;
     setT(startAt);
     setPlaying(true);
@@ -85,6 +91,7 @@ export function CanvasSlide({ slide, title, tag, notes }: CanvasSlideProps) {
 
   const seek = useCallback(
     (value: number) => {
+      endedNaturally.current = false;
       setT(value); // update the state with the new time to show in ui
       clockRef.current = { ...clockRef.current, wallStart: performance.now(), tStart: value }; // update the clockRef with the new time and wallStart
       draw(value); // draw immediately, even if paused 
@@ -95,6 +102,7 @@ export function CanvasSlide({ slide, title, tag, notes }: CanvasSlideProps) {
   useEffect(() => () => cancelAnimationFrame(clockRef.current.raf), []);
 
   const caption = slide.captions?.reduce((acc, c) => (c.at <= t ? c.text : acc), slide.captions[0]?.text ?? "");
+  const speechSupported = useSpeechNarration(caption, playing && !muted, endedNaturally);
 
   return (
     <section className="card">
@@ -107,6 +115,15 @@ export function CanvasSlide({ slide, title, tag, notes }: CanvasSlideProps) {
 
       <div className="player">
         <button onClick={playing ? pause : play}>{playing ? "Pause" : "Play"}</button>
+        {speechSupported && (
+          <button
+            className={muted ? "voice is-muted" : "voice"}
+            aria-pressed={!muted}
+            onClick={() => setMuted((m) => !m)}
+          >
+            {muted ? "🔇 Muted" : "🔊 Voice"}
+          </button>
+        )}
         <input
           type="range"
           min={0}
