@@ -240,3 +240,59 @@ describe("composeSlides render — offscreen buffer path", () => {
     expect(drawImageAlphas).toEqual([0.5, 0.5]);
   });
 });
+
+describe("composeSlides timings mode", () => {
+  // Two authored 10 s scenes, each with a caption at local t=2.
+  // Real narration: scene 0 spans 0..30 (caption spoken at 6), scene 1 spans 30..50 (caption at 33).
+  const timings = {
+    film: "test",
+    audio: "/x.wav",
+    duration: 50,
+    generated: true,
+    scenes: [
+      { index: 0, start: 0, end: 30 },
+      { index: 1, start: 30, end: 50 },
+    ],
+    captions: [
+      { scene: 0, at: 6, text: "s0" },
+      { scene: 1, at: 33, text: "s1" },
+    ],
+  };
+  const withCap = () => scene(10, { captions: [{ at: 2, text: "c" }] });
+
+  it("takes duration and captions from the timings, not authored durations", () => {
+    const film = composeSlides([withCap(), withCap()], { timings, progressDots: false });
+    expect(film.duration).toBe(50);
+    expect(film.captions).toEqual([
+      { at: 6, text: "s0" },
+      { at: 33, text: "s1" },
+    ]);
+  });
+
+  it("remaps a scene's authored beat onto the real spoken time", () => {
+    const a = recordingScene(10);
+    a.def.captions = [{ at: 2, text: "c" }];
+    const b = recordingScene(10);
+    b.def.captions = [{ at: 2, text: "c" }];
+    const film = composeSlides([a.def, b.def], { timings, progressDots: false });
+
+    // At global t=6 (scene 0's caption spoken), the scene should render at authored beat 2.
+    film.render(stubCtx(), 6);
+    expect(a.calls).toHaveLength(1);
+    expect(a.calls[0].localT).toBeCloseTo(2);
+    expect(a.calls[0].alpha).toBeCloseTo(1);
+  });
+
+  it("holds the outgoing scene at its authored end during the crossfade tail", () => {
+    const a = recordingScene(10);
+    a.def.captions = [{ at: 2, text: "c" }];
+    const b = recordingScene(10);
+    b.def.captions = [{ at: 2, text: "c" }];
+    // scene 0 true end = 30; with crossfade 2 it fades out over [30,32]. At t=31 it should
+    // still render, clamped to its authored duration (10).
+    const film = composeSlides([a.def, b.def], { timings, crossfade: 2, progressDots: false });
+    film.render(stubCtx(), 31);
+    const aCall = a.calls.at(-1);
+    expect(aCall?.localT).toBeCloseTo(10);
+  });
+});
