@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { composeSlides } from "./compose";
 import type { CanvasSlideDefinition } from "./types";
@@ -148,5 +148,95 @@ describe("composeSlides render", () => {
     const ctx = stubCtx();
     composeSlides([a.def, b.def], { crossfade: 2, progressDots: false }).render(ctx, 5);
     expect(ctx.arc).not.toHaveBeenCalled();
+  });
+
+  it("renders the last scene at full alpha on the final frame when crossfade is 0", () => {
+    const a = recordingScene(10);
+    const b = recordingScene(10);
+    const film = composeSlides([a.def, b.def], { crossfade: 0, progressDots: false });
+
+    film.render(stubCtx(), film.duration);
+    expect(b.calls).toEqual([{ localT: 10, alpha: 1 }]);
+  });
+});
+
+/** A scene that misbehaves like real scenes: self-clears and sets globalAlpha absolutely. */
+function nonCooperativeScene(duration: number) {
+  const calls: { localT: number }[] = [];
+  const def: CanvasSlideDefinition = {
+    duration,
+    viewW: 920,
+    viewH: 430,
+    render: (ctx, t) => {
+      calls.push({ localT: t });
+      ctx.clearRect(0, 0, 920, 430);
+      ctx.globalAlpha = 1;
+    },
+  };
+  return { def, calls };
+}
+
+/** Fake DOM + buffer-capable main ctx, so composeSlides takes the offscreen-buffer path. */
+function bufferCapableCtx() {
+  const stack: number[] = [];
+  const drawImageAlphas: number[] = [];
+  const ctx: Record<string, unknown> = {
+    canvas: { width: 1840, height: 860 },
+    globalAlpha: 1,
+    fillStyle: "",
+    save() {
+      stack.push(ctx.globalAlpha as number);
+    },
+    restore() {
+      ctx.globalAlpha = stack.pop() ?? 1;
+    },
+    clearRect: vi.fn(),
+    beginPath: vi.fn(),
+    arc: vi.fn(),
+    fill: vi.fn(),
+    getTransform: () => ({ a: 2, b: 0, c: 0, d: 2, e: 0, f: 0 }),
+    setTransform: vi.fn(),
+    drawImage: vi.fn(() => {
+      drawImageAlphas.push(ctx.globalAlpha as number);
+    }),
+  };
+  return { ctx: ctx as unknown as CanvasRenderingContext2D, drawImageAlphas };
+}
+
+function fakeBufferCanvas() {
+  const bufCtx: Record<string, unknown> = {
+    globalAlpha: 1,
+    fillStyle: "",
+    clearRect: vi.fn(),
+    setTransform: vi.fn(),
+    save: vi.fn(),
+    restore: vi.fn(),
+  };
+  return {
+    width: 0,
+    height: 0,
+    getContext: () => bufCtx,
+  };
+}
+
+describe("composeSlides render — offscreen buffer path", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("composites a non-cooperative scene's output under the envelope alpha during a crossfade", () => {
+    vi.stubGlobal("document", { createElement: () => fakeBufferCanvas() });
+
+    const a = nonCooperativeScene(10);
+    const b = nonCooperativeScene(10);
+    const film = composeSlides([a.def, b.def], { crossfade: 2, progressDots: false });
+
+    const { ctx, drawImageAlphas } = bufferCapableCtx();
+    film.render(ctx, 9); // midpoint of the [8,10) overlap → 0.5 / 0.5
+
+    expect(a.calls).toEqual([{ localT: 9 }]);
+    expect(b.calls).toEqual([{ localT: 1 }]);
+    expect(ctx.drawImage).toHaveBeenCalledTimes(2);
+    expect(drawImageAlphas).toEqual([0.5, 0.5]);
   });
 });

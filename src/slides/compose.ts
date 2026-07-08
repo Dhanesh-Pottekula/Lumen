@@ -5,8 +5,14 @@
  * own local time inside a fade-in × fade-out alpha envelope. The result is a
  * plain CanvasSlideDefinition, so the composed film stays a pure function of t
  * and seeks exactly like any slide.
+ *
+ * Compositing contract: scenes may self-clear (`clearRect`) and set `globalAlpha`
+ * absolutely — real scenes do both, which would otherwise defeat the fade envelope.
+ * During a crossfade the composer isolates each active scene in a shared offscreen
+ * buffer and composites that buffer onto the main canvas under the envelope alpha,
+ * so the scene's own clearing/alpha calls only ever affect the buffer.
  */
-import { phase, withAlpha } from "./anim";
+import { clamp01, phase, withAlpha } from "./anim";
 import type { CanvasSlideDefinition, CaptionSegment } from "./types";
 
 export interface ComposeOptions {
@@ -40,8 +46,11 @@ export function composeSlides(
   let crossfade = Math.max(0, options.crossfade ?? 2.5);
   const shortest = Math.min(...scenes.map((s) => s.duration));
   if (scenes.length > 1 && crossfade > shortest / 2) {
-    console.warn(`composeSlides: crossfade ${crossfade}s clamped to ${shortest / 2}s (half the shortest scene)`);
-    crossfade = shortest / 2;
+    const clamped = shortest / 2;
+    console.warn(
+      `composeSlides: crossfade ${crossfade.toFixed(3)}s clamped to ${clamped.toFixed(3)}s (half the shortest scene)`,
+    );
+    crossfade = clamped;
   }
   const progressDots = options.progressDots ?? true;
 
@@ -62,6 +71,20 @@ export function composeSlides(
     })
     .sort((a, b) => a.at - b.at);
 
+  // Lazily-created shared offscreen scratch buffer, resized to match the main
+  // canvas's device-pixel size on demand. Created on first buffered render.
+  let buffer: HTMLCanvasElement | { width: number; height: number; getContext: (id: "2d") => unknown } | null = null;
+
+  /** True when the environment/context support the offscreen-buffer compositing path. */
+  function canBuffer(ctx: CanvasRenderingContext2D): boolean {
+    return (
+      typeof document !== "undefined" &&
+      !!ctx.canvas &&
+      typeof ctx.drawImage === "function" &&
+      typeof ctx.getTransform === "function"
+    );
+  }
+
   return {
     duration,
     viewW,
@@ -76,12 +99,41 @@ export function composeSlides(
         return;
       }
 
+      const buffered = canBuffer(ctx);
+
       for (const { scene, start, end } of windows) {
+        const isLastWindow = end === windows[windows.length - 1].end;
         const fadeIn = crossfade > 0 ? phase(t, start, start + crossfade) : t >= start ? 1 : 0;
-        const fadeOut = crossfade > 0 ? 1 - phase(t, end - crossfade, end) : t < end ? 1 : 0;
-        withAlpha(ctx, fadeIn * fadeOut, () =>
-          scene.render(ctx, Math.max(0, Math.min(t - start, scene.duration))),
-        );
+        const fadeOut =
+          crossfade > 0 ? 1 - phase(t, end - crossfade, end) : (isLastWindow ? t <= end : t < end) ? 1 : 0;
+        const alpha = fadeIn * fadeOut;
+        if (alpha <= 0) continue;
+        const localT = Math.max(0, Math.min(t - start, scene.duration));
+
+        if (!buffered) {
+          withAlpha(ctx, alpha, () => scene.render(ctx, localT));
+          continue;
+        }
+
+        const canvasW = ctx.canvas.width;
+        const canvasH = ctx.canvas.height;
+        if (!buffer || buffer.width !== canvasW || buffer.height !== canvasH) {
+          buffer = document.createElement("canvas");
+          buffer.width = canvasW;
+          buffer.height = canvasH;
+        }
+        const bufCtx = buffer.getContext("2d") as CanvasRenderingContext2D;
+
+        bufCtx.setTransform(1, 0, 0, 1, 0, 0);
+        bufCtx.clearRect(0, 0, canvasW, canvasH);
+        bufCtx.setTransform(ctx.getTransform());
+        scene.render(bufCtx, localT);
+
+        ctx.save();
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
+        ctx.globalAlpha *= clamp01(alpha);
+        ctx.drawImage(buffer as HTMLCanvasElement, 0, 0);
+        ctx.restore();
       }
 
       if (progressDots) {

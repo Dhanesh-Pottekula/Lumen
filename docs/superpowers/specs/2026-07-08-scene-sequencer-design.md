@@ -52,11 +52,14 @@ Window math, for scene *i* with durations `d[0..n-1]` and crossfade `x`:
 The returned `render(ctx, t)`:
 
 1. Clears the full view rect.
-2. For each scene whose `[start, end)` window contains `t` (at most two during a crossfade,
-   drawn in array order so the incoming scene paints on top), computes the envelope
-   `alpha = phase(t, start, start + x) · (1 − phase(t, end − x, end))`, and if `alpha > 0`
-   draws the scene inside a saved/restored `globalAlpha *= alpha`, passing the scene its
-   **local time** `t − start`.
+2. For each scene whose `[start, end)` window contains `t` (at most two during a crossfade),
+   computes the envelope `alpha = phase(t, start, start + x) · (1 − phase(t, end − x, end))`,
+   and if `alpha > 0` renders the scene into a shared offscreen buffer (at the same HiDPI
+   transform as the main canvas) and composites that buffer onto the main canvas inside a
+   saved/restored `globalAlpha *= alpha`, passing the scene its **local time** `t − start`.
+   Routing each scene through its own buffer isolates scenes that self-clear (`clearRect`)
+   or set `globalAlpha` absolutely — both would otherwise defeat the fade envelope if drawn
+   directly onto the shared main canvas.
 3. If `progressDots` and `scenes.length > 1`: one dot per scene centred at the bottom
    (amber = active window, teal = finished, dim gray = upcoming) — same visual as the
    current film's chapter dots.
