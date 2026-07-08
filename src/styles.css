@@ -1,0 +1,193 @@
+:root {
+  --bg: #101418;
+  --panel: #181f26;
+  --panel-2: #1f2830;
+  --ink: #e8eef2;
+  --muted: #93a4b0;
+  --accent: #e8a13c;
+  --accent-2: #5cc8ae;
+  --line: #2b3640;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.5;
+  padding: 32px 16px 80px;
+}
+
+main {
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+h1 {
+  font-size: 1.5rem;
+  margin-bottom: 4px;
+}
+
+.sub {
+  color: var(--muted);
+  margin-bottom: 36px;
+  font-size: 0.95rem;
+}
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 24px;
+  margin-bottom: 40px;
+}
+
+.card h2 {
+  font-size: 1.1rem;
+  margin-bottom: 4px;
+}
+
+.tag {
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-bottom: 16px;
+}
+
+.tag b.good {
+  color: var(--accent-2);
+}
+
+.tag b.meh {
+  color: var(--accent);
+}
+
+.stage {
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  position: relative;
+}
+
+.stage canvas {
+  display: block;
+  width: 100%;
+}
+
+.stage svg {
+  display: block;
+}
+
+/* ── player chrome ── */
+.player {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.player button {
+  background: var(--accent);
+  color: #14181c;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 8px 18px;
+  cursor: pointer;
+  min-width: 84px;
+}
+
+.player button:active {
+  transform: translateY(1px);
+}
+
+.player input[type="range"] {
+  flex: 1;
+  accent-color: var(--accent);
+}
+
+.player .clock {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  font-size: 0.85rem;
+  min-width: 96px;
+  text-align: right;
+}
+
+.caption {
+  margin-top: 14px;
+  padding: 12px 16px;
+  border-left: 3px solid var(--accent);
+  background: var(--panel-2);
+  border-radius: 0 8px 8px 0;
+  color: var(--ink);
+  font-size: 0.95rem;
+  min-height: 48px;
+}
+
+.caption .who {
+  color: var(--accent);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  display: block;
+  margin-bottom: 2px;
+}
+
+.notes {
+  margin-top: 16px;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.notes li {
+  margin-left: 18px;
+  margin-bottom: 4px;
+}
+
+/* ────────────────────────────────────────────────────────────
+   SVG pendulums — the motion lives entirely in CSS keyframes.
+   A full swing (there and back) is one period: duration = T/2
+   per direction with alternate + ease-in-out approximating
+   the cosine.
+   ──────────────────────────────────────────────────────────── */
+.pend {
+  transform-box: view-box;
+}
+
+.pend-1 {
+  transform-origin: 300px 60px;
+  animation: swing1 1s ease-in-out infinite alternate;
+}
+
+.pend-2 {
+  transform-origin: 620px 60px;
+  animation: swing2 1.25s ease-in-out infinite alternate;
+}
+
+@keyframes swing1 {
+  from {
+    transform: rotate(25deg);
+  }
+  to {
+    transform: rotate(-25deg);
+  }
+}
+
+@keyframes swing2 {
+  from {
+    transform: rotate(25deg);
+  }
+  to {
+    transform: rotate(-25deg);
+  }
+}
+
+.svg-paused .pend {
+  animation-play-state: paused;
+}
