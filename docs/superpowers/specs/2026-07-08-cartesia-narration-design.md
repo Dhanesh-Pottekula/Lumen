@@ -11,6 +11,23 @@ real narration audio once via Cartesia (through the existing `aira-api` adapter)
 per-word timestamps, and use them to (a) play real audio and (b) drive scene/caption timing
 precisely. First film: photosynthesis.
 
+## Amendment (2026-07-08): generation moved into the canvas app
+
+Per user request ("keep this in the canvas app itself"), generation is now self-contained in
+aira_canvas using the Cartesia JS SDK, instead of a Python script in aira-api. The consumption
+side is unchanged (composer timings mode, player audio mode, `timings.json` shape, the WAV in
+`public/`). Concretely:
+
+- `scripts/generate-narration.ts` — `npm run generate-narration`, reads `CARTESIA_API_KEY`, calls
+  `client.tts.generateSSE({ ..., add_timestamps: true })`, collects `chunk` (base64 PCM) +
+  `timestamps` (word arrays), wraps a WAV, aligns, and writes the two artifacts.
+- `src/narration/align.ts` — the pure aligner / scene-timing / WAV helpers (unit-tested), ported
+  from the Python version.
+- The aira-api Python generator is superseded and removed.
+
+The sections below describe the original (aira-api) plan; the mechanism (one SSE upload → audio +
+word timestamps → align → artifacts) is identical.
+
 ## Decisions made during brainstorming
 
 - **Generation reuses aira-api's tested Cartesia code**, run as a one-off build-time Python
