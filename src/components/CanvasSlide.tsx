@@ -2,8 +2,12 @@
  * Generic canvas slide player — renders any CanvasSlideDefinition into a real <canvas>.
  *
  * The player owns the clock (play/pause/seek); the slide owns only its pure render(t).
- * In production the clock would be the narration audio's currentTime — the slider here
- * stands in for it, and captions switch on the same timeline.
+ * Two clock sources:
+ *  - Audio mode: when `audioSrc` is given and the file loads, the narration <audio> element's
+ *    currentTime IS the clock. Timings were derived from this exact audio, so visuals and voice
+ *    are synced by construction — no speech gating needed.
+ *  - Fallback: no audioSrc (or the file failed) → wall-clock rAF + browser speechSynthesis, with
+ *    the film held at each caption boundary until the utterance finishes.
  */
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
@@ -15,17 +19,29 @@ interface CanvasSlideProps {
   title: ReactNode;
   tag: ReactNode;
   notes?: string[];
+  /** Optional narration audio URL. When it loads, it becomes the master clock. */
+  audioSrc?: string;
 }
 // slide is the canvas slide code that we show, title is the heading, tag is the subheading, notes are optional bullet points
-export function CanvasSlide({ slide, title, tag, notes }: CanvasSlideProps) {
+export function CanvasSlide({ slide, title, tag, notes, audioSrc }: CanvasSlideProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const clockRef = useRef({ raf: 0, wallStart: 0, tStart: 0 }); // to track the animation frame, timing of the browser and the current time of the slide 
+  const audioRef = useRef<HTMLAudioElement>(null);
+  const clockRef = useRef({ raf: 0, wallStart: 0, tStart: 0 }); // to track the animation frame, timing of the browser and the current time of the slide
   const scrubbing = useRef(false);// to know if the user is dragging the timeline slider to change the time of video or not
   const [t, setT] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(false);
+  const [audioReady, setAudioReady] = useState(false);
+  const audioReadyRef = useRef(false);
   const endedNaturally = useRef(false);
   const holdSince = useRef(0); // wall time when a speech-gate hold began (0 = not holding)
+
+  const hasAudio = !!audioSrc;
+  /** The narration <audio> element when it's loaded and usable as the clock, else null. */
+  const audioClock = useCallback(
+    (): HTMLAudioElement | null => (hasAudio && audioReadyRef.current ? audioRef.current : null),
+    [hasAudio],
+  );
 
   /** Paint the frame for time `seconds` — HiDPI-aware, scaled to the slide's view space. */
   const draw = useCallback(
@@ -63,11 +79,30 @@ export function CanvasSlide({ slide, title, tag, notes }: CanvasSlideProps) {
     holdSince.current = 0;
     setPlaying(false);
     cancelAnimationFrame(clockRef.current.raf);
-  }, []);
+    audioClock()?.pause();
+  }, [audioClock]);
 
   const tick = useCallback(
     (now: number) => {
       const clock = clockRef.current;
+      const audio = audioClock();
+
+      // Audio mode: the <audio> element is the clock; no speech gating (synced by construction).
+      if (audio) {
+        let next = audio.currentTime;
+        if (audio.ended || next >= slide.duration) {
+          next = slide.duration;
+          endedNaturally.current = true;
+          setPlaying(false);
+        } else {
+          clock.raf = requestAnimationFrame(tick);
+        }
+        draw(next);
+        if (!scrubbing.current) setT(next);
+        return;
+      }
+
+      // Fallback: wall-clock + speech gating.
       let next = clock.tStart + (now - clock.wallStart) / 1000;
 
       // Speech-gated sync: the clock re-anchors at every caption boundary, so
@@ -105,7 +140,7 @@ export function CanvasSlide({ slide, title, tag, notes }: CanvasSlideProps) {
       draw(next);
       if (!scrubbing.current) setT(next);
     },
-    [slide.duration, slide.captions, draw],
+    [slide.duration, slide.captions, draw, audioClock],
   );
 
   const play = useCallback(() => {
@@ -114,9 +149,15 @@ export function CanvasSlide({ slide, title, tag, notes }: CanvasSlideProps) {
     const startAt = t >= slide.duration ? 0 : t;
     setT(startAt);
     setPlaying(true);
+    const audio = audioClock();
+    if (audio) {
+      audio.currentTime = startAt;
+      audio.muted = muted;
+      void audio.play();
+    }
     clockRef.current = { raf: 0, wallStart: performance.now(), tStart: startAt };
     clockRef.current.raf = requestAnimationFrame(tick);
-  }, [t, slide.duration, tick]);
+  }, [t, slide.duration, tick, audioClock, muted]);
 
   const seek = useCallback(
     (value: number) => {
@@ -124,15 +165,24 @@ export function CanvasSlide({ slide, title, tag, notes }: CanvasSlideProps) {
       holdSince.current = 0;
       setT(value); // update the state with the new time to show in ui
       clockRef.current = { ...clockRef.current, wallStart: performance.now(), tStart: value }; // update the clockRef with the new time and wallStart
-      draw(value); // draw immediately, even if paused 
+      const audio = audioClock();
+      if (audio) audio.currentTime = value;
+      draw(value); // draw immediately, even if paused
     },
-    [draw],
+    [draw, audioClock],
   );
 
   useEffect(() => () => cancelAnimationFrame(clockRef.current.raf), []);
+  // keep the audio element's mute in sync with the toggle
+  useEffect(() => {
+    if (audioRef.current) audioRef.current.muted = muted;
+  }, [muted]);
 
   const caption = slide.captions?.reduce((acc, c) => (c.at <= t ? c.text : acc), slide.captions[0]?.text ?? "");
-  const speechSupported = useSpeechNarration(caption, playing && !muted, endedNaturally);
+  // Speech synthesis only when the audio clock isn't driving playback.
+  const speechSupported = useSpeechNarration(caption, playing && !muted && !audioReady, endedNaturally);
+  const showVoiceToggle = hasAudio || speechSupported;
+  const narratorLabel = audioReady ? "AiRA · NARRATION" : "AiRA · NARRATION (simulated)";
 
   return (
     <section className="card">
@@ -143,9 +193,25 @@ export function CanvasSlide({ slide, title, tag, notes }: CanvasSlideProps) {
         <canvas ref={canvasRef} style={{ aspectRatio: `${slide.viewW} / ${slide.viewH}` }} />
       </div>
 
+      {hasAudio && (
+        <audio
+          ref={audioRef}
+          src={audioSrc}
+          preload="auto"
+          onCanPlayThrough={() => {
+            audioReadyRef.current = true;
+            setAudioReady(true);
+          }}
+          onError={() => {
+            audioReadyRef.current = false;
+            setAudioReady(false);
+          }}
+        />
+      )}
+
       <div className="player">
         <button onClick={playing ? pause : play}>{playing ? "Pause" : "Play"}</button>
-        {speechSupported && (
+        {showVoiceToggle && (
           <button
             className={muted ? "voice is-muted" : "voice"}
             aria-pressed={!muted}
@@ -175,7 +241,7 @@ export function CanvasSlide({ slide, title, tag, notes }: CanvasSlideProps) {
 
       {caption !== undefined && (
         <div className="caption">
-          <span className="who">AiRA · NARRATION (simulated)</span>
+          <span className="who">{narratorLabel}</span>
           {caption}
         </div>
       )}
