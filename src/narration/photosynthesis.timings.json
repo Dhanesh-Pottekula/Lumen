@@ -1,0 +1,200 @@
+{
+  "film": "photosynthesis",
+  "audio": "/narration/photosynthesis.wav",
+  "duration": 144,
+  "generated": false,
+  "scenes": [
+    {
+      "index": 0,
+      "start": 0,
+      "end": 18
+    },
+    {
+      "index": 1,
+      "start": 18,
+      "end": 38
+    },
+    {
+      "index": 2,
+      "start": 38,
+      "end": 60
+    },
+    {
+      "index": 3,
+      "start": 60,
+      "end": 86
+    },
+    {
+      "index": 4,
+      "start": 86,
+      "end": 112
+    },
+    {
+      "index": 5,
+      "start": 112,
+      "end": 130
+    },
+    {
+      "index": 6,
+      "start": 130,
+      "end": 144
+    }
+  ],
+  "captions": [
+    {
+      "scene": 0,
+      "at": 0,
+      "text": "every green leaf is a tiny solar-powered factory. it turns light, air, and water into food."
+    },
+    {
+      "scene": 0,
+      "at": 5,
+      "text": "sunlight pours in from above, and carbon dioxide drifts in from the air through tiny pores in the leaf."
+    },
+    {
+      "scene": 0,
+      "at": 10,
+      "text": "water climbs up from the roots. light, carbon dioxide, and water — those are the three raw ingredients."
+    },
+    {
+      "scene": 0,
+      "at": 14,
+      "text": "and the leaf hands back oxygen, the air we breathe. now let's go inside and watch it happen."
+    },
+    {
+      "scene": 1,
+      "at": 18,
+      "text": "slice a leaf open and you find layers of cells stacked like bricks, all packed with green."
+    },
+    {
+      "scene": 1,
+      "at": 23,
+      "text": "let's zoom into one of these mesophyll cells — the leaf's main food-making workers."
+    },
+    {
+      "scene": 1,
+      "at": 28,
+      "text": "it has a tough wall, a thin membrane, a nucleus, and a big watery vacuole in the middle."
+    },
+    {
+      "scene": 1,
+      "at": 33,
+      "text": "and scattered around the edge: dozens of little green ovals called chloroplasts. that's where the magic happens."
+    },
+    {
+      "scene": 2,
+      "at": 38,
+      "text": "here's a single chloroplast, blown up huge. it has a double outer membrane like a sealed pouch."
+    },
+    {
+      "scene": 2,
+      "at": 43,
+      "text": "inside floats a thick fluid called the stroma — that's where sugar gets built."
+    },
+    {
+      "scene": 2,
+      "at": 48,
+      "text": "suspended in it are stacks of green discs. each disc is a thylakoid; a stack of them is a granum."
+    },
+    {
+      "scene": 2,
+      "at": 53,
+      "text": "thin tubes called lamellae connect the stacks. the green discs are packed with chlorophyll, the pigment that catches light."
+    },
+    {
+      "scene": 2,
+      "at": 57,
+      "text": "two homes for two jobs: the discs catch light, the fluid builds sugar. let's watch each one."
+    },
+    {
+      "scene": 3,
+      "at": 60,
+      "text": "first, the light reactions, right on the thylakoid membrane. these green machines are embedded in it."
+    },
+    {
+      "scene": 3,
+      "at": 65,
+      "text": "sunlight strikes photosystem two and energizes electrons. to replace them, it splits water apart."
+    },
+    {
+      "scene": 3,
+      "at": 70,
+      "text": "splitting water releases oxygen — the gas we breathe out — plus hydrogen ions and those electrons."
+    },
+    {
+      "scene": 3,
+      "at": 74,
+      "text": "the excited electrons hop down a chain of carriers, and their energy pumps hydrogen ions into the inner space."
+    },
+    {
+      "scene": 3,
+      "at": 79,
+      "text": "photosystem one re-energizes them with more light to build NADPH, an energy carrier."
+    },
+    {
+      "scene": 3,
+      "at": 82,
+      "text": "and the crowded hydrogen ions rush back out through ATP synthase, spinning it to make ATP. two fuels, ready."
+    },
+    {
+      "scene": 4,
+      "at": 86,
+      "text": "now the second half — the calvin cycle, running in the stroma. it doesn't need light directly."
+    },
+    {
+      "scene": 4,
+      "at": 91,
+      "text": "it spends the ATP and NADPH the light reactions just made."
+    },
+    {
+      "scene": 4,
+      "at": 96,
+      "text": "step one: an enzyme called rubisco grabs carbon dioxide from the air and sticks it onto a sugar, RuBP."
+    },
+    {
+      "scene": 4,
+      "at": 101,
+      "text": "step two: using ATP and NADPH, that's converted into G3P — the first real sugar."
+    },
+    {
+      "scene": 4,
+      "at": 105,
+      "text": "step three: most G3P is recycled to rebuild RuBP, so the cycle can turn again."
+    },
+    {
+      "scene": 4,
+      "at": 109,
+      "text": "the rest leaves as G3P and joins up into glucose. that's the food the whole plant runs on."
+    },
+    {
+      "scene": 5,
+      "at": 112,
+      "text": "so here's the whole thing in one line."
+    },
+    {
+      "scene": 5,
+      "at": 115,
+      "text": "six carbon dioxide, plus six water, plus the energy of light..."
+    },
+    {
+      "scene": 5,
+      "at": 121,
+      "text": "...become one glucose molecule, and six oxygen released to the air."
+    },
+    {
+      "scene": 5,
+      "at": 125,
+      "text": "light and simple raw materials in; food and breathable air out. that's photosynthesis."
+    },
+    {
+      "scene": 6,
+      "at": 131,
+      "text": "so that's the whole journey: sunlight to leaf, to cell, to chloroplast, through two reaction stages, into sugar."
+    },
+    {
+      "scene": 6,
+      "at": 138,
+      "text": "photosynthesis — how the whole living world runs on light."
+    }
+  ]
+}
