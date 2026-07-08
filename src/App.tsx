@@ -6,6 +6,13 @@ import { coimbatoreGeographySlide } from "./slides/coimbatoreGeography";
 import { coimbatoreMachinesSlide } from "./slides/coimbatoreMachines";
 import { coimbatoreMillsSlide } from "./slides/coimbatoreMills";
 import { coimbatoreRomanTradeSlide } from "./slides/coimbatoreRomanTrade";
+import { photoCalvinCycleSlide } from "./slides/photoCalvinCycle";
+import { photoChloroplastSlide } from "./slides/photoChloroplast";
+import { photoEquationSlide } from "./slides/photoEquation";
+import { photoFinaleSlide } from "./slides/photoFinale";
+import { photoIntroSlide } from "./slides/photoIntro";
+import { photoLeafCellSlide } from "./slides/photoLeafCell";
+import { photoLightReactionsSlide } from "./slides/photoLightReactions";
 
 const coimbatoreLesson = composeSlides([
   coimbatoreGeographySlide,
@@ -14,6 +21,16 @@ const coimbatoreLesson = composeSlides([
   coimbatoreMillsSlide,
   coimbatoreMachinesSlide,
   coimbatoreFinaleSlide,
+]);
+
+const photosynthesisLesson = composeSlides([
+  photoIntroSlide,
+  photoLeafCellSlide,
+  photoChloroplastSlide,
+  photoLightReactionsSlide,
+  photoCalvinCycleSlide,
+  photoEquationSlide,
+  photoFinaleSlide,
 ]);
 
 export default function App() {
@@ -39,6 +56,29 @@ export default function App() {
           "Scenes crossfade over 2.5 s at each boundary.",
           "Captions hand off to the incoming scene during each crossfade.",
           "Progress dots: amber = playing, teal = finished, gray = upcoming.",
+        ]}
+      />
+
+      <h1 style={{ marginTop: 56 }}>Photosynthesis — a cellular deep dive</h1>
+      <p className="sub">
+        Seven scenes composed the same way, zooming one level deeper each time: the whole leaf, into a
+        cell, into a chloroplast, the light-dependent reactions, the Calvin cycle, the summary equation,
+        and a recap. Turn the voice on and press play.
+      </p>
+
+      <CanvasSlide
+        slide={photosynthesisLesson}
+        title={<>★ How a leaf makes food — seven scenes, one timeline</>}
+        tag={
+          <>
+            <b className="good">The science film.</b> Sunlight, air, and water become sugar — followed
+            from the whole plant all the way down to the thylakoid membrane and back.
+          </>
+        }
+        notes={[
+          "Leaf → cell → chloroplast → light reactions → Calvin cycle → equation → recap.",
+          "The film holds at each caption until the narration finishes the sentence.",
+          "Seven progress dots: amber = playing, teal = finished, gray = upcoming.",
         ]}
       />
     </main>
