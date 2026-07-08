@@ -18,6 +18,8 @@ playable film with transitions between scenes.
   functions (the film's authored gold→coin / thread / wheel-morph bridges are retired).
 - **The film is rebuilt from its chapters** — `coimbatoreStory.ts` is deleted and replaced by
   a composition of the six standalone scenes.
+- **The app shows only the combined lesson** — the standalone chapter cards and the
+  pendulum/crowd prototype slides are removed from the app (prototype slide files deleted).
 - **Pure composer function, not a React component** — the existing `<CanvasSlide>` player is
   unchanged and plays the composed result.
 - **No speed scaling** — the previous `SPEED = 2.5` global-tempo hack is removed entirely.
@@ -102,12 +104,16 @@ composeSlides([
 
 ### 5. Migration
 
-- [App.tsx](../../../src/App.tsx): replace the `coimbatoreStorySlide` import with the
-  composition above; update the film card's title/tag/notes (current notes describe bridge
-  moments that no longer exist — replace with crossfade-boundary descriptions and the new
-  ~141 s duration).
-- Delete `src/slides/coimbatoreStory.ts`.
-- The five chapter slides and their standalone cards in App.tsx are untouched.
+The app shows **only the combined Coimbatore lesson** — a single `<CanvasSlide>` card.
+
+- [App.tsx](../../../src/App.tsx): render exactly one card, the composed film; update its
+  title/tag/notes (current notes describe bridge moments that no longer exist — replace
+  with crossfade-boundary descriptions and the new ~141 s duration). Remove the five
+  standalone chapter cards, the "earlier prototypes" section, and their heading/sub text.
+- Delete `src/slides/coimbatoreStory.ts` (replaced by the composition).
+- Delete `src/slides/pendulumSlide.ts` and `src/slides/crowdSlide.ts` (no longer rendered).
+- The five chapter slide files remain — they are the scene sources for the composition —
+  but are no longer imported anywhere except the composed film.
 
 ### 6. Testing
 
