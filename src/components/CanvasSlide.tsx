@@ -15,11 +15,11 @@ interface CanvasSlideProps {
   tag: ReactNode;
   notes?: string[];
 }
-
+// slide is the canvas slide code that we show, title is the heading, tag is the subheading, notes are optional bullet points
 export function CanvasSlide({ slide, title, tag, notes }: CanvasSlideProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const clockRef = useRef({ raf: 0, wallStart: 0, tStart: 0 });
-  const scrubbing = useRef(false);
+  const clockRef = useRef({ raf: 0, wallStart: 0, tStart: 0 }); // to track the animation frame, timing of the browser and the current time of the slide 
+  const scrubbing = useRef(false);// to know if the user is dragging the timeline slider to change the time of video or not
   const [t, setT] = useState(0);
   const [playing, setPlaying] = useState(false);
 
@@ -31,7 +31,7 @@ export function CanvasSlide({ slide, title, tag, notes }: CanvasSlideProps) {
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
 
-      const dpr = window.devicePixelRatio || 1;
+      const dpr = window.devicePixelRatio || 1; // css pixel to real physical pixel ratio
       const w = canvas.clientWidth;
       const h = canvas.clientHeight;
       if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
@@ -85,9 +85,9 @@ export function CanvasSlide({ slide, title, tag, notes }: CanvasSlideProps) {
 
   const seek = useCallback(
     (value: number) => {
-      setT(value);
-      clockRef.current = { ...clockRef.current, wallStart: performance.now(), tStart: value };
-      draw(value);
+      setT(value); // update the state with the new time to show in ui
+      clockRef.current = { ...clockRef.current, wallStart: performance.now(), tStart: value }; // update the clockRef with the new time and wallStart
+      draw(value); // draw immediately, even if paused 
     },
     [draw],
   );
