@@ -13,6 +13,8 @@ import { photoFinaleSlide } from "./slides/photoFinale";
 import { photoIntroSlide } from "./slides/photoIntro";
 import { photoLeafCellSlide } from "./slides/photoLeafCell";
 import { photoLightReactionsSlide } from "./slides/photoLightReactions";
+import type { FilmTimings } from "./slides/timings";
+import photosynthesisTimings from "./narration/photosynthesis.timings.json";
 
 const coimbatoreLesson = composeSlides([
   coimbatoreGeographySlide,
@@ -23,15 +25,18 @@ const coimbatoreLesson = composeSlides([
   coimbatoreFinaleSlide,
 ]);
 
-const photosynthesisLesson = composeSlides([
-  photoIntroSlide,
-  photoLeafCellSlide,
-  photoChloroplastSlide,
-  photoLightReactionsSlide,
-  photoCalvinCycleSlide,
-  photoEquationSlide,
-  photoFinaleSlide,
-]);
+const photosynthesisLesson = composeSlides(
+  [
+    photoIntroSlide,
+    photoLeafCellSlide,
+    photoChloroplastSlide,
+    photoLightReactionsSlide,
+    photoCalvinCycleSlide,
+    photoEquationSlide,
+    photoFinaleSlide,
+  ],
+  { timings: photosynthesisTimings as FilmTimings },
+);
 
 export default function App() {
   return (
@@ -68,6 +73,7 @@ export default function App() {
 
       <CanvasSlide
         slide={photosynthesisLesson}
+        audioSrc={photosynthesisTimings.audio}
         title={<>★ How a leaf makes food — seven scenes, one timeline</>}
         tag={
           <>
