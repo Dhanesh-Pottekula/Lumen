@@ -82,3 +82,12 @@ export function fadeText(
   ctx.fillText(text, x, y);
   ctx.restore();
 }
+
+/** Run `draw` with globalAlpha scaled by `alpha` (clamped), save/restored. No-op at alpha ≤ 0. */
+export function withAlpha(ctx: CanvasRenderingContext2D, alpha: number, draw: () => void) {
+  if (alpha <= 0) return;
+  ctx.save();
+  ctx.globalAlpha *= clamp01(alpha);
+  draw();
+  ctx.restore();
+}
