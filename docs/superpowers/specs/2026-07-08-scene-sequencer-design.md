@@ -100,7 +100,8 @@ composeSlides([
   and both sizes (the composer does not rescale).
 - `crossfade` greater than half the shortest scene duration → clamp to that value and
   `console.warn` (prevents window inversion). Negative crossfade → treated as 0.
-- A single scene composes to itself plus (optional) one progress dot; crossfade is unused.
+- A single scene composes to itself unchanged; crossfade envelopes and progress dots only
+  apply when there are two or more scenes.
 
 ### 5. Migration
 
