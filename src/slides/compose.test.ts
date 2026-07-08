@@ -61,3 +61,92 @@ describe("composeSlides metadata", () => {
     expect(composeSlides([scene(5), scene(5)]).captions).toBeUndefined();
   });
 });
+
+function recordingScene(duration: number) {
+  const calls: { localT: number; alpha: number }[] = [];
+  const def: CanvasSlideDefinition = {
+    duration,
+    viewW: 920,
+    viewH: 430,
+    render: (ctx, t) => calls.push({ localT: t, alpha: ctx.globalAlpha }),
+  };
+  return { def, calls };
+}
+
+function stubCtx() {
+  const stack: number[] = [];
+  const ctx: Record<string, unknown> = {
+    globalAlpha: 1,
+    fillStyle: "",
+    save() {
+      stack.push(ctx.globalAlpha as number);
+    },
+    restore() {
+      ctx.globalAlpha = stack.pop() ?? 1;
+    },
+    clearRect: vi.fn(),
+    beginPath: vi.fn(),
+    arc: vi.fn(),
+    fill: vi.fn(),
+  };
+  return ctx as unknown as CanvasRenderingContext2D & { arc: ReturnType<typeof vi.fn> };
+}
+
+describe("composeSlides render", () => {
+  // two 10 s scenes, 2 s crossfade → windows [0,10) and [8,18), duration 18
+  it("renders only the active scene at its local time", () => {
+    const a = recordingScene(10);
+    const b = recordingScene(10);
+    const film = composeSlides([a.def, b.def], { crossfade: 2, progressDots: false });
+
+    film.render(stubCtx(), 5);
+    expect(a.calls).toEqual([{ localT: 5, alpha: 1 }]);
+    expect(b.calls).toEqual([]);
+  });
+
+  it("renders both scenes during the crossfade with complementary alphas", () => {
+    const a = recordingScene(10);
+    const b = recordingScene(10);
+    const film = composeSlides([a.def, b.def], { crossfade: 2, progressDots: false });
+
+    film.render(stubCtx(), 9); // midpoint of the [8,10) overlap
+    expect(a.calls).toEqual([{ localT: 9, alpha: 0.5 }]);
+    expect(b.calls).toEqual([{ localT: 1, alpha: 0.5 }]);
+  });
+
+  it("hands over fully after the crossfade", () => {
+    const a = recordingScene(10);
+    const b = recordingScene(10);
+    const film = composeSlides([a.def, b.def], { crossfade: 2, progressDots: false });
+
+    film.render(stubCtx(), 14);
+    expect(a.calls).toEqual([]);
+    expect(b.calls).toEqual([{ localT: 6, alpha: 1 }]);
+  });
+
+  it("renders a single scene as passthrough (no fade, no dots)", () => {
+    const a = recordingScene(10);
+    const ctx = stubCtx();
+    const film = composeSlides([a.def]);
+
+    film.render(ctx, 0);
+    expect(a.calls).toEqual([{ localT: 0, alpha: 1 }]);
+    expect(ctx.arc).not.toHaveBeenCalled();
+  });
+
+  it("draws one progress dot per scene by default", () => {
+    const a = recordingScene(10);
+    const b = recordingScene(10);
+    const ctx = stubCtx();
+    composeSlides([a.def, b.def], { crossfade: 2 }).render(ctx, 5);
+    expect(ctx.arc).toHaveBeenCalledTimes(2);
+  });
+
+  it("draws no dots when progressDots is false", () => {
+    const a = recordingScene(10);
+    const b = recordingScene(10);
+    const ctx = stubCtx();
+    composeSlides([a.def, b.def], { crossfade: 2, progressDots: false }).render(ctx, 5);
+    expect(ctx.arc).not.toHaveBeenCalled();
+  });
+});

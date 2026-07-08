@@ -69,13 +69,31 @@ export function composeSlides(
     captions: captions.length > 0 ? captions : undefined,
     render(ctx, t) {
       ctx.clearRect(0, 0, viewW, viewH);
-      // Task 3: scene dispatch + envelopes + progress dots
-      void t;
-      void windows;
-      void crossfade;
-      void progressDots;
-      void phase;
-      void withAlpha;
+
+      if (windows.length === 1) {
+        const only = scenes[0];
+        only.render(ctx, Math.max(0, Math.min(t, only.duration)));
+        return;
+      }
+
+      for (const { scene, start, end } of windows) {
+        const fadeIn = crossfade > 0 ? phase(t, start, start + crossfade) : t >= start ? 1 : 0;
+        const fadeOut = crossfade > 0 ? 1 - phase(t, end - crossfade, end) : t < end ? 1 : 0;
+        withAlpha(ctx, fadeIn * fadeOut, () =>
+          scene.render(ctx, Math.max(0, Math.min(t - start, scene.duration))),
+        );
+      }
+
+      if (progressDots) {
+        const x0 = viewW / 2 - (windows.length - 1) * 8;
+        windows.forEach(({ start, end }, i) => {
+          const active = t >= start && t < end;
+          ctx.beginPath();
+          ctx.arc(x0 + i * 16, viewH - 8, active ? 3.4 : 2.2, 0, 7);
+          ctx.fillStyle = active ? "#e8a13c" : t >= end ? "#5cc8ae" : "#39434d";
+          ctx.fill();
+        });
+      }
     },
   };
 }
