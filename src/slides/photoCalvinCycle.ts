@@ -5,7 +5,8 @@
  * via RuBisCO), reduction (3-PGA → G3P, spending ATP + NADPH), and regeneration (RuBP
  * remade). A G3P molecule exits toward glucose; ATP/NADPH feed in. Pure renderFrame(t).
  */
-import { cycle, fadeText, phase } from "./anim";
+import { img } from "../assets/photosynthesis";
+import { cycle, drawSvg, fadeText, phase } from "./anim";
 import type { CanvasSlideDefinition } from "./types";
 
 const W = 920;
@@ -48,32 +49,36 @@ export const photoCalvinCycleSlide: CanvasSlideDefinition = {
     ctx.fillRect(0, 0, W, H);
     fadeText(ctx, "in the stroma", 60, 30, phase(t, 1, 2.5), "italic 12px -apple-system, sans-serif", "#a8d0b4", "start");
 
-    // the ring
+    // the ring — SVG backdrop (slowly rotating), with a primitive fallback
     const ringIn = phase(t, 0.5, 3);
-    ctx.save();
-    ctx.globalAlpha = ringIn;
-    ctx.strokeStyle = "#4aa062";
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.arc(CX, CY, R, 0, 7);
-    ctx.stroke();
-    // rotating arrows on the ring
-    for (let i = 0; i < 3; i++) {
-      const a = t * 0.5 + (i / 3) * Math.PI * 2;
-      const p = pt(a);
+    const ringImg = img("calvinRing");
+    if (ringImg) {
+      drawSvg(ctx, ringImg, CX, CY, R * 2 + 64, R * 2 + 64, { alpha: ringIn, rotate: t * 0.12 });
+    } else {
       ctx.save();
-      ctx.translate(p.x, p.y);
-      ctx.rotate(a + Math.PI / 2);
-      ctx.fillStyle = "#6dd07a";
+      ctx.globalAlpha = ringIn;
+      ctx.strokeStyle = "#4aa062";
+      ctx.lineWidth = 4;
       ctx.beginPath();
-      ctx.moveTo(0, -7);
-      ctx.lineTo(6, 4);
-      ctx.lineTo(-6, 4);
-      ctx.closePath();
-      ctx.fill();
+      ctx.arc(CX, CY, R, 0, 7);
+      ctx.stroke();
+      for (let i = 0; i < 3; i++) {
+        const a = t * 0.5 + (i / 3) * Math.PI * 2;
+        const p = pt(a);
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(a + Math.PI / 2);
+        ctx.fillStyle = "#6dd07a";
+        ctx.beginPath();
+        ctx.moveTo(0, -7);
+        ctx.lineTo(6, 4);
+        ctx.lineTo(-6, 4);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
       ctx.restore();
     }
-    ctx.restore();
 
     // stage nodes appear in sequence
     STAGES.forEach((s, i) => {
@@ -100,17 +105,23 @@ export const photoCalvinCycleSlide: CanvasSlideDefinition = {
     if (co2In > 0) {
       const c = cycle(t * 0.5);
       const p1 = pt(STAGES[0].ang);
-      ctx.save();
-      ctx.globalAlpha = co2In * (1 - phase(t, 22, 24));
-      ctx.fillStyle = "#8a94a0";
+      const a = co2In * (1 - phase(t, 22, 24));
       const sx = p1.x;
       const sy = 20 + c * (p1.y - 34);
-      for (const dx of [-6, 0, 6]) {
-        ctx.beginPath();
-        ctx.arc(sx + dx, sy, 4, 0, 7);
-        ctx.fill();
+      const co2Img = img("co2");
+      if (co2Img) {
+        drawSvg(ctx, co2Img, sx, sy, 40, 22, { alpha: a });
+      } else {
+        ctx.save();
+        ctx.globalAlpha = a;
+        ctx.fillStyle = "#8a94a0";
+        for (const dx of [-6, 0, 6]) {
+          ctx.beginPath();
+          ctx.arc(sx + dx, sy, 4, 0, 7);
+          ctx.fill();
+        }
+        ctx.restore();
       }
-      ctx.restore();
       fadeText(ctx, "CO₂", p1.x, 16, co2In, "600 12px -apple-system, sans-serif", "#aab2bc");
     }
 
@@ -118,18 +129,9 @@ export const photoCalvinCycleSlide: CanvasSlideDefinition = {
     const fuelIn = phase(t, 15, 17);
     if (fuelIn > 0) {
       const p2 = pt(STAGES[1].ang);
+      const fuelAlpha = fuelIn * (1 - phase(t, 22, 24));
       ctx.save();
-      ctx.globalAlpha = fuelIn * (1 - phase(t, 22, 24));
-      // ATP token
-      ctx.fillStyle = "#e8c14a";
-      ctx.beginPath();
-      ctx.roundRect(CX - 20, CY + 150, 44, 20, 5);
-      ctx.fill();
-      ctx.fillStyle = "#6db0e8";
-      ctx.beginPath();
-      ctx.roundRect(CX + 30, CY + 150, 60, 20, 5);
-      ctx.fill();
-      // arrows toward stage 2 node
+      ctx.globalAlpha = fuelAlpha;
       ctx.strokeStyle = "rgba(240,216,120,0.6)";
       ctx.lineWidth = 2;
       ctx.beginPath();
@@ -137,8 +139,26 @@ export const photoCalvinCycleSlide: CanvasSlideDefinition = {
       ctx.lineTo(p2.x, p2.y + 12);
       ctx.stroke();
       ctx.restore();
-      fadeText(ctx, "ATP", CX + 2, CY + 164, fuelIn, "600 11px -apple-system, sans-serif", "#412402");
-      fadeText(ctx, "NADPH", CX + 60, CY + 164, fuelIn, "600 11px -apple-system, sans-serif", "#0c447c");
+      const atpImg = img("atp");
+      const nadphImg = img("nadph");
+      if (atpImg && nadphImg) {
+        drawSvg(ctx, atpImg, CX + 2, CY + 160, 50, 24, { alpha: fuelAlpha });
+        drawSvg(ctx, nadphImg, CX + 62, CY + 160, 66, 24, { alpha: fuelAlpha });
+      } else {
+        ctx.save();
+        ctx.globalAlpha = fuelAlpha;
+        ctx.fillStyle = "#e8c14a";
+        ctx.beginPath();
+        ctx.roundRect(CX - 20, CY + 150, 44, 20, 5);
+        ctx.fill();
+        ctx.fillStyle = "#6db0e8";
+        ctx.beginPath();
+        ctx.roundRect(CX + 30, CY + 150, 60, 20, 5);
+        ctx.fill();
+        ctx.restore();
+        fadeText(ctx, "ATP", CX + 2, CY + 164, fuelIn, "600 11px -apple-system, sans-serif", "#412402");
+        fadeText(ctx, "NADPH", CX + 60, CY + 164, fuelIn, "600 11px -apple-system, sans-serif", "#0c447c");
+      }
     }
 
     // G3P exiting toward glucose (from stage 2 outward to the right)
@@ -154,24 +174,29 @@ export const photoCalvinCycleSlide: CanvasSlideDefinition = {
       ctx.arc(ex, p2.y + 20 + c * 40, 5, 0, 7);
       ctx.fill();
       ctx.restore();
-      // glucose hexagon target
-      ctx.save();
-      ctx.globalAlpha = exitIn;
-      ctx.strokeStyle = "#f0d878";
-      ctx.fillStyle = "rgba(240,216,120,0.15)";
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      for (let i = 0; i < 6; i++) {
-        const a = (i / 6) * Math.PI * 2 - Math.PI / 2;
-        const hx = W - 90 + Math.cos(a) * 26;
-        const hy = CY + 70 + Math.sin(a) * 26;
-        if (i === 0) ctx.moveTo(hx, hy);
-        else ctx.lineTo(hx, hy);
+      // glucose target — SVG hexagon with a primitive fallback
+      const glucoseImg = img("glucose");
+      if (glucoseImg) {
+        drawSvg(ctx, glucoseImg, W - 90, CY + 70, 64, 64, { alpha: exitIn });
+      } else {
+        ctx.save();
+        ctx.globalAlpha = exitIn;
+        ctx.strokeStyle = "#f0d878";
+        ctx.fillStyle = "rgba(240,216,120,0.15)";
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+          const a = (i / 6) * Math.PI * 2 - Math.PI / 2;
+          const hx = W - 90 + Math.cos(a) * 26;
+          const hy = CY + 70 + Math.sin(a) * 26;
+          if (i === 0) ctx.moveTo(hx, hy);
+          else ctx.lineTo(hx, hy);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
       }
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-      ctx.restore();
       fadeText(ctx, "glucose", W - 90, CY + 116, exitIn, "600 13px -apple-system, sans-serif", "#f0d878");
       fadeText(ctx, "G3P", (p2.x + W - 90) / 2, p2.y + 70, exitIn, "11px -apple-system, sans-serif", "#f0d878");
     }

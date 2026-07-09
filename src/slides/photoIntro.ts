@@ -5,7 +5,8 @@
  * water climbs from the roots. Establishes the three inputs and one output before any zoom.
  * Pure renderFrame(t).
  */
-import { clamp01, cycle, fadeText, lerp, phase, prng } from "./anim";
+import { img } from "../assets/photosynthesis";
+import { clamp01, cycle, drawSvg, fadeText, lerp, phase, prng } from "./anim";
 import type { CanvasSlideDefinition } from "./types";
 
 const W = 920;
@@ -88,27 +89,32 @@ export const photoIntroSlide: CanvasSlideDefinition = {
 
     // sun with rotating rays
     const sunIn = phase(t, 0.3, 2);
-    ctx.save();
-    ctx.globalAlpha = sunIn;
-    for (let i = 0; i < 12; i++) {
-      const a = (i / 12) * Math.PI * 2 + t * 0.25;
-      const r1 = SUN.r + 8;
-      const r2 = SUN.r + 22 + 6 * Math.sin(t * 2 + i);
-      ctx.strokeStyle = "#e8c14a";
-      ctx.lineWidth = 3;
+    const sunImg = img("sun");
+    if (sunImg) {
+      drawSvg(ctx, sunImg, SUN.x, SUN.y, 168, 168, { alpha: sunIn, rotate: t * 0.18 });
+    } else {
+      ctx.save();
+      ctx.globalAlpha = sunIn;
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2 + t * 0.25;
+        const r1 = SUN.r + 8;
+        const r2 = SUN.r + 22 + 6 * Math.sin(t * 2 + i);
+        ctx.strokeStyle = "#e8c14a";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(SUN.x + Math.cos(a) * r1, SUN.y + Math.sin(a) * r1);
+        ctx.lineTo(SUN.x + Math.cos(a) * r2, SUN.y + Math.sin(a) * r2);
+        ctx.stroke();
+      }
+      const sg = ctx.createRadialGradient(SUN.x, SUN.y, 4, SUN.x, SUN.y, SUN.r);
+      sg.addColorStop(0, "#f6e08a");
+      sg.addColorStop(1, "#e8c14a");
+      ctx.fillStyle = sg;
       ctx.beginPath();
-      ctx.moveTo(SUN.x + Math.cos(a) * r1, SUN.y + Math.sin(a) * r1);
-      ctx.lineTo(SUN.x + Math.cos(a) * r2, SUN.y + Math.sin(a) * r2);
-      ctx.stroke();
+      ctx.arc(SUN.x, SUN.y, SUN.r, 0, 7);
+      ctx.fill();
+      ctx.restore();
     }
-    const sg = ctx.createRadialGradient(SUN.x, SUN.y, 4, SUN.x, SUN.y, SUN.r);
-    sg.addColorStop(0, "#f6e08a");
-    sg.addColorStop(1, "#e8c14a");
-    ctx.fillStyle = sg;
-    ctx.beginPath();
-    ctx.arc(SUN.x, SUN.y, SUN.r, 0, 7);
-    ctx.fill();
-    ctx.restore();
 
     // light beams from sun to leaf
     const beamIn = phase(t, 2, 4);
@@ -148,23 +154,32 @@ export const photoIntroSlide: CanvasSlideDefinition = {
     }
     ctx.restore();
 
-    drawLeaf(ctx, phase(t, 1.5, 3.5));
+    const leafIn = phase(t, 1.5, 3.5);
+    const leafImg = img("leaf");
+    if (leafImg) drawSvg(ctx, leafImg, LEAF.x, LEAF.y, 320, 200, { alpha: leafIn });
+    else drawLeaf(ctx, leafIn);
 
     // CO2 in (from the right, gray) — appears with caption 2
     const co2In = phase(t, 5, 7);
     if (co2In > 0) {
+      const co2Img = img("co2");
       for (const p of CO2) {
         const c = cycle(t * p.s + p.off);
         const x = lerp(W - 30, LEAF.x + LEAF.rx - 30, c);
-        ctx.save();
-        ctx.globalAlpha = co2In * (0.35 + 0.5 * Math.sin(c * Math.PI));
-        ctx.fillStyle = "#8a94a0";
-        ctx.beginPath();
-        ctx.arc(x, p.y, 4, 0, 7);
-        ctx.arc(x + 7, p.y, 4, 0, 7);
-        ctx.arc(x - 7, p.y, 4, 0, 7);
-        ctx.fill();
-        ctx.restore();
+        const a = co2In * (0.35 + 0.5 * Math.sin(c * Math.PI));
+        if (co2Img) {
+          drawSvg(ctx, co2Img, x, p.y, 42, 24, { alpha: a });
+        } else {
+          ctx.save();
+          ctx.globalAlpha = a;
+          ctx.fillStyle = "#8a94a0";
+          ctx.beginPath();
+          ctx.arc(x, p.y, 4, 0, 7);
+          ctx.arc(x + 7, p.y, 4, 0, 7);
+          ctx.arc(x - 7, p.y, 4, 0, 7);
+          ctx.fill();
+          ctx.restore();
+        }
       }
       fadeText(ctx, "CO₂ in", W - 74, 140, co2In, "600 13px -apple-system, sans-serif", "#aab2bc");
     }
@@ -172,16 +187,23 @@ export const photoIntroSlide: CanvasSlideDefinition = {
     // water up (blue, along stem) — appears with caption 3
     const waterIn = phase(t, 10, 12);
     if (waterIn > 0) {
+      const dropImg = img("waterDrop");
       for (const p of WATER) {
         const c = cycle(t * p.s + p.off);
         const y = lerp(SOIL_Y - 4, LEAF.y + 42, c);
-        ctx.save();
-        ctx.globalAlpha = waterIn * (0.4 + 0.5 * Math.sin(c * Math.PI));
-        ctx.fillStyle = "#4a90d8";
-        ctx.beginPath();
-        ctx.arc(STEM_X + (p.off - 0.5) * 6, y, 3.4, 0, 7);
-        ctx.fill();
-        ctx.restore();
+        const a = waterIn * (0.4 + 0.5 * Math.sin(c * Math.PI));
+        const x = STEM_X + (p.off - 0.5) * 6;
+        if (dropImg) {
+          drawSvg(ctx, dropImg, x, y, 12, 16, { alpha: a });
+        } else {
+          ctx.save();
+          ctx.globalAlpha = a;
+          ctx.fillStyle = "#4a90d8";
+          ctx.beginPath();
+          ctx.arc(x, y, 3.4, 0, 7);
+          ctx.fill();
+          ctx.restore();
+        }
       }
       fadeText(ctx, "H₂O up", STEM_X + 46, SOIL_Y - 40, waterIn, "600 13px -apple-system, sans-serif", "#7fb0e8");
     }
@@ -189,18 +211,24 @@ export const photoIntroSlide: CanvasSlideDefinition = {
     // O2 out (cyan, up-left) — appears with caption 4
     const o2In = phase(t, 14, 15.5);
     if (o2In > 0) {
+      const o2Img = img("o2");
       for (const p of O2) {
         const c = cycle(t * p.s + p.off);
         const y = lerp(LEAF.y - 20, 60, c);
         const x = p.x - c * 40;
-        ctx.save();
-        ctx.globalAlpha = o2In * (0.4 + 0.5 * Math.sin(c * Math.PI));
-        ctx.strokeStyle = "#7fe0d8";
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(x, y, 5, 0, 7);
-        ctx.stroke();
-        ctx.restore();
+        const a = o2In * (0.4 + 0.5 * Math.sin(c * Math.PI));
+        if (o2Img) {
+          drawSvg(ctx, o2Img, x, y, 34, 22, { alpha: a });
+        } else {
+          ctx.save();
+          ctx.globalAlpha = a;
+          ctx.strokeStyle = "#7fe0d8";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.arc(x, y, 5, 0, 7);
+          ctx.stroke();
+          ctx.restore();
+        }
       }
       fadeText(ctx, "O₂ out", 360, 48, o2In, "600 13px -apple-system, sans-serif", "#8fe8e0");
     }

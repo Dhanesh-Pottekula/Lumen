@@ -15,6 +15,7 @@ import { photoLeafCellSlide } from "./slides/photoLeafCell";
 import { photoLightReactionsSlide } from "./slides/photoLightReactions";
 import type { FilmTimings } from "./slides/timings";
 import photosynthesisTimings from "./narration/photosynthesis.timings.json";
+import { PHOTO_ASSET_URLS } from "./assets/photosynthesis";
 
 const coimbatoreLesson = composeSlides([
   coimbatoreGeographySlide,
@@ -74,6 +75,7 @@ export default function App() {
       <CanvasSlide
         slide={photosynthesisLesson}
         audioSrc={photosynthesisTimings.audio}
+        assetUrls={PHOTO_ASSET_URLS}
         title={<>★ How a leaf makes food — seven scenes, one timeline</>}
         tag={
           <>

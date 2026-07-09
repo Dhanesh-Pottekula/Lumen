@@ -5,7 +5,8 @@
  * light reactions → Calvin cycle → sugar, then the title and a one-line summary.
  * Pure renderFrame(t).
  */
-import { fadeText, phase } from "./anim";
+import { img } from "../assets/photosynthesis";
+import { drawSvg, fadeText, phase } from "./anim";
 import type { CanvasSlideDefinition } from "./types";
 
 const W = 920;
@@ -45,6 +46,11 @@ export const photoFinaleSlide: CanvasSlideDefinition = {
     const stations: Station[] = [
       // sun
       ["sunlight", (x) => {
+        const el = img("sun");
+        if (el) {
+          drawSvg(ctx, el, x, Y - 20, 40, 40, { rotate: t * 0.25 });
+          return;
+        }
         for (let i = 0; i < 8; i++) {
           const a = (i / 8) * Math.PI * 2 + t * 0.4;
           ctx.strokeStyle = "#e8c14a";
@@ -61,6 +67,11 @@ export const photoFinaleSlide: CanvasSlideDefinition = {
       }],
       // leaf
       ["leaf", (x) => {
+        const el = img("leaf");
+        if (el) {
+          drawSvg(ctx, el, x, Y - 20, 42, 26);
+          return;
+        }
         ctx.fillStyle = "#3a8a4a";
         ctx.beginPath();
         ctx.moveTo(x - 16, Y - 20);
@@ -83,6 +94,11 @@ export const photoFinaleSlide: CanvasSlideDefinition = {
       }],
       // chloroplast
       ["chloroplast", (x) => {
+        const el = img("chloroplast");
+        if (el) {
+          drawSvg(ctx, el, x, Y - 20, 40, 24);
+          return;
+        }
         ctx.fillStyle = "#3a8a4a";
         ctx.strokeStyle = "#2c6b3a";
         ctx.lineWidth = 1.5;
@@ -118,6 +134,11 @@ export const photoFinaleSlide: CanvasSlideDefinition = {
       }],
       // sugar
       ["sugar", (x) => {
+        const el = img("glucose");
+        if (el) {
+          drawSvg(ctx, el, x, Y - 20, 34, 34);
+          return;
+        }
         ctx.strokeStyle = "#f0d878";
         ctx.fillStyle = "rgba(240,216,120,0.16)";
         ctx.lineWidth = 2;

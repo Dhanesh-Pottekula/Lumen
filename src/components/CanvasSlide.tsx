@@ -11,6 +11,7 @@
  */
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
+import { preloadImages } from "../assets/imageRegistry";
 import type { CanvasSlideDefinition } from "../slides/types";
 import { useSpeechNarration } from "./useSpeechNarration";
 
@@ -21,9 +22,11 @@ interface CanvasSlideProps {
   notes?: string[];
   /** Optional narration audio URL. When it loads, it becomes the master clock. */
   audioSrc?: string;
+  /** Optional SVG asset URLs to preload; the paused frame repaints once they decode. */
+  assetUrls?: string[];
 }
 // slide is the canvas slide code that we show, title is the heading, tag is the subheading, notes are optional bullet points
-export function CanvasSlide({ slide, title, tag, notes, audioSrc }: CanvasSlideProps) {
+export function CanvasSlide({ slide, title, tag, notes, audioSrc, assetUrls }: CanvasSlideProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const clockRef = useRef({ raf: 0, wallStart: 0, tStart: 0 }); // to track the animation frame, timing of the browser and the current time of the slide
@@ -171,6 +174,18 @@ export function CanvasSlide({ slide, title, tag, notes, audioSrc }: CanvasSlideP
     },
     [draw, audioClock],
   );
+
+  // preload SVG assets, then repaint the current (paused) frame so they appear immediately
+  useEffect(() => {
+    if (!assetUrls || assetUrls.length === 0) return;
+    let cancelled = false;
+    void preloadImages(assetUrls).then(() => {
+      if (!cancelled) draw(clockRef.current.tStart);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [assetUrls, draw]);
 
   useEffect(() => () => cancelAnimationFrame(clockRef.current.raf), []);
   // keep the audio element's mute in sync with the toggle

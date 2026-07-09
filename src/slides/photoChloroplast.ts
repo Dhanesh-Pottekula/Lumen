@@ -5,7 +5,8 @@
  * stacked into grana, and lamellae connecting the stacks. Each part labelled.
  * Pure renderFrame(t).
  */
-import { fadeText, phase, prng } from "./anim";
+import { img } from "../assets/photosynthesis";
+import { drawSvg, fadeText, phase, prng } from "./anim";
 import type { CanvasSlideDefinition } from "./types";
 
 const W = 920;
@@ -41,36 +42,39 @@ export const photoChloroplastSlide: CanvasSlideDefinition = {
     ctx.fillStyle = "#14201a";
     ctx.fillRect(0, 0, W, H);
 
-    // outer + inner membrane
+    // outer + inner membrane — SVG cutaway hero, with a primitive fallback
     const bodyIn = phase(t, 0.3, 2.5);
-    ctx.save();
-    ctx.globalAlpha = bodyIn;
-    // stroma fill
-    const stroma = ctx.createRadialGradient(CX, CY, 20, CX, CY, RX);
-    stroma.addColorStop(0, "#2a5c38");
-    stroma.addColorStop(1, "#1f4a2c");
-    ctx.fillStyle = stroma;
-    ctx.strokeStyle = "#6db06a";
-    ctx.lineWidth = 7;
-    ctx.beginPath();
-    ctx.ellipse(CX, CY, RX, RY, 0, 0, 7);
-    ctx.fill();
-    ctx.stroke();
-    // inner membrane
-    ctx.strokeStyle = "#8fd08a";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.ellipse(CX, CY, RX - 8, RY - 8, 0, 0, 7);
-    ctx.stroke();
-    ctx.restore();
+    const cutaway = img("chloroplastCutaway");
+    if (cutaway) {
+      drawSvg(ctx, cutaway, CX, CY, RX * 2 + 24, RY * 2 + 24, { alpha: bodyIn });
+    } else {
+      ctx.save();
+      ctx.globalAlpha = bodyIn;
+      const stroma = ctx.createRadialGradient(CX, CY, 20, CX, CY, RX);
+      stroma.addColorStop(0, "#2a5c38");
+      stroma.addColorStop(1, "#1f4a2c");
+      ctx.fillStyle = stroma;
+      ctx.strokeStyle = "#6db06a";
+      ctx.lineWidth = 7;
+      ctx.beginPath();
+      ctx.ellipse(CX, CY, RX, RY, 0, 0, 7);
+      ctx.fill();
+      ctx.stroke();
+      ctx.strokeStyle = "#8fd08a";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.ellipse(CX, CY, RX - 8, RY - 8, 0, 0, 7);
+      ctx.stroke();
+      ctx.restore();
+    }
 
     // stroma label
     const strLab = phase(t, 5, 7);
     if (strLab > 0) fadeText(ctx, "stroma (fluid)", CX + 120, CY - 96, strLab, "italic 13px -apple-system, sans-serif", "#a8d0a8");
 
-    // grana stacks
+    // grana stacks (only when the SVG cutaway isn't providing them)
     const granaIn = phase(t, 10, 13.5);
-    if (granaIn > 0) {
+    if (granaIn > 0 && !cutaway) {
       for (const g of GRANA) {
         const gin = phase(t, 10 + g.order, 12 + g.order);
         if (gin <= 0) continue;
@@ -90,9 +94,9 @@ export const photoChloroplastSlide: CanvasSlideDefinition = {
       }
     }
 
-    // lamellae connecting stacks
+    // lamellae connecting stacks (only when the SVG cutaway isn't providing them)
     const lamIn = phase(t, 15, 17);
-    if (lamIn > 0) {
+    if (lamIn > 0 && !cutaway) {
       ctx.save();
       ctx.globalAlpha = lamIn * 0.8;
       ctx.strokeStyle = "#4aa062";

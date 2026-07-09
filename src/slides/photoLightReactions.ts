@@ -6,7 +6,8 @@
  * water splits (→ O₂ + H⁺ + e⁻), electrons hop the chain, H⁺ build in the lumen and
  * flow through ATP synthase (ATP), NADPH forms at PSI. Pure renderFrame(t).
  */
-import { cycle, fadeText, lerp, phase } from "./anim";
+import { img } from "../assets/photosynthesis";
+import { cycle, drawSvg, fadeText, lerp, phase } from "./anim";
 import type { CanvasSlideDefinition } from "./types";
 
 const W = 920;
@@ -50,24 +51,35 @@ export const photoLightReactionsSlide: CanvasSlideDefinition = {
   render(ctx, t) {
     ctx.clearRect(0, 0, W, H);
 
-    // stroma (top) and lumen (bottom) regions
-    ctx.fillStyle = "#25543a";
-    ctx.fillRect(0, 0, W, MEM_TOP);
-    ctx.fillStyle = "#153a4a";
-    ctx.fillRect(0, MEM_BOT, W, H - MEM_BOT);
-    // membrane band
-    ctx.fillStyle = "#2f6b46";
-    ctx.fillRect(0, MEM_TOP, W, MEM_BOT - MEM_TOP);
+    const cIn = phase(t, 0.5, 2.5);
+    const membrane = img("thylakoidMembrane");
+    if (membrane) {
+      // SVG hero (bands + complexes), aligned 1:1 to scene geometry
+      drawSvg(ctx, membrane, W / 2, H / 2, W, H, { alpha: cIn });
+    } else {
+      // stroma (top) and lumen (bottom) regions
+      ctx.fillStyle = "#25543a";
+      ctx.fillRect(0, 0, W, MEM_TOP);
+      ctx.fillStyle = "#153a4a";
+      ctx.fillRect(0, MEM_BOT, W, H - MEM_BOT);
+      ctx.fillStyle = "#2f6b46";
+      ctx.fillRect(0, MEM_TOP, W, MEM_BOT - MEM_TOP);
+      complex(ctx, PSII, 70, "#3a9a54", "Photosystem II", cIn);
+      complex(ctx, ETC, 56, "#4a8a70", "electron chain", cIn);
+      complex(ctx, PSI, 70, "#3a9a54", "Photosystem I", cIn);
+      complex(ctx, SYNTH, 60, "#c8a23a", "ATP synthase", cIn);
+    }
 
     fadeText(ctx, "stroma", 60, 30, phase(t, 1, 2.5), "italic 12px -apple-system, sans-serif", "#a8d0b4", "start");
     fadeText(ctx, "thylakoid lumen", 60, MEM_BOT + 60, phase(t, 1, 2.5), "italic 12px -apple-system, sans-serif", "#8fc0d8", "start");
 
-    // complexes
-    const cIn = phase(t, 0.5, 2.5);
-    complex(ctx, PSII, 70, "#3a9a54", "Photosystem II", cIn);
-    complex(ctx, ETC, 56, "#4a8a70", "electron chain", cIn);
-    complex(ctx, PSI, 70, "#3a9a54", "Photosystem I", cIn);
-    complex(ctx, SYNTH, 60, "#c8a23a", "ATP synthase", cIn);
+    // complex labels (always, over the SVG or the fallback rects)
+    if (membrane) {
+      fadeText(ctx, "Photosystem II", PSII, MEM_BOT + 24, cIn, "600 12px -apple-system, sans-serif", "#dfe8ea");
+      fadeText(ctx, "electron chain", ETC, MEM_BOT + 24, cIn, "600 12px -apple-system, sans-serif", "#dfe8ea");
+      fadeText(ctx, "Photosystem I", PSI, MEM_BOT + 24, cIn, "600 12px -apple-system, sans-serif", "#dfe8ea");
+      fadeText(ctx, "ATP synthase", SYNTH, MEM_BOT + 24, cIn, "600 12px -apple-system, sans-serif", "#dfe8ea");
+    }
 
     // photons striking PSII and PSI
     const photonIn = phase(t, 4, 5.5);
@@ -156,14 +168,19 @@ export const photoLightReactionsSlide: CanvasSlideDefinition = {
     // NADPH forms at PSI (stroma side)
     const nadphIn = phase(t, 19, 21);
     if (nadphIn > 0) {
-      ctx.save();
-      ctx.globalAlpha = nadphIn;
-      ctx.fillStyle = "#6db0e8";
-      ctx.beginPath();
-      ctx.roundRect(PSI + 30, MEM_TOP - 44, 62, 22, 6);
-      ctx.fill();
-      ctx.restore();
-      fadeText(ctx, "NADPH", PSI + 61, MEM_TOP - 29, nadphIn, "600 12px -apple-system, sans-serif", "#0c447c");
+      const nadphImg = img("nadph");
+      if (nadphImg) {
+        drawSvg(ctx, nadphImg, PSI + 61, MEM_TOP - 33, 74, 30, { alpha: nadphIn });
+      } else {
+        ctx.save();
+        ctx.globalAlpha = nadphIn;
+        ctx.fillStyle = "#6db0e8";
+        ctx.beginPath();
+        ctx.roundRect(PSI + 30, MEM_TOP - 44, 62, 22, 6);
+        ctx.fill();
+        ctx.restore();
+        fadeText(ctx, "NADPH", PSI + 61, MEM_TOP - 29, nadphIn, "600 12px -apple-system, sans-serif", "#0c447c");
+      }
     }
 
     // ATP made at synthase (H+ flowing back up through it)
@@ -179,14 +196,19 @@ export const photoLightReactionsSlide: CanvasSlideDefinition = {
         ctx.fill();
         ctx.restore();
       }
-      ctx.save();
-      ctx.globalAlpha = atpIn;
-      ctx.fillStyle = "#e8c14a";
-      ctx.beginPath();
-      ctx.roundRect(SYNTH - 30, MEM_TOP - 44, 52, 22, 6);
-      ctx.fill();
-      ctx.restore();
-      fadeText(ctx, "ATP", SYNTH - 4, MEM_TOP - 29, atpIn, "600 12px -apple-system, sans-serif", "#412402");
+      const atpImg = img("atp");
+      if (atpImg) {
+        drawSvg(ctx, atpImg, SYNTH - 4, MEM_TOP - 33, 56, 28, { alpha: atpIn });
+      } else {
+        ctx.save();
+        ctx.globalAlpha = atpIn;
+        ctx.fillStyle = "#e8c14a";
+        ctx.beginPath();
+        ctx.roundRect(SYNTH - 30, MEM_TOP - 44, 52, 22, 6);
+        ctx.fill();
+        ctx.restore();
+        fadeText(ctx, "ATP", SYNTH - 4, MEM_TOP - 29, atpIn, "600 12px -apple-system, sans-serif", "#412402");
+      }
     }
 
     // title

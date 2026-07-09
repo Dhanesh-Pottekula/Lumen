@@ -5,7 +5,8 @@
  * mesophyll cell: wall, membrane, nucleus, central vacuole, and green chloroplasts.
  * Pure renderFrame(t).
  */
-import { clamp01, fadeText, lerp, phase, prng } from "./anim";
+import { img } from "../assets/photosynthesis";
+import { clamp01, drawSvg, fadeText, lerp, phase, prng } from "./anim";
 import type { CanvasSlideDefinition } from "./types";
 
 const W = 920;
@@ -95,45 +96,49 @@ export const photoLeafCellSlide: CanvasSlideDefinition = {
       ctx.scale(s, s);
       ctx.translate(-CELL.x, -CELL.y);
 
-      // cell wall (thick) + membrane (thin inside)
-      ctx.fillStyle = "#20323f";
-      ctx.strokeStyle = "#6db06a";
-      ctx.lineWidth = 10;
-      ctx.beginPath();
-      ctx.arc(CELL.x, CELL.y, CELL.r, 0, 7);
-      ctx.fill();
-      ctx.stroke();
-      ctx.strokeStyle = "#8fd08a";
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.arc(CELL.x, CELL.y, CELL.r - 9, 0, 7);
-      ctx.stroke();
-
-      // central vacuole
-      ctx.fillStyle = "rgba(74, 144, 216, 0.16)";
-      ctx.strokeStyle = "rgba(109, 176, 232, 0.5)";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.arc(CELL.x, CELL.y + 8, CELL.r * 0.5, 0, 7);
-      ctx.fill();
-      ctx.stroke();
-
-      // nucleus
-      ctx.fillStyle = "#7a6bb0";
-      ctx.beginPath();
-      ctx.arc(CELL.x - CELL.r * 0.42, CELL.y - CELL.r * 0.42, 26, 0, 7);
-      ctx.fill();
-      ctx.fillStyle = "#5a4b90";
-      ctx.beginPath();
-      ctx.arc(CELL.x - CELL.r * 0.42, CELL.y - CELL.r * 0.42, 11, 0, 7);
-      ctx.fill();
+      // cell body — SVG hero art, with a primitive fallback
+      const cellImg = img("cell");
+      if (cellImg) {
+        drawSvg(ctx, cellImg, CELL.x, CELL.y, CELL.r * 2.08, CELL.r * 2.08);
+      } else {
+        ctx.fillStyle = "#20323f";
+        ctx.strokeStyle = "#6db06a";
+        ctx.lineWidth = 10;
+        ctx.beginPath();
+        ctx.arc(CELL.x, CELL.y, CELL.r, 0, 7);
+        ctx.fill();
+        ctx.stroke();
+        ctx.strokeStyle = "#8fd08a";
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.arc(CELL.x, CELL.y, CELL.r - 9, 0, 7);
+        ctx.stroke();
+        ctx.fillStyle = "rgba(74, 144, 216, 0.16)";
+        ctx.strokeStyle = "rgba(109, 176, 232, 0.5)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(CELL.x, CELL.y + 8, CELL.r * 0.5, 0, 7);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = "#7a6bb0";
+        ctx.beginPath();
+        ctx.arc(CELL.x - CELL.r * 0.42, CELL.y - CELL.r * 0.42, 26, 0, 7);
+        ctx.fill();
+        ctx.fillStyle = "#5a4b90";
+        ctx.beginPath();
+        ctx.arc(CELL.x - CELL.r * 0.42, CELL.y - CELL.r * 0.42, 11, 0, 7);
+        ctx.fill();
+      }
 
       // chloroplasts appear last
       const chlIn = phase(t, 13, 16);
       if (chlIn > 0) {
         ctx.globalAlpha = clamp01(zoom) * chlIn;
+        const chlImg = img("chloroplast");
         for (const c of CHLOROPLASTS) {
-          drawChloroplast(ctx, c.x, c.y, c.rot, Math.sin(t * 1.2 + c.drift * 6));
+          const wob = Math.sin(t * 1.2 + c.drift * 6);
+          if (chlImg) drawSvg(ctx, chlImg, c.x, c.y, 52, 30, { rotate: c.rot + wob * 0.15 });
+          else drawChloroplast(ctx, c.x, c.y, c.rot, wob);
         }
       }
       ctx.restore();
