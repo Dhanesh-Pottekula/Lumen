@@ -1,52 +1,41 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="620" height="340" viewBox="0 0 620 340">
   <defs>
-    <radialGradient id="stromaFill" cx="50%" cy="50%" r="60%">
-      <stop offset="0%" stop-color="#2f6b42"/>
-      <stop offset="100%" stop-color="#1c4229"/>
+    <radialGradient id="stromaCut" cx="42%" cy="36%" r="70%">
+      <stop offset="0%" stop-color="#367a4a"/>
+      <stop offset="70%" stop-color="#245638"/>
+      <stop offset="100%" stop-color="#173d26"/>
     </radialGradient>
-    <linearGradient id="granum" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#57b06e"/>
-      <stop offset="100%" stop-color="#2c7a40"/>
+    <linearGradient id="envelope" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#8fe0a0"/>
+      <stop offset="100%" stop-color="#4e9a5e"/>
     </linearGradient>
+    <linearGradient id="granumBig" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#68c97e"/>
+      <stop offset="100%" stop-color="#277a3c"/>
+    </linearGradient>
+    <radialGradient id="innerShade" cx="50%" cy="46%" r="58%">
+      <stop offset="70%" stop-color="#000000" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#0b2416" stop-opacity="0.45"/>
+    </radialGradient>
   </defs>
-  <!-- double membrane envelope -->
-  <ellipse cx="310" cy="170" rx="300" ry="158" fill="#6db06a"/>
-  <ellipse cx="310" cy="170" rx="292" ry="150" fill="url(#stromaFill)"/>
-  <ellipse cx="310" cy="170" rx="284" ry="142" fill="none" stroke="#8fd08a" stroke-width="2" opacity="0.7"/>
-  <!-- lamellae connectors -->
-  <g stroke="#4aa062" stroke-width="4" fill="none" opacity="0.8" stroke-linecap="round">
-    <path d="M150 150 C210 120 250 120 300 150"/>
+  <ellipse cx="310" cy="170" rx="300" ry="158" fill="url(#envelope)"/>
+  <ellipse cx="310" cy="170" rx="292" ry="150" fill="url(#stromaCut)"/>
+  <ellipse cx="310" cy="170" rx="284" ry="142" fill="url(#innerShade)"/>
+  <ellipse cx="310" cy="170" rx="284" ry="142" fill="none" stroke="#a6ecb4" stroke-width="1.5" opacity="0.55"/>
+  <!-- top sheen -->
+  <path d="M120 78 C220 40 420 40 520 82 C420 66 220 66 120 78 Z" fill="#ffffff" opacity="0.12"/>
+  <!-- lamellae -->
+  <g stroke="#57b06e" stroke-width="4" fill="none" opacity="0.7" stroke-linecap="round">
+    <path d="M150 152 C210 122 250 122 300 150"/>
     <path d="M300 190 C360 220 420 210 470 180"/>
-    <path d="M190 200 C250 230 300 220 340 200"/>
+    <path d="M190 202 C250 232 300 222 340 202"/>
   </g>
-  <!-- grana stacks (discs) -->
-  <g stroke="#2c7a40" stroke-width="1.5">
-    <g transform="translate(150 150)">
-      <ellipse cx="0" cy="-12" rx="30" ry="6" fill="url(#granum)"/>
-      <ellipse cx="0" cy="-2" rx="30" ry="6" fill="url(#granum)"/>
-      <ellipse cx="0" cy="8" rx="30" ry="6" fill="url(#granum)"/>
-      <ellipse cx="0" cy="18" rx="30" ry="6" fill="url(#granum)"/>
-    </g>
-    <g transform="translate(300 150)">
-      <ellipse cx="0" cy="-10" rx="30" ry="6" fill="url(#granum)"/>
-      <ellipse cx="0" cy="0" rx="30" ry="6" fill="url(#granum)"/>
-      <ellipse cx="0" cy="10" rx="30" ry="6" fill="url(#granum)"/>
-    </g>
-    <g transform="translate(340 200)">
-      <ellipse cx="0" cy="-10" rx="28" ry="6" fill="url(#granum)"/>
-      <ellipse cx="0" cy="0" rx="28" ry="6" fill="url(#granum)"/>
-      <ellipse cx="0" cy="10" rx="28" ry="6" fill="url(#granum)"/>
-    </g>
-    <g transform="translate(470 175)">
-      <ellipse cx="0" cy="-12" rx="30" ry="6" fill="url(#granum)"/>
-      <ellipse cx="0" cy="-2" rx="30" ry="6" fill="url(#granum)"/>
-      <ellipse cx="0" cy="8" rx="30" ry="6" fill="url(#granum)"/>
-      <ellipse cx="0" cy="18" rx="30" ry="6" fill="url(#granum)"/>
-    </g>
-    <g transform="translate(215 235)">
-      <ellipse cx="0" cy="-8" rx="26" ry="5" fill="url(#granum)"/>
-      <ellipse cx="0" cy="2" rx="26" ry="5" fill="url(#granum)"/>
-      <ellipse cx="0" cy="12" rx="26" ry="5" fill="url(#granum)"/>
-    </g>
+  <!-- grana stacks with depth -->
+  <g stroke="#1f5a2c" stroke-width="1">
+    <g transform="translate(150 152)"><ellipse cx="0" cy="-15" rx="30" ry="6.5" fill="url(#granumBig)"/><ellipse cx="0" cy="-4" rx="30" ry="6.5" fill="url(#granumBig)"/><ellipse cx="0" cy="7" rx="30" ry="6.5" fill="url(#granumBig)"/><ellipse cx="0" cy="18" rx="30" ry="6.5" fill="url(#granumBig)"/></g>
+    <g transform="translate(300 150)"><ellipse cx="0" cy="-11" rx="30" ry="6.5" fill="url(#granumBig)"/><ellipse cx="0" cy="0" rx="30" ry="6.5" fill="url(#granumBig)"/><ellipse cx="0" cy="11" rx="30" ry="6.5" fill="url(#granumBig)"/></g>
+    <g transform="translate(340 202)"><ellipse cx="0" cy="-11" rx="28" ry="6" fill="url(#granumBig)"/><ellipse cx="0" cy="0" rx="28" ry="6" fill="url(#granumBig)"/><ellipse cx="0" cy="11" rx="28" ry="6" fill="url(#granumBig)"/></g>
+    <g transform="translate(470 176)"><ellipse cx="0" cy="-15" rx="30" ry="6.5" fill="url(#granumBig)"/><ellipse cx="0" cy="-4" rx="30" ry="6.5" fill="url(#granumBig)"/><ellipse cx="0" cy="7" rx="30" ry="6.5" fill="url(#granumBig)"/><ellipse cx="0" cy="18" rx="30" ry="6.5" fill="url(#granumBig)"/></g>
+    <g transform="translate(215 236)"><ellipse cx="0" cy="-9" rx="26" ry="5.5" fill="url(#granumBig)"/><ellipse cx="0" cy="1" rx="26" ry="5.5" fill="url(#granumBig)"/><ellipse cx="0" cy="11" rx="26" ry="5.5" fill="url(#granumBig)"/></g>
   </g>
 </svg>

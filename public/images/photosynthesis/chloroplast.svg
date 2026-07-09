@@ -1,16 +1,20 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="96" height="56" viewBox="0 0 96 56">
+<svg xmlns="http://www.w3.org/2000/svg" width="100" height="60" viewBox="0 0 100 60">
   <defs>
-    <linearGradient id="chl" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#5cc87a"/>
-      <stop offset="100%" stop-color="#2c7a40"/>
+    <linearGradient id="chlBody" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#7ad98f"/>
+      <stop offset="50%" stop-color="#3f9a54"/>
+      <stop offset="100%" stop-color="#236b34"/>
+    </linearGradient>
+    <linearGradient id="granumSm" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#57c06e"/>
+      <stop offset="100%" stop-color="#2b7a3e"/>
     </linearGradient>
   </defs>
-  <ellipse cx="48" cy="28" rx="46" ry="26" fill="url(#chl)" stroke="#1f4f2a" stroke-width="2.5"/>
-  <ellipse cx="48" cy="28" rx="40" ry="20" fill="none" stroke="#8fe0a8" stroke-width="1.2" opacity="0.55"/>
-  <g fill="#1f4f2a">
-    <ellipse cx="28" cy="28" rx="5" ry="7"/>
-    <ellipse cx="44" cy="24" rx="5" ry="7"/>
-    <ellipse cx="60" cy="30" rx="5" ry="7"/>
-    <ellipse cx="72" cy="25" rx="4" ry="6"/>
+  <ellipse cx="50" cy="30" rx="48" ry="27" fill="url(#chlBody)" stroke="#184f26" stroke-width="2"/>
+  <path d="M14 20 C34 8 66 8 86 20" fill="none" stroke="#ffffff" stroke-width="2" opacity="0.28" stroke-linecap="round"/>
+  <g stroke="#1f5a2c" stroke-width="0.8">
+    <g transform="translate(30 30)"><ellipse cx="0" cy="-5" rx="8" ry="2.6" fill="url(#granumSm)"/><ellipse cx="0" cy="0" rx="8" ry="2.6" fill="url(#granumSm)"/><ellipse cx="0" cy="5" rx="8" ry="2.6" fill="url(#granumSm)"/></g>
+    <g transform="translate(52 26)"><ellipse cx="0" cy="-5" rx="8" ry="2.6" fill="url(#granumSm)"/><ellipse cx="0" cy="0" rx="8" ry="2.6" fill="url(#granumSm)"/><ellipse cx="0" cy="5" rx="8" ry="2.6" fill="url(#granumSm)"/></g>
+    <g transform="translate(72 32)"><ellipse cx="0" cy="-4" rx="7" ry="2.4" fill="url(#granumSm)"/><ellipse cx="0" cy="1" rx="7" ry="2.4" fill="url(#granumSm)"/></g>
   </g>
 </svg>

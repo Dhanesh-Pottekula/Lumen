@@ -1,26 +1,32 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="360" height="360" viewBox="0 0 360 360">
   <defs>
-    <radialGradient id="cytoplasm" cx="50%" cy="45%" r="55%">
-      <stop offset="0%" stop-color="#25404f"/>
-      <stop offset="100%" stop-color="#1b2f3b"/>
+    <radialGradient id="cellWall" cx="50%" cy="50%" r="50%">
+      <stop offset="88%" stop-color="#4e9a44"/>
+      <stop offset="100%" stop-color="#356b2f"/>
     </radialGradient>
-    <radialGradient id="vac" cx="45%" cy="40%" r="60%">
-      <stop offset="0%" stop-color="#4a90d8" stop-opacity="0.22"/>
-      <stop offset="100%" stop-color="#4a90d8" stop-opacity="0.08"/>
+    <radialGradient id="cyto" cx="42%" cy="38%" r="62%">
+      <stop offset="0%" stop-color="#2c4a5a"/>
+      <stop offset="100%" stop-color="#182b36"/>
     </radialGradient>
-    <radialGradient id="nuc" cx="40%" cy="38%" r="65%">
-      <stop offset="0%" stop-color="#9a8ad8"/>
-      <stop offset="100%" stop-color="#5a4b90"/>
+    <radialGradient id="vacG" cx="40%" cy="34%" r="66%">
+      <stop offset="0%" stop-color="#7fc0f0" stop-opacity="0.34"/>
+      <stop offset="60%" stop-color="#4a90d8" stop-opacity="0.16"/>
+      <stop offset="100%" stop-color="#2f6ba8" stop-opacity="0.10"/>
+    </radialGradient>
+    <radialGradient id="nucG" cx="38%" cy="34%" r="68%">
+      <stop offset="0%" stop-color="#b6a6ea"/>
+      <stop offset="60%" stop-color="#7d6cc0"/>
+      <stop offset="100%" stop-color="#4f4088"/>
     </radialGradient>
   </defs>
-  <!-- cell wall (thick) -->
-  <rect x="16" y="16" width="328" height="328" rx="150" fill="#3a6b34"/>
-  <rect x="26" y="26" width="308" height="308" rx="142" fill="url(#cytoplasm)"/>
-  <!-- inner membrane -->
-  <rect x="30" y="30" width="300" height="300" rx="140" fill="none" stroke="#8fd08a" stroke-width="2.5" opacity="0.7"/>
-  <!-- central vacuole -->
-  <circle cx="182" cy="192" r="96" fill="url(#vac)" stroke="#6db0e8" stroke-width="2" opacity="0.8"/>
-  <!-- nucleus -->
-  <circle cx="112" cy="110" r="34" fill="url(#nuc)" stroke="#b0a4e0" stroke-width="2"/>
-  <circle cx="104" cy="102" r="13" fill="#4a3d7a"/>
+  <circle cx="180" cy="180" r="168" fill="url(#cellWall)"/>
+  <circle cx="180" cy="180" r="156" fill="url(#cyto)"/>
+  <circle cx="180" cy="180" r="150" fill="none" stroke="#9fe0a0" stroke-width="2" opacity="0.6"/>
+  <!-- vacuole with glossy highlight -->
+  <circle cx="188" cy="196" r="96" fill="url(#vacG)" stroke="#7fc0f0" stroke-width="1.5" opacity="0.85"/>
+  <ellipse cx="158" cy="150" rx="30" ry="18" fill="#ffffff" opacity="0.12"/>
+  <!-- nucleus with highlight + nucleolus -->
+  <circle cx="112" cy="112" r="36" fill="url(#nucG)"/>
+  <ellipse cx="100" cy="98" rx="12" ry="8" fill="#ffffff" opacity="0.3"/>
+  <circle cx="118" cy="118" r="13" fill="#4a3d7a"/>
 </svg>
