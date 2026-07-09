@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="360" height="360" viewBox="0 0 360 360">
+  <defs>
+    <radialGradient id="cytoplasm" cx="50%" cy="45%" r="55%">
+      <stop offset="0%" stop-color="#25404f"/>
+      <stop offset="100%" stop-color="#1b2f3b"/>
+    </radialGradient>
+    <radialGradient id="vac" cx="45%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#4a90d8" stop-opacity="0.22"/>
+      <stop offset="100%" stop-color="#4a90d8" stop-opacity="0.08"/>
+    </radialGradient>
+    <radialGradient id="nuc" cx="40%" cy="38%" r="65%">
+      <stop offset="0%" stop-color="#9a8ad8"/>
+      <stop offset="100%" stop-color="#5a4b90"/>
+    </radialGradient>
+  </defs>
+  <!-- cell wall (thick) -->
+  <rect x="16" y="16" width="328" height="328" rx="150" fill="#3a6b34"/>
+  <rect x="26" y="26" width="308" height="308" rx="142" fill="url(#cytoplasm)"/>
+  <!-- inner membrane -->
+  <rect x="30" y="30" width="300" height="300" rx="140" fill="none" stroke="#8fd08a" stroke-width="2.5" opacity="0.7"/>
+  <!-- central vacuole -->
+  <circle cx="182" cy="192" r="96" fill="url(#vac)" stroke="#6db0e8" stroke-width="2" opacity="0.8"/>
+  <!-- nucleus -->
+  <circle cx="112" cy="110" r="34" fill="url(#nuc)" stroke="#b0a4e0" stroke-width="2"/>
+  <circle cx="104" cy="102" r="13" fill="#4a3d7a"/>
+</svg>

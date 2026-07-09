@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="320" height="200" viewBox="0 0 320 200">
+  <defs>
+    <linearGradient id="leafBlade" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#5cc87a"/>
+      <stop offset="55%" stop-color="#3a8a4a"/>
+      <stop offset="100%" stop-color="#276536"/>
+    </linearGradient>
+    <linearGradient id="leafSheen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.28"/>
+      <stop offset="45%" stop-color="#ffffff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <path d="M16 100 C70 20 250 20 304 100 C250 180 70 180 16 100 Z" fill="url(#leafBlade)" stroke="#1f4f2a" stroke-width="3"/>
+  <path d="M16 100 C70 20 250 20 304 100 C250 130 70 130 16 100 Z" fill="url(#leafSheen)"/>
+  <path d="M16 100 L304 100" stroke="#1f4f2a" stroke-width="4" stroke-linecap="round"/>
+  <g stroke="#2c6b3a" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.85">
+    <path d="M96 100 C120 82 150 66 168 52"/>
+    <path d="M96 100 C120 118 150 134 168 148"/>
+    <path d="M148 100 C168 86 196 74 214 62"/>
+    <path d="M148 100 C168 114 196 126 214 138"/>
+    <path d="M200 100 C218 90 244 82 260 74"/>
+    <path d="M200 100 C218 110 244 118 260 126"/>
+    <path d="M64 100 C82 90 100 80 112 70"/>
+    <path d="M64 100 C82 110 100 120 112 130"/>
+  </g>
+</svg>

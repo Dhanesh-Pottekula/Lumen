@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="60" viewBox="0 0 120 60">
+  <defs>
+    <linearGradient id="atpG" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#f6e08a"/>
+      <stop offset="100%" stop-color="#e2b23e"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="10" width="112" height="40" rx="20" fill="url(#atpG)" stroke="#b98a1f" stroke-width="2"/>
+  <text x="60" y="38" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="22" fill="#5a3d0a">ATP</text>
+</svg>
