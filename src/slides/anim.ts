@@ -91,3 +91,27 @@ export function withAlpha(ctx: CanvasRenderingContext2D, alpha: number, draw: ()
   draw();
   ctx.restore();
 }
+
+/**
+ * Draw an image centered at (cx, cy) at w×h, with optional alpha and rotation (radians).
+ * No-op when `img` is falsy, so scenes can call it directly with an optional asset.
+ */
+export function drawSvg(
+  ctx: CanvasRenderingContext2D,
+  img: CanvasImageSource | undefined | null,
+  cx: number,
+  cy: number,
+  w: number,
+  h: number,
+  opts: { alpha?: number; rotate?: number } = {},
+) {
+  if (!img) return;
+  const alpha = opts.alpha ?? 1;
+  if (alpha <= 0) return;
+  ctx.save();
+  ctx.globalAlpha *= clamp01(alpha);
+  ctx.translate(cx, cy);
+  if (opts.rotate) ctx.rotate(opts.rotate);
+  ctx.drawImage(img, -w / 2, -h / 2, w, h);
+  ctx.restore();
+}
