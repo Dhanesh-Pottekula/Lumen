@@ -6,7 +6,7 @@
  * Each term is echoed by a small icon. Pure renderFrame(t).
  */
 import { img, type PhotoAssetName } from "../assets/photosynthesis";
-import { drawSvg, fadeText, phase } from "./anim";
+import { drawSvg, fadeText, phase, radialGlow, withGlow } from "./anim";
 import type { CanvasSlideDefinition } from "./types";
 
 const W = 920;
@@ -57,7 +57,9 @@ export const photoEquationSlide: CanvasSlideDefinition = {
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, W, H);
 
-    fadeText(ctx, "the balance sheet", 460, 90, phase(t, 0.3, 2), "700 20px -apple-system, sans-serif", "#eef5ef");
+    withGlow(ctx, { blur: 16, color: "rgba(120,220,150,0.55)" }, () => {
+      fadeText(ctx, "the balance sheet", 460, 90, phase(t, 0.3, 2), "700 20px -apple-system, sans-serif", "#eef5ef");
+    });
 
     // inputs
     molecule(ctx, 120, "co2", "#8a94a0", "6 CO₂", phase(t, 3, 4.5), 52, 30);
@@ -68,6 +70,7 @@ export const photoEquationSlide: CanvasSlideDefinition = {
     // light (sun icon)
     const lightIn = phase(t, 5, 6.5);
     if (lightIn > 0) {
+      radialGlow(ctx, 440, ROW, 40, "rgba(255,214,120,0.6)", lightIn);
       const sunImg = img("sun");
       if (sunImg) {
         drawSvg(ctx, sunImg, 440, ROW, 52, 52, { alpha: lightIn, rotate: t * 0.25 });
@@ -115,6 +118,7 @@ export const photoEquationSlide: CanvasSlideDefinition = {
     // outputs: glucose hexagon + O2
     const glucoseIn = phase(t, 9, 10.5);
     if (glucoseIn > 0) {
+      radialGlow(ctx, 640, ROW, 42, "rgba(242,193,78,0.5)", glucoseIn);
       const glucoseImg = img("glucose");
       if (glucoseImg) {
         drawSvg(ctx, glucoseImg, 640, ROW, 54, 54, { alpha: glucoseIn });

@@ -6,7 +6,7 @@
  * Pure renderFrame(t).
  */
 import { img } from "../assets/photosynthesis";
-import { clamp01, cycle, drawSvg, fadeText, lerp, phase, prng } from "./anim";
+import { clamp01, cycle, drawSvg, fadeText, lerp, phase, prng, radialGlow, withGlow } from "./anim";
 import type { CanvasSlideDefinition } from "./types";
 
 const W = 920;
@@ -90,6 +90,7 @@ export const photoIntroSlide: CanvasSlideDefinition = {
     // sun with rotating rays
     const sunIn = phase(t, 0.3, 2);
     const sunImg = img("sun");
+    radialGlow(ctx, SUN.x, SUN.y, 150, "rgba(255,214,120,0.55)", sunIn * (0.85 + 0.15 * Math.sin(t * 2)));
     if (sunImg) {
       drawSvg(ctx, sunImg, SUN.x, SUN.y, 168, 168, { alpha: sunIn, rotate: t * 0.18 });
     } else {
@@ -120,7 +121,8 @@ export const photoIntroSlide: CanvasSlideDefinition = {
     const beamIn = phase(t, 2, 4);
     if (beamIn > 0) {
       ctx.save();
-      ctx.globalAlpha = beamIn * (0.25 + 0.1 * Math.sin(t * 3));
+      ctx.globalCompositeOperation = "lighter";
+      ctx.globalAlpha = beamIn * (0.3 + 0.12 * Math.sin(t * 3));
       ctx.strokeStyle = "#f0d878";
       ctx.lineWidth = 3;
       for (let i = -2; i <= 2; i++) {
@@ -235,6 +237,8 @@ export const photoIntroSlide: CanvasSlideDefinition = {
 
     // title
     const titleIn = phase(t, 0.4, 2);
-    fadeText(ctx, "PHOTOSYNTHESIS", 460, 402, titleIn * (1 - phase(t, 15, 17)), "800 26px -apple-system, sans-serif", "#eef5ef");
+    withGlow(ctx, { blur: 18, color: "rgba(120,220,150,0.6)" }, () => {
+      fadeText(ctx, "PHOTOSYNTHESIS", 460, 402, titleIn * (1 - phase(t, 15, 17)), "800 26px -apple-system, sans-serif", "#eef5ef");
+    });
   },
 };

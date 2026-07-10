@@ -7,7 +7,7 @@
  * flow through ATP synthase (ATP), NADPH forms at PSI. Pure renderFrame(t).
  */
 import { img } from "../assets/photosynthesis";
-import { cycle, drawSvg, fadeText, lerp, phase } from "./anim";
+import { cycle, drawSvg, fadeText, lerp, phase, radialGlow } from "./anim";
 import type { CanvasSlideDefinition } from "./types";
 
 const W = 920;
@@ -85,7 +85,8 @@ export const photoLightReactionsSlide: CanvasSlideDefinition = {
     const photonIn = phase(t, 4, 5.5);
     if (photonIn > 0) {
       ctx.save();
-      ctx.strokeStyle = "#f0d878";
+      ctx.globalCompositeOperation = "lighter";
+      ctx.strokeStyle = "#ffe89a";
       ctx.lineWidth = 2.5;
       for (const px of [PSII, PSI]) {
         for (let i = 0; i < 3; i++) {
@@ -130,11 +131,12 @@ export const photoLightReactionsSlide: CanvasSlideDefinition = {
         const x = lerp(path[k], path[k + 1], seg - k);
         ctx.save();
         ctx.globalAlpha = eIn;
-        ctx.fillStyle = "#f0d878";
+        ctx.fillStyle = "#fff0b0";
         ctx.beginPath();
         ctx.arc(x, MEM_TOP - 16, 4, 0, 7);
         ctx.fill();
         ctx.restore();
+        radialGlow(ctx, x, MEM_TOP - 16, 12, "rgba(240,216,120,0.8)", eIn);
       }
       fadeText(ctx, "e⁻", (PSII + ETC) / 2, MEM_TOP - 26, eIn, "11px -apple-system, sans-serif", "#f0d878");
     }
