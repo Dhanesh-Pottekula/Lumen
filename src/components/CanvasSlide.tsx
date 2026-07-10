@@ -54,7 +54,7 @@ export function CanvasSlide({ slide, title, tag, notes, audioSrc, assetUrls }: C
       const ctx = canvas.getContext("2d");
       if (!ctx) return;
 
-      const dpr = window.devicePixelRatio || 1; // css pixel to real physical pixel ratio
+      const dpr = Math.min(2, window.devicePixelRatio || 1); // cap at 2× — 3× phones gain nothing visible
       const w = canvas.clientWidth;
       const h = canvas.clientHeight;
       if (canvas.width !== w * dpr || canvas.height !== h * dpr) {

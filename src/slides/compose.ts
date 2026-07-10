@@ -20,7 +20,7 @@
  * buffer and composites that buffer onto the main canvas under the envelope alpha,
  * so the scene's own clearing/alpha calls only ever affect the buffer.
  */
-import { clamp01, phase, withAlpha } from "./anim";
+import { clamp01, phase, prng, withAlpha } from "./anim";
 import { type FilmTimings, remapSceneTime } from "./timings";
 import type { CanvasSlideDefinition, CaptionSegment } from "./types";
 
@@ -31,6 +31,33 @@ export interface ComposeOptions {
   progressDots?: boolean;
   /** Real narration timings (from Cartesia). When present, drives windows/duration/captions. */
   timings?: FilmTimings;
+  /** Apply a filmic overlay (vignette + grain + grade) to the final frame. Default false. */
+  filmGrade?: boolean;
+}
+
+/** Vignette + deterministic grain + subtle grade over the whole view. Seekable (grain keyed to t). */
+function drawFilmGrade(ctx: CanvasRenderingContext2D, w: number, h: number, t: number) {
+  // vignette
+  ctx.save();
+  const vig = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.32, w / 2, h / 2, Math.max(w, h) * 0.62);
+  vig.addColorStop(0, "rgba(0,0,0,0)");
+  vig.addColorStop(1, "rgba(0,0,0,0.34)");
+  ctx.fillStyle = vig;
+  ctx.fillRect(0, 0, w, h);
+  // subtle top-down grade for cohesion
+  const grade = ctx.createLinearGradient(0, 0, 0, h);
+  grade.addColorStop(0, "rgba(90,120,150,0.05)");
+  grade.addColorStop(1, "rgba(20,30,25,0.10)");
+  ctx.fillStyle = grade;
+  ctx.fillRect(0, 0, w, h);
+  // animated grain — deterministic per ~12 fps tick so scrubbing stays exact
+  const rnd = prng(Math.floor(t * 12) + 1);
+  ctx.globalAlpha = 0.05;
+  ctx.fillStyle = "#ffffff";
+  for (let i = 0; i < 90; i++) {
+    ctx.fillRect(rnd() * w, rnd() * h, 1.2, 1.2);
+  }
+  ctx.restore();
 }
 
 interface SceneWindow {
@@ -62,6 +89,7 @@ export function composeSlides(
 
   const timings = options.timings;
   const progressDots = options.progressDots ?? true;
+  const filmGrade = options.filmGrade ?? false;
 
   // Span of each scene: authored duration, or its real spoken length in timings mode.
   const spanOf = (i: number): number =>
@@ -149,6 +177,7 @@ export function composeSlides(
         const only = windows[0];
         const localT = only.remap ? only.remap(t) : t;
         only.scene.render(ctx, Math.max(0, Math.min(localT, only.scene.duration)));
+        if (filmGrade) drawFilmGrade(ctx, viewW, viewH, t);
         return;
       }
 
@@ -202,6 +231,8 @@ export function composeSlides(
           ctx.fill();
         });
       }
+
+      if (filmGrade) drawFilmGrade(ctx, viewW, viewH, t);
     },
   };
 }

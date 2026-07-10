@@ -36,7 +36,7 @@ const photosynthesisLesson = composeSlides(
     photoEquationSlide,
     photoFinaleSlide,
   ],
-  { timings: photosynthesisTimings as FilmTimings },
+  { timings: photosynthesisTimings as FilmTimings, filmGrade: true },
 );
 
 export default function App() {
