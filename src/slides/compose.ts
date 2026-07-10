@@ -6,13 +6,7 @@
  * plain CanvasSlideDefinition, so the composed film stays a pure function of t
  * and seeks exactly like any slide.
  *
- * Two timing modes:
- *  - Authored (default): scene windows come from each scene's `duration`; a scene's
- *    local time is `t - start`.
- *  - Timings (audio): pass `options.timings` (derived from Cartesia word timestamps).
- *    Scene windows, total duration, and captions come from the real narration, and each
- *    scene's local time is piecewise-remapped so authored beats land on the sentence that
- *    narrates them. See timings.ts.
+ * Scene windows come from each scene's `duration`; a scene's local time is `t - start`.
  *
  * Compositing contract: scenes may self-clear (`clearRect`) and set `globalAlpha`
  * absolutely — real scenes do both, which would otherwise defeat the fade envelope.
@@ -20,8 +14,9 @@
  * buffer and composites that buffer onto the main canvas under the envelope alpha,
  * so the scene's own clearing/alpha calls only ever affect the buffer.
  */
+import { createFrame } from "../render/frame";
+import { type Theme, TEXTBOOK } from "../render/theme";
 import { clamp01, phase, prng, withAlpha } from "./anim";
-import { type FilmTimings, remapSceneTime } from "./timings";
 import type { CanvasSlideDefinition, CaptionSegment } from "./types";
 
 export interface ComposeOptions {
@@ -29,10 +24,10 @@ export interface ComposeOptions {
   crossfade?: number;
   /** Draw one progress dot per scene along the bottom (films of 2+ scenes). Default true. */
   progressDots?: boolean;
-  /** Real narration timings (from Cartesia). When present, drives windows/duration/captions. */
-  timings?: FilmTimings;
   /** Apply a filmic overlay (vignette + grain + grade) to the final frame. Default false. */
   filmGrade?: boolean;
+  /** Art-direction theme passed to each scene's FrameCtx. Default TEXTBOOK. */
+  theme?: Theme;
 }
 
 /** Vignette + deterministic grain + subtle grade over the whole view. Seekable (grain keyed to t). */
@@ -64,12 +59,10 @@ interface SceneWindow {
   scene: CanvasSlideDefinition;
   /** Fade-in start. */
   start: number;
-  /** Fade-out end (may extend past the scene's true span for the crossfade tail). */
+  /** Fade-out end. */
   end: number;
-  /** True scene end, used for progress-dot state and remap clamping. */
+  /** Scene end, used for progress-dot state. */
   dotEnd: number;
-  /** Authored-mode local time is `t - start`; timings mode supplies a remap instead. */
-  remap?: (t: number) => number;
 }
 
 export function composeSlides(
@@ -87,16 +80,12 @@ export function composeSlides(
     }
   });
 
-  const timings = options.timings;
   const progressDots = options.progressDots ?? true;
   const filmGrade = options.filmGrade ?? false;
-
-  // Span of each scene: authored duration, or its real spoken length in timings mode.
-  const spanOf = (i: number): number =>
-    timings ? timings.scenes[i].end - timings.scenes[i].start : scenes[i].duration;
+  const theme = options.theme ?? TEXTBOOK;
 
   let crossfade = Math.max(0, options.crossfade ?? 2.5);
-  const shortest = Math.min(...scenes.map((_, i) => spanOf(i)));
+  const shortest = Math.min(...scenes.map((s) => s.duration));
   if (scenes.length > 1 && crossfade > shortest / 2) {
     const clamped = shortest / 2;
     console.warn(
@@ -105,51 +94,21 @@ export function composeSlides(
     crossfade = clamped;
   }
 
-  let windows: SceneWindow[];
-  let duration: number;
-  let captions: CaptionSegment[];
-
-  if (timings) {
-    duration = timings.duration;
-    windows = scenes.map((scene, i) => {
-      const trueStart = timings.scenes[i].start;
-      const trueEnd = timings.scenes[i].end;
-      const isLast = i === scenes.length - 1;
-      // Extend the fade-out tail into the next scene for the crossfade (never past the film end).
-      const renderEnd = isLast ? trueEnd : Math.min(duration, trueEnd + crossfade);
-      const authoredCaps = (scene.captions ?? []).map((c) => c.at).sort((a, b) => a - b);
-      const realCaps = timings.captions
-        .filter((c) => c.scene === i)
-        .map((c) => c.at)
-        .sort((a, b) => a - b);
-      return {
-        scene,
-        start: trueStart,
-        end: renderEnd,
-        dotEnd: trueEnd,
-        remap: remapSceneTime(authoredCaps, realCaps, scene.duration, trueStart, trueEnd),
-      };
-    });
-    captions = timings.captions
-      .map((c) => ({ at: c.at, text: c.text }))
-      .sort((a, b) => a.at - b.at);
-  } else {
-    windows = [];
-    let cursor = 0;
-    for (const scene of scenes) {
-      windows.push({ scene, start: cursor, end: cursor + scene.duration, dotEnd: cursor + scene.duration });
-      cursor += scene.duration - crossfade;
-    }
-    duration = cursor + crossfade;
-    captions = windows
-      .flatMap(({ scene, start }, i) => {
-        const cutoff = i + 1 < windows.length ? windows[i + 1].start : Infinity;
-        return (scene.captions ?? [])
-          .map((c) => ({ at: c.at + start, text: c.text }))
-          .filter((c) => c.at < cutoff);
-      })
-      .sort((a, b) => a.at - b.at);
+  const windows: SceneWindow[] = [];
+  let cursor = 0;
+  for (const scene of scenes) {
+    windows.push({ scene, start: cursor, end: cursor + scene.duration, dotEnd: cursor + scene.duration });
+    cursor += scene.duration - crossfade;
   }
+  const duration = cursor + crossfade;
+  const captions: CaptionSegment[] = windows
+    .flatMap(({ scene, start }, i) => {
+      const cutoff = i + 1 < windows.length ? windows[i + 1].start : Infinity;
+      return (scene.captions ?? [])
+        .map((c) => ({ at: c.at + start, text: c.text }))
+        .filter((c) => c.at < cutoff);
+    })
+    .sort((a, b) => a.at - b.at);
 
   // Lazily-created shared offscreen scratch buffer, resized to match the main
   // canvas's device-pixel size on demand. Created on first buffered render.
@@ -175,8 +134,10 @@ export function composeSlides(
 
       if (windows.length === 1) {
         const only = windows[0];
-        const localT = only.remap ? only.remap(t) : t;
-        only.scene.render(ctx, Math.max(0, Math.min(localT, only.scene.duration)));
+        const localT = t;
+        const f = createFrame(ctx, localT, viewW, viewH, theme);
+        only.scene.render(ctx, Math.max(0, Math.min(localT, only.scene.duration)), f);
+        f.finish();
         if (filmGrade) drawFilmGrade(ctx, viewW, viewH, t);
         return;
       }
@@ -192,11 +153,14 @@ export function composeSlides(
           crossfade > 0 ? 1 - phase(t, end - crossfade, end) : (isLastWindow ? t <= end : t < end) ? 1 : 0;
         const alpha = fadeIn * fadeOut;
         if (alpha <= 0) continue;
-        const rawLocal = w.remap ? w.remap(t) : t - start;
-        const localT = Math.max(0, Math.min(rawLocal, scene.duration));
+        const localT = Math.max(0, Math.min(t - start, scene.duration));
 
         if (!buffered) {
-          withAlpha(ctx, alpha, () => scene.render(ctx, localT));
+          withAlpha(ctx, alpha, () => {
+            const f = createFrame(ctx, localT, viewW, viewH, theme);
+            scene.render(ctx, localT, f);
+            f.finish();
+          });
           continue;
         }
 
@@ -212,7 +176,9 @@ export function composeSlides(
         bufCtx.setTransform(1, 0, 0, 1, 0, 0);
         bufCtx.clearRect(0, 0, canvasW, canvasH);
         bufCtx.setTransform(ctx.getTransform());
-        scene.render(bufCtx, localT);
+        const bf = createFrame(bufCtx, localT, viewW, viewH, theme);
+        scene.render(bufCtx, localT, bf);
+        bf.finish();
 
         ctx.save();
         ctx.setTransform(1, 0, 0, 1, 0, 0);

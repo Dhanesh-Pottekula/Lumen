@@ -79,10 +79,6 @@ h1 {
   width: 100%;
 }
 
-.stage svg {
-  display: block;
-}
-
 /* ── player chrome ── */
 .player {
   display: flex;
@@ -105,12 +101,6 @@ h1 {
 
 .player button:active {
   transform: translateY(1px);
-}
-
-.player button.voice.is-muted {
-  background: transparent;
-  color: var(--muted);
-  box-shadow: inset 0 0 0 1px var(--muted);
 }
 
 .player input[type="range"] {
@@ -154,46 +144,4 @@ h1 {
 .notes li {
   margin-left: 18px;
   margin-bottom: 4px;
-}
-
-/* ────────────────────────────────────────────────────────────
-   SVG pendulums — the motion lives entirely in CSS keyframes.
-   A full swing (there and back) is one period: duration = T/2
-   per direction with alternate + ease-in-out approximating
-   the cosine.
-   ──────────────────────────────────────────────────────────── */
-.pend {
-  transform-box: view-box;
-}
-
-.pend-1 {
-  transform-origin: 300px 60px;
-  animation: swing1 1s ease-in-out infinite alternate;
-}
-
-.pend-2 {
-  transform-origin: 620px 60px;
-  animation: swing2 1.25s ease-in-out infinite alternate;
-}
-
-@keyframes swing1 {
-  from {
-    transform: rotate(25deg);
-  }
-  to {
-    transform: rotate(-25deg);
-  }
-}
-
-@keyframes swing2 {
-  from {
-    transform: rotate(25deg);
-  }
-  to {
-    transform: rotate(-25deg);
-  }
-}
-
-.svg-paused .pend {
-  animation-play-state: paused;
 }

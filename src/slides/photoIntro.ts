@@ -67,101 +67,108 @@ export const photoIntroSlide: CanvasSlideDefinition = {
     { at: 10, text: "water climbs up from the roots. light, carbon dioxide, and water — those are the three raw ingredients." },
     { at: 14, text: "and the leaf hands back oxygen, the air we breathe. now let's go inside and watch it happen." },
   ],
-  render(ctx, t) {
-    ctx.clearRect(0, 0, W, H);
+  render(ctx, t, frame) {
+    // Layer routing (Step 01): sky/soil on bg, sun/beams/stem/leaf on mid, molecules on fg,
+    // labels on annotation. Falls back to the single ctx when no frame is supplied.
+    const bg = frame?.layer.ctx("bg") ?? ctx;
+    const mid = frame?.layer.ctx("mid") ?? ctx;
+    const fg = frame?.layer.ctx("fg") ?? ctx;
+    const ann = frame?.layer.ctx("annotation") ?? ctx;
+    if (!frame) ctx.clearRect(0, 0, W, H);
 
-    // sky
-    const sky = ctx.createLinearGradient(0, 0, 0, H);
+    // sky (bg)
+    const sky = bg.createLinearGradient(0, 0, 0, H);
     sky.addColorStop(0, "#213445");
     sky.addColorStop(1, "#18242e");
-    ctx.fillStyle = sky;
-    ctx.fillRect(0, 0, W, H);
+    bg.fillStyle = sky;
+    bg.fillRect(0, 0, W, H);
 
-    // soil
-    ctx.fillStyle = "#241d16";
-    ctx.fillRect(0, SOIL_Y, W, H - SOIL_Y);
-    ctx.strokeStyle = "#3a2e22";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(0, SOIL_Y);
-    ctx.lineTo(W, SOIL_Y);
-    ctx.stroke();
+    // soil (bg)
+    bg.fillStyle = "#241d16";
+    bg.fillRect(0, SOIL_Y, W, H - SOIL_Y);
+    bg.strokeStyle = "#3a2e22";
+    bg.lineWidth = 2;
+    bg.beginPath();
+    bg.moveTo(0, SOIL_Y);
+    bg.lineTo(W, SOIL_Y);
+    bg.stroke();
 
-    // sun with rotating rays
+    // sun with rotating rays (mid)
     const sunIn = phase(t, 0.3, 2);
     const sunImg = img("sun");
-    radialGlow(ctx, SUN.x, SUN.y, 150, "rgba(255,214,120,0.55)", sunIn * (0.85 + 0.15 * Math.sin(t * 2)));
+    radialGlow(mid, SUN.x, SUN.y, 150, "rgba(255,214,120,0.55)", sunIn * (0.85 + 0.15 * Math.sin(t * 2)));
     if (sunImg) {
-      drawSvg(ctx, sunImg, SUN.x, SUN.y, 168, 168, { alpha: sunIn, rotate: t * 0.18 });
+      drawSvg(mid, sunImg, SUN.x, SUN.y, 168, 168, { alpha: sunIn, rotate: t * 0.18 });
     } else {
-      ctx.save();
-      ctx.globalAlpha = sunIn;
+      mid.save();
+      mid.globalAlpha = sunIn;
       for (let i = 0; i < 12; i++) {
         const a = (i / 12) * Math.PI * 2 + t * 0.25;
         const r1 = SUN.r + 8;
         const r2 = SUN.r + 22 + 6 * Math.sin(t * 2 + i);
-        ctx.strokeStyle = "#e8c14a";
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.moveTo(SUN.x + Math.cos(a) * r1, SUN.y + Math.sin(a) * r1);
-        ctx.lineTo(SUN.x + Math.cos(a) * r2, SUN.y + Math.sin(a) * r2);
-        ctx.stroke();
+        mid.strokeStyle = "#e8c14a";
+        mid.lineWidth = 3;
+        mid.beginPath();
+        mid.moveTo(SUN.x + Math.cos(a) * r1, SUN.y + Math.sin(a) * r1);
+        mid.lineTo(SUN.x + Math.cos(a) * r2, SUN.y + Math.sin(a) * r2);
+        mid.stroke();
       }
-      const sg = ctx.createRadialGradient(SUN.x, SUN.y, 4, SUN.x, SUN.y, SUN.r);
+      const sg = mid.createRadialGradient(SUN.x, SUN.y, 4, SUN.x, SUN.y, SUN.r);
       sg.addColorStop(0, "#f6e08a");
       sg.addColorStop(1, "#e8c14a");
-      ctx.fillStyle = sg;
-      ctx.beginPath();
-      ctx.arc(SUN.x, SUN.y, SUN.r, 0, 7);
-      ctx.fill();
-      ctx.restore();
+      mid.fillStyle = sg;
+      mid.beginPath();
+      mid.arc(SUN.x, SUN.y, SUN.r, 0, 7);
+      mid.fill();
+      mid.restore();
     }
 
-    // light beams from sun to leaf
+    // light beams from sun to leaf (mid, additive)
     const beamIn = phase(t, 2, 4);
     if (beamIn > 0) {
-      ctx.save();
-      ctx.globalCompositeOperation = "lighter";
-      ctx.globalAlpha = beamIn * (0.3 + 0.12 * Math.sin(t * 3));
-      ctx.strokeStyle = "#f0d878";
-      ctx.lineWidth = 3;
+      mid.save();
+      mid.globalCompositeOperation = "lighter";
+      mid.globalAlpha = beamIn * (0.3 + 0.12 * Math.sin(t * 3));
+      mid.strokeStyle = "#f0d878";
+      mid.lineWidth = 3;
       for (let i = -2; i <= 2; i++) {
-        ctx.beginPath();
-        ctx.moveTo(SUN.x + i * 10, SUN.y + SUN.r);
-        ctx.lineTo(LEAF.x - 60 + i * 26, LEAF.y - 30);
-        ctx.stroke();
+        mid.beginPath();
+        mid.moveTo(SUN.x + i * 10, SUN.y + SUN.r);
+        mid.lineTo(LEAF.x - 60 + i * 26, LEAF.y - 30);
+        mid.stroke();
       }
-      ctx.restore();
+      mid.restore();
     }
 
-    // stem + roots
+    // stem + roots (mid)
     const stemIn = phase(t, 1, 3);
-    ctx.save();
-    ctx.globalAlpha = stemIn;
-    ctx.strokeStyle = "#3a6b34";
-    ctx.lineWidth = 6;
-    ctx.beginPath();
-    ctx.moveTo(STEM_X, LEAF.y + 40);
-    ctx.lineTo(STEM_X, SOIL_Y);
-    ctx.stroke();
-    ctx.lineWidth = 2.4;
-    ctx.strokeStyle = "#2c5228";
+    mid.save();
+    mid.globalAlpha = stemIn;
+    mid.strokeStyle = "#3a6b34";
+    mid.lineWidth = 6;
+    mid.beginPath();
+    mid.moveTo(STEM_X, LEAF.y + 40);
+    mid.lineTo(STEM_X, SOIL_Y);
+    mid.stroke();
+    mid.lineWidth = 2.4;
+    mid.strokeStyle = "#2c5228";
     for (const dx of [-1, 1]) {
-      ctx.beginPath();
-      ctx.moveTo(STEM_X, SOIL_Y);
-      ctx.quadraticCurveTo(STEM_X + dx * 30, SOIL_Y + 24, STEM_X + dx * 60, H - 14);
-      ctx.moveTo(STEM_X, SOIL_Y);
-      ctx.quadraticCurveTo(STEM_X + dx * 14, SOIL_Y + 30, STEM_X + dx * 24, H - 8);
-      ctx.stroke();
+      mid.beginPath();
+      mid.moveTo(STEM_X, SOIL_Y);
+      mid.quadraticCurveTo(STEM_X + dx * 30, SOIL_Y + 24, STEM_X + dx * 60, H - 14);
+      mid.moveTo(STEM_X, SOIL_Y);
+      mid.quadraticCurveTo(STEM_X + dx * 14, SOIL_Y + 30, STEM_X + dx * 24, H - 8);
+      mid.stroke();
     }
-    ctx.restore();
+    mid.restore();
 
+    // leaf (mid)
     const leafIn = phase(t, 1.5, 3.5);
     const leafImg = img("leaf");
-    if (leafImg) drawSvg(ctx, leafImg, LEAF.x, LEAF.y, 320, 200, { alpha: leafIn });
-    else drawLeaf(ctx, leafIn);
+    if (leafImg) drawSvg(mid, leafImg, LEAF.x, LEAF.y, 320, 200, { alpha: leafIn });
+    else drawLeaf(mid, leafIn);
 
-    // CO2 in (from the right, gray) — appears with caption 2
+    // CO2 in (fg) + label (annotation)
     const co2In = phase(t, 5, 7);
     if (co2In > 0) {
       const co2Img = img("co2");
@@ -170,23 +177,23 @@ export const photoIntroSlide: CanvasSlideDefinition = {
         const x = lerp(W - 30, LEAF.x + LEAF.rx - 30, c);
         const a = co2In * (0.35 + 0.5 * Math.sin(c * Math.PI));
         if (co2Img) {
-          drawSvg(ctx, co2Img, x, p.y, 42, 24, { alpha: a });
+          drawSvg(fg, co2Img, x, p.y, 42, 24, { alpha: a });
         } else {
-          ctx.save();
-          ctx.globalAlpha = a;
-          ctx.fillStyle = "#8a94a0";
-          ctx.beginPath();
-          ctx.arc(x, p.y, 4, 0, 7);
-          ctx.arc(x + 7, p.y, 4, 0, 7);
-          ctx.arc(x - 7, p.y, 4, 0, 7);
-          ctx.fill();
-          ctx.restore();
+          fg.save();
+          fg.globalAlpha = a;
+          fg.fillStyle = "#8a94a0";
+          fg.beginPath();
+          fg.arc(x, p.y, 4, 0, 7);
+          fg.arc(x + 7, p.y, 4, 0, 7);
+          fg.arc(x - 7, p.y, 4, 0, 7);
+          fg.fill();
+          fg.restore();
         }
       }
-      fadeText(ctx, "CO₂ in", W - 74, 140, co2In, "600 13px -apple-system, sans-serif", "#aab2bc");
+      fadeText(ann, "CO₂ in", W - 74, 140, co2In, "600 13px -apple-system, sans-serif", "#aab2bc");
     }
 
-    // water up (blue, along stem) — appears with caption 3
+    // water up (fg) + label (annotation)
     const waterIn = phase(t, 10, 12);
     if (waterIn > 0) {
       const dropImg = img("waterDrop");
@@ -196,21 +203,21 @@ export const photoIntroSlide: CanvasSlideDefinition = {
         const a = waterIn * (0.4 + 0.5 * Math.sin(c * Math.PI));
         const x = STEM_X + (p.off - 0.5) * 6;
         if (dropImg) {
-          drawSvg(ctx, dropImg, x, y, 12, 16, { alpha: a });
+          drawSvg(fg, dropImg, x, y, 12, 16, { alpha: a });
         } else {
-          ctx.save();
-          ctx.globalAlpha = a;
-          ctx.fillStyle = "#4a90d8";
-          ctx.beginPath();
-          ctx.arc(x, y, 3.4, 0, 7);
-          ctx.fill();
-          ctx.restore();
+          fg.save();
+          fg.globalAlpha = a;
+          fg.fillStyle = "#4a90d8";
+          fg.beginPath();
+          fg.arc(x, y, 3.4, 0, 7);
+          fg.fill();
+          fg.restore();
         }
       }
-      fadeText(ctx, "H₂O up", STEM_X + 46, SOIL_Y - 40, waterIn, "600 13px -apple-system, sans-serif", "#7fb0e8");
+      fadeText(ann, "H₂O up", STEM_X + 46, SOIL_Y - 40, waterIn, "600 13px -apple-system, sans-serif", "#7fb0e8");
     }
 
-    // O2 out (cyan, up-left) — appears with caption 4
+    // O2 out (fg) + label (annotation)
     const o2In = phase(t, 14, 15.5);
     if (o2In > 0) {
       const o2Img = img("o2");
@@ -220,25 +227,25 @@ export const photoIntroSlide: CanvasSlideDefinition = {
         const x = p.x - c * 40;
         const a = o2In * (0.4 + 0.5 * Math.sin(c * Math.PI));
         if (o2Img) {
-          drawSvg(ctx, o2Img, x, y, 34, 22, { alpha: a });
+          drawSvg(fg, o2Img, x, y, 34, 22, { alpha: a });
         } else {
-          ctx.save();
-          ctx.globalAlpha = a;
-          ctx.strokeStyle = "#7fe0d8";
-          ctx.lineWidth = 2;
-          ctx.beginPath();
-          ctx.arc(x, y, 5, 0, 7);
-          ctx.stroke();
-          ctx.restore();
+          fg.save();
+          fg.globalAlpha = a;
+          fg.strokeStyle = "#7fe0d8";
+          fg.lineWidth = 2;
+          fg.beginPath();
+          fg.arc(x, y, 5, 0, 7);
+          fg.stroke();
+          fg.restore();
         }
       }
-      fadeText(ctx, "O₂ out", 360, 48, o2In, "600 13px -apple-system, sans-serif", "#8fe8e0");
+      fadeText(ann, "O₂ out", 360, 48, o2In, "600 13px -apple-system, sans-serif", "#8fe8e0");
     }
 
-    // title
+    // title (annotation)
     const titleIn = phase(t, 0.4, 2);
-    withGlow(ctx, { blur: 18, color: "rgba(120,220,150,0.6)" }, () => {
-      fadeText(ctx, "PHOTOSYNTHESIS", 460, 402, titleIn * (1 - phase(t, 15, 17)), "800 26px -apple-system, sans-serif", "#eef5ef");
+    withGlow(ann, { blur: 18, color: "rgba(120,220,150,0.6)" }, () => {
+      fadeText(ann, "PHOTOSYNTHESIS", 460, 402, titleIn * (1 - phase(t, 15, 17)), "800 26px -apple-system, sans-serif", "#eef5ef");
     });
   },
 };

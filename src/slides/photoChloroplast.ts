@@ -37,40 +37,45 @@ export const photoChloroplastSlide: CanvasSlideDefinition = {
     { at: 15, text: "thin tubes called lamellae connect the stacks. the green discs are packed with chlorophyll, the pigment that catches light." },
     { at: 19, text: "two homes for two jobs: the discs catch light, the fluid builds sugar. let's watch each one." },
   ],
-  render(ctx, t) {
-    ctx.clearRect(0, 0, W, H);
-    ctx.fillStyle = "#14201a";
-    ctx.fillRect(0, 0, W, H);
+  render(ctx, t, frame) {
+    const bg = frame?.layer.ctx("bg") ?? ctx;
+    const mid = frame?.layer.ctx("mid") ?? ctx;
+    const fg = frame?.layer.ctx("fg") ?? ctx;
+    const ann = frame?.layer.ctx("annotation") ?? ctx;
+    if (!frame) ctx.clearRect(0, 0, W, H);
+
+    bg.fillStyle = "#14201a";
+    bg.fillRect(0, 0, W, H);
 
     // outer + inner membrane — SVG cutaway hero, with a primitive fallback
     const bodyIn = phase(t, 0.3, 2.5);
     const cutaway = img("chloroplastCutaway");
     if (cutaway) {
-      drawSvg(ctx, cutaway, CX, CY, RX * 2 + 24, RY * 2 + 24, { alpha: bodyIn });
+      drawSvg(mid, cutaway, CX, CY, RX * 2 + 24, RY * 2 + 24, { alpha: bodyIn });
     } else {
-      ctx.save();
-      ctx.globalAlpha = bodyIn;
-      const stroma = ctx.createRadialGradient(CX, CY, 20, CX, CY, RX);
+      mid.save();
+      mid.globalAlpha = bodyIn;
+      const stroma = mid.createRadialGradient(CX, CY, 20, CX, CY, RX);
       stroma.addColorStop(0, "#2a5c38");
       stroma.addColorStop(1, "#1f4a2c");
-      ctx.fillStyle = stroma;
-      ctx.strokeStyle = "#6db06a";
-      ctx.lineWidth = 7;
-      ctx.beginPath();
-      ctx.ellipse(CX, CY, RX, RY, 0, 0, 7);
-      ctx.fill();
-      ctx.stroke();
-      ctx.strokeStyle = "#8fd08a";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.ellipse(CX, CY, RX - 8, RY - 8, 0, 0, 7);
-      ctx.stroke();
-      ctx.restore();
+      mid.fillStyle = stroma;
+      mid.strokeStyle = "#6db06a";
+      mid.lineWidth = 7;
+      mid.beginPath();
+      mid.ellipse(CX, CY, RX, RY, 0, 0, 7);
+      mid.fill();
+      mid.stroke();
+      mid.strokeStyle = "#8fd08a";
+      mid.lineWidth = 2;
+      mid.beginPath();
+      mid.ellipse(CX, CY, RX - 8, RY - 8, 0, 0, 7);
+      mid.stroke();
+      mid.restore();
     }
 
     // stroma label
     const strLab = phase(t, 5, 7);
-    if (strLab > 0) fadeText(ctx, "stroma (fluid)", CX + 120, CY - 96, strLab, "italic 13px -apple-system, sans-serif", "#a8d0a8");
+    if (strLab > 0) fadeText(ann, "stroma (fluid)", CX + 120, CY - 96, strLab, "italic 13px -apple-system, sans-serif", "#a8d0a8");
 
     // grana stacks (only when the SVG cutaway isn't providing them)
     const granaIn = phase(t, 10, 13.5);
@@ -78,50 +83,50 @@ export const photoChloroplastSlide: CanvasSlideDefinition = {
       for (const g of GRANA) {
         const gin = phase(t, 10 + g.order, 12 + g.order);
         if (gin <= 0) continue;
-        ctx.save();
-        ctx.globalAlpha = gin;
+        mid.save();
+        mid.globalAlpha = gin;
         for (let d = 0; d < g.discs; d++) {
           const y = g.gy - (g.discs - 1) * 5 + d * 10;
-          ctx.fillStyle = "#3a9a54";
-          ctx.strokeStyle = "#2c7a40";
-          ctx.lineWidth = 1.5;
-          ctx.beginPath();
-          ctx.ellipse(g.gx, y, 26, 5, 0, 0, 7);
-          ctx.fill();
-          ctx.stroke();
+          mid.fillStyle = "#3a9a54";
+          mid.strokeStyle = "#2c7a40";
+          mid.lineWidth = 1.5;
+          mid.beginPath();
+          mid.ellipse(g.gx, y, 26, 5, 0, 0, 7);
+          mid.fill();
+          mid.stroke();
         }
-        ctx.restore();
+        mid.restore();
       }
     }
 
     // lamellae connecting stacks (only when the SVG cutaway isn't providing them)
     const lamIn = phase(t, 15, 17);
     if (lamIn > 0 && !cutaway) {
-      ctx.save();
-      ctx.globalAlpha = lamIn * 0.8;
-      ctx.strokeStyle = "#4aa062";
-      ctx.lineWidth = 3;
+      mid.save();
+      mid.globalAlpha = lamIn * 0.8;
+      mid.strokeStyle = "#4aa062";
+      mid.lineWidth = 3;
       for (let i = 0; i < GRANA.length - 1; i++) {
-        ctx.beginPath();
-        ctx.moveTo(GRANA[i].gx + 22, GRANA[i].gy);
-        ctx.quadraticCurveTo((GRANA[i].gx + GRANA[i + 1].gx) / 2, (GRANA[i].gy + GRANA[i + 1].gy) / 2 - 18, GRANA[i + 1].gx - 22, GRANA[i + 1].gy);
-        ctx.stroke();
+        mid.beginPath();
+        mid.moveTo(GRANA[i].gx + 22, GRANA[i].gy);
+        mid.quadraticCurveTo((GRANA[i].gx + GRANA[i + 1].gx) / 2, (GRANA[i].gy + GRANA[i + 1].gy) / 2 - 18, GRANA[i + 1].gx - 22, GRANA[i + 1].gy);
+        mid.stroke();
       }
-      ctx.restore();
+      mid.restore();
     }
 
     // labels for thylakoid / granum / lamellae
     const lab = phase(t, 12, 14);
     if (lab > 0) {
       const g0 = GRANA[0];
-      fadeText(ctx, "thylakoid (one disc)", g0.gx - 30, g0.gy - 30, lab, "12px -apple-system, sans-serif", "#9fe0a8", "start");
+      fadeText(ann, "thylakoid (one disc)", g0.gx - 30, g0.gy - 30, lab, "12px -apple-system, sans-serif", "#9fe0a8", "start");
       const g2 = GRANA[2];
-      fadeText(ctx, "granum (a stack)", g2.gx, g2.gy + 34, lab, "12px -apple-system, sans-serif", "#9fe0a8");
+      fadeText(ann, "granum (a stack)", g2.gx, g2.gy + 34, lab, "12px -apple-system, sans-serif", "#9fe0a8");
     }
     const lamLab = phase(t, 16.5, 18);
-    if (lamLab > 0) fadeText(ctx, "lamellae (connectors)", CX, CY + RY - 24, lamLab, "12px -apple-system, sans-serif", "#7fc090");
+    if (lamLab > 0) fadeText(ann, "lamellae (connectors)", CX, CY + RY - 24, lamLab, "12px -apple-system, sans-serif", "#7fc090");
 
     // title
-    fadeText(ctx, "inside a chloroplast", 460, 40, phase(t, 0.5, 2) * (1 - phase(t, 18, 20)), "700 18px -apple-system, sans-serif", "#eef5ef");
+    fadeText(ann, "inside a chloroplast", 460, 40, phase(t, 0.5, 2) * (1 - phase(t, 18, 20)), "700 18px -apple-system, sans-serif", "#eef5ef");
   },
 };
