@@ -13,6 +13,20 @@ export const easeOutCubic = (p: number): number => {
   return 1 - (1 - p) ** 3;
 };
 
+/** Symmetric ease-in-out (cubic), clamped. */
+export const easeInOutCubic = (p: number): number => {
+  p = clamp01(p);
+  return p < 0.5 ? 4 * p * p * p : 1 - (-2 * p + 2) ** 3 / 2;
+};
+
+/** Ease-out with a slight overshoot past 1 then settle — lively reveals. Clamped input. */
+export const easeOutBack = (p: number): number => {
+  p = clamp01(p);
+  const c1 = 1.70158;
+  const c3 = c1 + 1;
+  return 1 + c3 * (p - 1) ** 3 + c1 * (p - 1) ** 2;
+};
+
 /** Eased 0→1 progress of `t` through the window [a, b]. The workhorse for staging. */
 export const phase = (t: number, a: number, b: number): number => smooth((t - a) / (b - a));
 
@@ -80,6 +94,47 @@ export function fadeText(
   ctx.fillStyle = color;
   ctx.textAlign = align;
   ctx.fillText(text, x, y);
+  ctx.restore();
+}
+
+/**
+ * Additive radial-gradient glow blob centered at (x, y), radius r. Uses "lighter" compositing so
+ * overlapping light adds up — the workhorse for suns, beams, electrons, energy. Save/restored.
+ */
+export function radialGlow(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  r: number,
+  color: string,
+  alpha = 1,
+) {
+  if (alpha <= 0 || r <= 0) return;
+  ctx.save();
+  ctx.globalCompositeOperation = "lighter";
+  ctx.globalAlpha *= clamp01(alpha);
+  const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+  g.addColorStop(0, color);
+  g.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, 7);
+  ctx.fill();
+  ctx.restore();
+}
+
+/** Run `draw` with a soft canvas shadow (blur + color) set — native soft shadows/halos. Save/restored. */
+export function withGlow(
+  ctx: CanvasRenderingContext2D,
+  opts: { blur: number; color: string; offsetX?: number; offsetY?: number },
+  draw: () => void,
+) {
+  ctx.save();
+  ctx.shadowBlur = opts.blur;
+  ctx.shadowColor = opts.color;
+  ctx.shadowOffsetX = opts.offsetX ?? 0;
+  ctx.shadowOffsetY = opts.offsetY ?? 0;
+  draw();
   ctx.restore();
 }
 

@@ -1,6 +1,24 @@
 import { describe, expect, it } from "vitest";
 
-import { withAlpha } from "./anim";
+import { easeInOutCubic, easeOutBack, withAlpha } from "./anim";
+
+describe("easings", () => {
+  it("easeInOutCubic hits the endpoints and midpoint, clamps out-of-range", () => {
+    expect(easeInOutCubic(0)).toBeCloseTo(0);
+    expect(easeInOutCubic(1)).toBeCloseTo(1);
+    expect(easeInOutCubic(0.5)).toBeCloseTo(0.5);
+    expect(easeInOutCubic(-1)).toBe(0);
+    expect(easeInOutCubic(2)).toBe(1);
+  });
+
+  it("easeOutBack overshoots past 1 before settling, exact at endpoints", () => {
+    expect(easeOutBack(0)).toBeCloseTo(0);
+    expect(easeOutBack(1)).toBeCloseTo(1);
+    // classic back easing peaks above 1 in the last third
+    const peak = Math.max(...Array.from({ length: 21 }, (_, i) => easeOutBack(0.5 + i * 0.025)));
+    expect(peak).toBeGreaterThan(1);
+  });
+});
 
 /** Minimal stand-in for the parts of CanvasRenderingContext2D that withAlpha touches. */
 function stubCtx() {
