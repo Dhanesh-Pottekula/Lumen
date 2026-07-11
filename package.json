@@ -1,8 +1,8 @@
 {
-  "name": "aira_canvas",
+  "name": "lumen",
   "private": true,
   "version": "1.0.0",
-  "description": "AiRA tutorial-slide animation prototypes — canvas renderFrame(t) vs SVG/CSS declarative, as separate React components.",
+  "description": "Lumen turns language models into animators: a small JSON grammar an LLM writes, compiled into a deterministic, seekable explainer film rendered live on an HTML5 canvas.",
   "type": "module",
   "scripts": {
     "dev": "vite",
