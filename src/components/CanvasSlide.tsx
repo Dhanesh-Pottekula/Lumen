@@ -27,6 +27,7 @@ interface CanvasSlideProps {
 export function CanvasSlide({ slide, title, tag, notes, assetUrls, theme = TEXTBOOK }: CanvasSlideProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const clockRef = useRef({ raf: 0, wallStart: 0, tStart: 0 });
+  const tRef = useRef(0); // the currently-displayed time — so resize/preload repaint the right frame
   const scrubbing = useRef(false);
   const [t, setT] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -34,6 +35,7 @@ export function CanvasSlide({ slide, title, tag, notes, assetUrls, theme = TEXTB
   /** Paint the frame for time `seconds` — HiDPI-aware, scaled to the slide's view space. */
   const draw = useCallback(
     (seconds: number) => {
+      tRef.current = seconds;
       const canvas = canvasRef.current;
       if (!canvas) return;
       const ctx = canvas.getContext("2d");
@@ -42,6 +44,7 @@ export function CanvasSlide({ slide, title, tag, notes, assetUrls, theme = TEXTB
       const dpr = Math.min(2, window.devicePixelRatio || 1); // cap at 2× — 3× phones gain nothing visible
       const w = canvas.clientWidth;
       const h = canvas.clientHeight;
+      if (w === 0 || h === 0) return; // not laid out yet; the ResizeObserver redraws once it has a size
       if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
         canvas.width = w * dpr;
         canvas.height = h * dpr;
@@ -60,7 +63,7 @@ export function CanvasSlide({ slide, title, tag, notes, assetUrls, theme = TEXTB
     draw(0);
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const observer = new ResizeObserver(() => draw(clockRef.current.tStart));
+    const observer = new ResizeObserver(() => draw(tRef.current));
     observer.observe(canvas);
     return () => observer.disconnect();
   }, [draw]);
@@ -108,7 +111,7 @@ export function CanvasSlide({ slide, title, tag, notes, assetUrls, theme = TEXTB
     if (!assetUrls || assetUrls.length === 0) return;
     let cancelled = false;
     void preloadImages(assetUrls).then(() => {
-      if (!cancelled) draw(clockRef.current.tStart);
+      if (!cancelled) draw(tRef.current);
     });
     return () => {
       cancelled = true;

@@ -1,97 +1,38 @@
-# Step 15 — Iconography & Color-Semantics
+# Step 15 — Iconography & Color-Semantics (full-capacity)
 
 > **For agentic workers:** REQUIRED SUB-SKILL: superpowers:subagent-driven-development or executing-plans.
 
-**Goal:** A reusable **icon/sprite kit** per domain plus a **color-semantics registry** — assign a
-consistent color to each category (empire, force, species) and auto-render a legend.
+**Goal:** A reusable vector icon/sprite kit + a color-semantics registry with auto-legend (category →
+consistent color across the whole lesson).
 
-**Architecture:** Icons are SVG files under `public/images/icons/<domain>/` reusing the existing image
-registry + `drawSvg` (already built). A `Semantics` object maps `category → color` (deterministic from a
-palette), exposes `color(cat)` and `legendItems()`; `drawLegend` renders it themed.
+**Architecture:** `src/render/icons.ts` — icons are pure path functions in a unit box (scale/theme/draw-on
+cleanly); the color registry assigns stable palette colors per category and caches them.
 
-**Tech Stack:** TypeScript, Canvas 2D, vitest.
+**Tech Stack:** TypeScript, Canvas 2D.
 
 ## Global Constraints
-- Deterministic color assignment; themed legend; reuses image registry; existing suite green; build clean.
+- Deterministic/seekable; `npm run build` clean; additive.
+- **Project overrides:** tests removed → scratch eval + browser demo; **leave uncommitted**.
 
 ## File structure
-- Create `public/images/icons/**` — authored SVG icons (soldier, ship, arrow, flag, atom, force-arrow, etc.).
-- Create `src/render/semantics.ts` — `createSemantics(categories, palette)`, `drawLegend`.
-- Create `src/render/semantics.test.ts` — stable color assignment + legend items.
+- **New** `src/render/icons.ts`; **new** `src/slides/iconsDemo.ts` + card.
 
----
+## The surface (implemented)
+- **Icons (30):** arrow/check/cross/plus/minus/star/heart/circle/square/triangle/gear/bolt/drop/sun/leaf/
+  flame/factory/home/person/book/flask/atom/clock/pin/warning/info/search/cloud/mountain/seed.
+- `drawIcon(ctx, name, x, y, size, {color, filled, width, alpha})`; `iconNames`.
+- **Color semantics:** `colorSemantics(palette?)` → `{ colorFor(category), legend(ctx, cats, x, y, {icon,…}) }`
+  — stable per-category color (cached), auto-legend with swatch or icon.
 
-### Task 1: color-semantics registry (pure)
+**Noted as addable:** image-sprite atlas, more icons, per-theme icon styling, colorblind-safe palettes,
+icon draw-on (via strokes) for a "constructing" reveal.
 
-**Interfaces — Produces:**
-```ts
-createSemantics(categories: string[], palette: string[]): {
-  color(cat: string): string;         // stable, same cat → same color
-  legendItems(): { label: string; color: string }[];
-}
-```
-
-- [ ] **Step 1: Failing tests** — `src/render/semantics.test.ts`:
-
-```ts
-import { describe, expect, it } from "vitest";
-import { createSemantics } from "./semantics";
-
-const PAL = ["#e00", "#0e0", "#00e"];
-
-describe("createSemantics", () => {
-  it("assigns a stable color per category in order", () => {
-    const s = createSemantics(["allies", "central", "neutral"], PAL);
-    expect(s.color("allies")).toBe("#e00");
-    expect(s.color("central")).toBe("#0e0");
-    expect(s.color("allies")).toBe("#e00"); // stable on repeat
-  });
-  it("wraps the palette when categories exceed colors", () => {
-    const s = createSemantics(["a", "b", "c", "d"], PAL);
-    expect(s.color("d")).toBe("#e00");
-  });
-  it("legendItems lists all categories with their colors", () => {
-    const s = createSemantics(["a", "b"], PAL);
-    expect(s.legendItems()).toEqual([{ label: "a", color: "#e00" }, { label: "b", color: "#0e0" }]);
-  });
-  it("unknown category falls back to the first color deterministically", () => {
-    const s = createSemantics(["a"], PAL);
-    expect(s.color("zzz")).toBe("#e00");
-  });
-});
-```
-
-- [ ] **Step 2: Run — FAIL.**
-- [ ] **Step 3: Implement `src/render/semantics.ts`:**
-
-```ts
-export function createSemantics(categories: string[], palette: string[]) {
-  const map = new Map<string, string>();
-  categories.forEach((c, i) => map.set(c, palette[i % palette.length]));
-  return {
-    color: (cat: string) => map.get(cat) ?? palette[0],
-    legendItems: () => categories.map((c) => ({ label: c, color: map.get(c) ?? palette[0] })),
-  };
-}
-```
-Plus `drawLegend(frame, x, y, items)` — themed swatches + labels on the `annotation` layer.
-
-- [ ] **Step 4: Run — PASS.** — [ ] **Step 5: Commit** `feat: color-semantics registry + legend`.
-
----
-
-### Task 2: icon kit
-
-- [ ] **Step 1:** Author a starter icon set as SVGs under `public/images/icons/history/` (soldier,
-  cavalry, ship, cannon, flag, fort, arrow) and `public/images/icons/science/` (atom, force-arrow,
-  bulb, magnet). Add an `ICONS` manifest (like `photosynthesis.ts`) + preload wiring.
-- [ ] **Step 2:** Add a manifest completeness test (mirrors the photosynthesis manifest test: every
-  name → a `/images/icons/...svg` URL, unique).
-- [ ] **Step 3: Browser verify** — render a row of icons in each domain color via `drawSvg` + a legend;
-  screenshot. — [ ] **Step 4: Commit** `feat: domain icon kit + manifest`.
+## Tasks
+- [ ] Implement `icons.ts` (above). Verify: `drawIcon` renders each name; `colorFor` stable+distinct; build clean.
+- [ ] `iconsDemo.ts` + card: icon grid + color-semantics legend + consistency bars. Browser-verify. **Uncommitted.**
 
 ## Self-review
-- Color assignment stable/wrapping/fallback tested; icons reuse the existing registry; legend themed. ✅
+- 30 icons pure/scalable; color registry stable+cached+legend. ✅
 
 ## What this unlocks
-Consistent, legible symbology and color-coding for maps (16) and any categorical scene.
+A consistent visual language across a lesson; used by maps (16, markers), callouts (07), and domain kits (18).

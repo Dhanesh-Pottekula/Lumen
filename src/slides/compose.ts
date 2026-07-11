@@ -16,8 +16,10 @@
  */
 import { createFrame } from "../render/frame";
 import { type Theme, TEXTBOOK } from "../render/theme";
-import { clamp01, phase, prng, withAlpha } from "./anim";
+import { clamp01, lerp, phase, withAlpha } from "./anim";
 import type { CanvasSlideDefinition, CaptionSegment } from "./types";
+
+export type TransitionKind = "crossfade" | "zoom-through" | "whip-pan";
 
 export interface ComposeOptions {
   /** Seconds of overlap between consecutive scenes. Default 2.5. */
@@ -28,31 +30,37 @@ export interface ComposeOptions {
   filmGrade?: boolean;
   /** Art-direction theme passed to each scene's FrameCtx. Default TEXTBOOK. */
   theme?: Theme;
+  /** Scene-to-scene transition. Default "crossfade" (existing behavior). */
+  transition?: TransitionKind;
 }
 
-/** Vignette + deterministic grain + subtle grade over the whole view. Seekable (grain keyed to t). */
-function drawFilmGrade(ctx: CanvasRenderingContext2D, w: number, h: number, t: number) {
-  // vignette
-  ctx.save();
-  const vig = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.32, w / 2, h / 2, Math.max(w, h) * 0.62);
-  vig.addColorStop(0, "rgba(0,0,0,0)");
-  vig.addColorStop(1, "rgba(0,0,0,0.34)");
-  ctx.fillStyle = vig;
-  ctx.fillRect(0, 0, w, h);
-  // subtle top-down grade for cohesion
-  const grade = ctx.createLinearGradient(0, 0, 0, h);
-  grade.addColorStop(0, "rgba(90,120,150,0.05)");
-  grade.addColorStop(1, "rgba(20,30,25,0.10)");
-  ctx.fillStyle = grade;
-  ctx.fillRect(0, 0, w, h);
-  // animated grain — deterministic per ~12 fps tick so scrubbing stays exact
-  const rnd = prng(Math.floor(t * 12) + 1);
-  ctx.globalAlpha = 0.05;
-  ctx.fillStyle = "#ffffff";
-  for (let i = 0; i < 90; i++) {
-    ctx.fillRect(rnd() * w, rnd() * h, 1.2, 1.2);
+/**
+ * Extra transform for a scene buffer during its crossfade, beyond the alpha envelope. `fadeIn` (0→1 at
+ * scene start) and `fadeOut` (1→0 at scene end) drive an entrance/exit scale (zoom-through) or slide
+ * (whip-pan). Pure. Returns a scale about center and an x offset in canvas px.
+ */
+function transitionParams(kind: TransitionKind, fadeIn: number, fadeOut: number, canvasW: number): { scale: number; dx: number } {
+  if (kind === "zoom-through") {
+    let scale = 1;
+    if (fadeIn < 1) scale *= lerp(1.14, 1, fadeIn); // enters slightly large, settles
+    if (fadeOut < 1) scale *= lerp(1.5, 1, fadeOut); // grows as it leaves
+    return { scale, dx: 0 };
   }
-  ctx.restore();
+  if (kind === "whip-pan") {
+    let dx = 0;
+    if (fadeIn < 1) dx += canvasW * 0.55 * (1 - fadeIn); // enters from the right
+    if (fadeOut < 1) dx += -canvasW * 0.55 * (1 - fadeOut); // exits to the left
+    return { scale: 1, dx };
+  }
+  return { scale: 1, dx: 0 };
+}
+
+/** The filmic pass (vignette + grade + grain) now lives on the fx layer via `frame.grade()`, applied
+ *  once to the whole composited film below. A single film-level frame carries it, theme-driven. */
+function applyFilmGrade(ctx: CanvasRenderingContext2D, viewW: number, viewH: number, t: number, theme: Theme) {
+  const film = createFrame(ctx, t, viewW, viewH, theme);
+  film.grade({ vignette: theme.fx.vignette, grain: theme.fx.grain });
+  film.finish();
 }
 
 interface SceneWindow {
@@ -83,6 +91,7 @@ export function composeSlides(
   const progressDots = options.progressDots ?? true;
   const filmGrade = options.filmGrade ?? false;
   const theme = options.theme ?? TEXTBOOK;
+  const transition = options.transition ?? "crossfade";
 
   let crossfade = Math.max(0, options.crossfade ?? 2.5);
   const shortest = Math.min(...scenes.map((s) => s.duration));
@@ -138,19 +147,23 @@ export function composeSlides(
         const f = createFrame(ctx, localT, viewW, viewH, theme);
         only.scene.render(ctx, Math.max(0, Math.min(localT, only.scene.duration)), f);
         f.finish();
-        if (filmGrade) drawFilmGrade(ctx, viewW, viewH, t);
+        if (filmGrade) applyFilmGrade(ctx, viewW, viewH, t, theme);
         return;
       }
 
       const buffered = canBuffer(ctx);
       const lastEnd = windows[windows.length - 1].end;
 
+      const firstStart = windows[0].start;
       for (const w of windows) {
         const { scene, start, end } = w;
         const isLastWindow = end === lastEnd;
-        const fadeIn = crossfade > 0 ? phase(t, start, start + crossfade) : t >= start ? 1 : 0;
+        const isFirstWindow = start === firstStart;
+        // First/last scenes hold (no crossfade partner) — the film opens and closes on a full frame;
+        // scene-internal animation handles the intro/outro. Only interior boundaries crossfade.
+        const fadeIn = crossfade > 0 ? (isFirstWindow ? 1 : phase(t, start, start + crossfade)) : t >= start ? 1 : 0;
         const fadeOut =
-          crossfade > 0 ? 1 - phase(t, end - crossfade, end) : (isLastWindow ? t <= end : t < end) ? 1 : 0;
+          crossfade > 0 ? (isLastWindow ? 1 : 1 - phase(t, end - crossfade, end)) : (isLastWindow ? t <= end : t < end) ? 1 : 0;
         const alpha = fadeIn * fadeOut;
         if (alpha <= 0) continue;
         const localT = Math.max(0, Math.min(t - start, scene.duration));
@@ -183,6 +196,12 @@ export function composeSlides(
         ctx.save();
         ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.globalAlpha *= clamp01(alpha);
+        if (transition !== "crossfade") {
+          const tp = transitionParams(transition, fadeIn, fadeOut, canvasW);
+          ctx.translate(canvasW / 2 + tp.dx, canvasH / 2);
+          ctx.scale(tp.scale, tp.scale);
+          ctx.translate(-canvasW / 2, -canvasH / 2);
+        }
         ctx.drawImage(buffer as HTMLCanvasElement, 0, 0);
         ctx.restore();
       }
@@ -198,7 +217,7 @@ export function composeSlides(
         });
       }
 
-      if (filmGrade) drawFilmGrade(ctx, viewW, viewH, t);
+      if (filmGrade) applyFilmGrade(ctx, viewW, viewH, t, theme);
     },
   };
 }

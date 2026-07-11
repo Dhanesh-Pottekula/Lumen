@@ -1,114 +1,91 @@
-# Step 06 — Attention Direction (spotlight / dim / highlight)
+# Step 06 — Attention Direction (full-capacity: isolate / mark / point / de-emphasize / magnify / motion)
 
 > **For agentic workers:** REQUIRED SUB-SKILL: superpowers:subagent-driven-development or executing-plans.
 
-**Goal:** Direct the viewer's eye — the #1 teaching skill. Spotlight a region, dim/ghost everything
-else, and pulse highlight rings, all as reusable helpers driven by a focus target + `t`.
+**Goal:** Direct the viewer's eye — the #1 teaching skill — as a complete, reusable toolkit. Every
+technique the research surfaced across motion-graphics, UX coach-marks (Shepherd/Intro/Driver),
+data-storytelling, and Manim's indication animations is either implemented or noted as trivially
+addable. Each effect is a pure function of `t`/`p`, so the whole thing is deterministic and seekable.
 
-**Architecture:** Helpers that draw onto the `annotation` (rings) and `fx` (dim scrim) layers from
-`FrameCtx`. A dim scrim is a full-view fill with a "hole" punched via the reveal `iris`/`clipShape`
-inverse. Focus target + intensity are functions of `t`, so seekable.
+**Architecture:** `src/render/focus.ts`, reusing earlier steps — reveal's `masked` (soft cutouts /
+desaturate surround), stroke arrowheads + `drawOn` (pointers), and motion oscillators (`wobble`,
+pulse). Effects draw onto whichever layer the scene chooses; the dim scrim goes on an isolated layer
+(fg) so its `destination-out` holes cut the scrim, not the scene beneath.
 
-**Tech Stack:** TypeScript, Canvas 2D, vitest.
+**Tech Stack:** TypeScript, Canvas 2D.
 
 ## Global Constraints
-- Deterministic; uses `frame.layer`; existing suite green; build clean.
+- Deterministic (`t`-driven); `npm run build` clean; additive/backward-compatible.
+- **Project overrides:** tests removed → verify with scratch eval + the browser demo; **leave uncommitted**.
 
 ## File structure
-- Create `src/render/focus.ts` — `spotlight`, `dimExcept`, `highlightRing`.
-- Create `src/render/focus.test.ts` — ring radius easing + scrim alpha math.
+- **New** `src/render/focus.ts` — the toolkit (below).
+- **New** `src/slides/focusDemo.ts` + a card in `App.tsx` — capability demo / living verification.
 
 ---
 
-### Task 1: focus helpers
+## The surface (implemented), by category
 
-**Interfaces — Produces:**
-```ts
-spotlight(ctx, cx, cy, r, intensity: number): void        // dim scrim with a soft circular hole
-dimExcept(ctx, w, h, holes: {cx,cy,r}[], intensity): void // scrim with multiple holes
-highlightRing(ctx, cx, cy, r, p: number, color: string): void // ring that expands+fades with p
-```
+**Isolate the focus**
+- `dimExcept(ctx, holes[], { intensity, color, feather })` — darken the view except one/more circle or
+  rounded-rect holes (coach-mark cutout / spotlight; draw on an isolated layer).
+- `spotlightFocus(ctx, cx, cy, r, opts)` — single-circle convenience.
 
-- [ ] **Step 1: Failing tests** — `src/render/focus.test.ts`:
+**Mark the focus**
+- `highlightRing(ctx, cx, cy, r, t, { amp, period, color, width })` — persistent breathing ring.
+- `focusRings(ctx, cx, cy, p, { count, maxR, targetR })` — Manim "FocusOn" converging rings.
+- `flash(ctx, cx, cy, r, p)` — additive radial beat; `sparkFlash(ctx, cx, cy, p, { count, length })` —
+  Manim "Flash" radiating lines.
+- `focusBox(ctx, x, y, w, h, t, { pad, corner, amp, dash, dashSpin })` — animated box (marching ants).
+- `cornerBrackets(ctx, x, y, w, h, { pad, length, p })` — camera-reticle framing (optional snap-in).
+- `indicate(ctx, cx, cy, p, draw, { scale })` — Manim "Indicate" scale-and-return beat.
 
-```ts
-import { describe, expect, it } from "vitest";
-import { ringRadius, scrimAlpha } from "./focus";
+**Point at the focus**
+- `pointerArrow(ctx, fromX, fromY, toX, toY, p, { color, width })` — draw-on arrow, head on arrival.
+- `bouncePointer(ctx, x, y, t, { size, color })` — bobbing triangle pointer.
+- `convergingArrows(ctx, cx, cy, p, { count, ring, targetR })` — arrows sliding inward at the target.
 
-describe("highlight ring math", () => {
-  it("radius grows from base with p", () => {
-    expect(ringRadius(20, 0)).toBeCloseTo(20);
-    expect(ringRadius(20, 1)).toBeGreaterThan(20);
-  });
-  it("alpha fades out as p→1", () => {
-    expect(scrimAlpha(0)).toBeGreaterThan(scrimAlpha(1));
-    expect(scrimAlpha(1)).toBeCloseTo(0);
-  });
-});
-```
+**De-emphasize the surround**
+- `ghost(ctx, alpha, draw)` — draw at reduced opacity.
+- `emphasizeSurround(ctx, w, h, focusPath, drawScene, { filter })` — crisp focus, desaturated/blurred
+  surround (draws the scene twice; `filter` default grayscale+dim).
 
-- [ ] **Step 2: Run — FAIL.**
-- [ ] **Step 3: Implement `src/render/focus.ts`** (expose the two pure helpers used by tests, plus the draw fns):
+**Magnify**
+- `magnify(ctx, cx, cy, r, zoom, drawScene, { ringColor })` — in-place loupe.
+- `vignetteTo(ctx, cx, cy, { strength, inner, outer })` — asymmetric edge vignette toward the focus.
 
-```ts
-import { clamp01 } from "../slides/anim";
+**Motion emphasis**
+- `wiggle(ctx, cx, cy, t, draw, { amp, freq })` · `pulseScale(ctx, cx, cy, t, draw, { amp, period })`.
 
-export const ringRadius = (base: number, p: number) => base + clamp01(p) * base * 0.6;
-export const scrimAlpha = (p: number) => (1 - clamp01(p)); // for a fading ring
+**Pure helpers:** `ringRadius`, `scrimAlpha`.
 
-/** Full-view dim with a soft circular hole over (cx,cy,r). intensity 0..1 = scrim darkness. */
-export function spotlight(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, intensity: number, w: number, h: number) {
-  if (intensity <= 0) return;
-  ctx.save();
-  ctx.globalAlpha = clamp01(intensity);
-  const g = ctx.createRadialGradient(cx, cy, r * 0.6, cx, cy, r * 1.4);
-  g.addColorStop(0, "rgba(0,0,0,0)");
-  g.addColorStop(1, "rgba(0,0,0,1)");
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, w, h);
-  ctx.restore();
-}
+**Noted as addable when needed** (owned by other steps or a trivial extension): leader lines / callouts
+(Step 07), camera push-in / zoom-to-fit (Step 11), `ApplyWave` geometry displacement, hand-cursor tap,
+fisheye focus+context, and the sequencing/relay meta-layer (focus hand-off, timed dwell) — which is just
+staging these effects with `phase`/`stagger`.
 
-export function dimExcept(ctx: CanvasRenderingContext2D, w: number, h: number, holes: { cx: number; cy: number; r: number }[], intensity: number) {
-  if (intensity <= 0) return;
-  ctx.save();
-  ctx.globalAlpha = clamp01(intensity);
-  ctx.fillStyle = "#000";
-  ctx.fillRect(0, 0, w, h);
-  ctx.globalCompositeOperation = "destination-out";
-  for (const { cx, cy, r } of holes) {
-    const g = ctx.createRadialGradient(cx, cy, r * 0.5, cx, cy, r);
-    g.addColorStop(0, "rgba(0,0,0,1)");
-    g.addColorStop(1, "rgba(0,0,0,0)");
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, 7);
-    ctx.fill();
-  }
-  ctx.restore();
-}
+---
 
-export function highlightRing(ctx: CanvasRenderingContext2D, cx: number, cy: number, base: number, p: number, color: string) {
-  const a = scrimAlpha(p);
-  if (a <= 0) return;
-  ctx.save();
-  ctx.globalAlpha = a;
-  ctx.strokeStyle = color;
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.arc(cx, cy, ringRadius(base, p), 0, 7);
-  ctx.stroke();
-  ctx.restore();
-}
-```
+### Task 1: focus.ts
+- [ ] Implement every function above, reusing `masked` (reveal), `drawOn`/`arrowhead` (strokeVerbs),
+  and `wobble`/`lerp`/`clamp01` (motion). Dim scrim uses `destination-out` soft holes; feather via a
+  radial gradient (circle) or `blur()` (rect).
+- [ ] **Verify:** scratch eval — `ringRadius(20,1) > 20`, `scrimAlpha(1) ≈ 0`; a `dimExcept` call renders
+  without throwing; build clean.
 
-- [ ] **Step 4: Run — PASS.**
-- [ ] **Step 5: Browser verify** — demo: dim a scene except one organelle; pulse a ring on it. Screenshot.
-- [ ] **Step 6: Commit** `feat: attention direction — spotlight/dimExcept/highlightRing`.
+### Task 2: demo + card + browser verify
+- [ ] `src/slides/focusDemo.ts` — a row of chips; per segment, one technique directs the eye to one chip
+  (dim+ring, box+brackets, arrow+bounce, focusRings+converging+pulse, magnify+vignette). Add a card.
+- [ ] **Browser verify:** scrub each segment; confirm the spotlight scrim, box/brackets, pointer arrow,
+  converging rings/arrows + pulse, and the loupe + vignette. Other films non-regressed. **Uncommitted.**
 
-## Self-review
-- `dimExcept` uses `destination-out` to punch soft holes; ring math tested; scrim on fx layer. ✅
+---
+
+## Self-review checklist
+- Full attention surface across all six categories; the rest addable without new machinery. ✅
+- Deterministic/seekable; reuses steps 03–05 (no duplication). ✅
+- Dim scrim isolated on its own layer so it cuts the scrim, not the scene. ✅
 
 ## What this unlocks
-Every complex scene can now direct the eye; callouts (07) pair with rings; used heavily by maps (16)
-and any multi-part diagram.
+Every complex scene can now guide the eye. Pairs with callouts (07, leader lines), build-steps (08),
+and is used heavily by maps (16) and any multi-part diagram.

@@ -1,156 +1,139 @@
-# Step 04 — Draw-On / Stroke System
+# Step 04 — Draw-On / Stroke System (full-capacity)
 
 > **For agentic workers:** REQUIRED SUB-SKILL: superpowers:subagent-driven-development or executing-plans.
 
-**Goal:** Paths that **draw themselves** over time — the "teacher writing on the board" effect — with
-themed line width and hand-drawn roughness. The single most engaging teaching visual.
+**Goal:** Paths that **draw themselves** over time — the "teacher writing on the board" effect — as a
+complete, composable vocabulary. Not just one `strokeOn`, but the full option surface the best
+libraries expose (GSAP DrawSVG, Framer Motion, Rough.js, perfect-freehand, D3 curves, Manim, Motion
+Canvas), so no capability is missing when a lesson needs it. Every option is optional and defaulted;
+scenes pay only for what they use.
 
-**Architecture:** A pure `strokeOn(ctx, points, p, style)` that renders the first `p` (0→1) fraction of
-a polyline by arc-length, so a diagram/arrow/letter appears to be drawn. Built on `makePath`
-(arc-length param, already in `anim.ts`) and `roughen` (Step 02). Progress `p` is any eased function
-of `t`, keeping it seekable.
+**The unifying insight.** Across every system surveyed, one primitive underlies everything: a
+normalized **`[start, end]` window over a path's arc length**. Draw-on is `window(0, p)`; erase is
+`window(p, 1)`; a passing-flash is a narrow sliding window; write is per-glyph border-then-fill with a
+stagger. Build the window + a complete style surface once, and every "verb" is a thin, cheap wrapper.
 
-**Tech Stack:** TypeScript, Canvas 2D, vitest.
+**Architecture:** `src/render/strokes.ts` holds the geometry (arc-length window, curve interpolation),
+the `StrokeStyle` surface, and the one renderer (`strokeWindow`). `src/render/strokeVerbs.ts` holds the
+verbs, markers, followers, and orchestration — all wrappers over `strokeWindow`. Both reuse Step 03's
+`motion.ts` (easings/`stagger`) and Step 02's `roughen` (hand-drawn), and draw onto a raw ctx or any
+`FrameCtx` layer, so strokes inherit Step 03 layer bloom/shadow for free.
+
+**Tech Stack:** TypeScript, Canvas 2D.
 
 ## Global Constraints
 
-- Deterministic: `p` derives from `t`; roughness uses a fixed seed per stroke.
-- Existing suite green; `npm run build` clean.
+- Deterministic & seekable: window/progress derive from `t`; arc-length tables are recomputed purely;
+  roughness uses a fixed seed per stroke (no per-frame crawl).
+- Backward compatible; additive. `npm run build` clean.
+- **Project overrides:** test files were removed — verify pure geometry with a scratch eval + the
+  browser demo (not vitest). **Leave everything uncommitted** for review.
 
 ## File structure
 
-- Create `src/render/strokes.ts` — `strokeOn`, `partialPolyline` (pure geometry), `strokePath`.
-- Create `src/render/strokes.test.ts` — partial-length geometry tests.
-- (Consumers arrive in later steps: callouts, plots, math.)
+- **New** `src/render/strokes.ts` — geometry core + `StrokeStyle` + `strokeWindow`/`strokeOn`.
+- **New** `src/render/strokeVerbs.ts` — verbs, markers/followers, orchestration.
+- **New** `src/slides/strokesDemo.ts` + a card in `App.tsx` — capability demo / living verification.
 
 ---
 
-### Task 1: `partialPolyline` — the pure geometry
+## The complete option surface (what "full capacity" means)
 
-**Interfaces — Produces:** `partialPolyline(points: [number,number][], p: number): [number,number][]`
-— returns the sub-polyline covering the first `clamp01(p)` of total arc length, including a final
-interpolated point at the exact cut.
+### Geometry & path construction (`strokes.ts`)
+`arcTable` (cumulative length) · `windowPolyline(points, start, end)` (the core primitive) ·
+`partialPolyline(points, p)` · `pointAt(points, p)` → `{x, y, angle}` (point + tangent, for
+tracers/markers/followers) · `smoothPath(points, {curve, tension, alpha, closed, samples})` with
+curve kinds **linear · cardinal · catmullRom · basis · natural · step · stepBefore · stepAfter**
+(tension for cardinal, alpha for catmull-rom — 0.5 centripetal default, samples per segment).
 
-- [ ] **Step 1: Failing tests** — `src/render/strokes.test.ts`:
+### `StrokeStyle` (appearance)
+- **Line:** `color` (string/gradient/pattern) · `width` · `cap` (butt/round/square) · `join`
+  (miter/round/bevel) · `miterLimit`.
+- **Dashes:** `dash[]` · `dashOffset` (animate for marching-ants).
+- **Compositing:** `alpha` · `blend` (globalCompositeOperation) · `shadow {blur,color,dx,dy}`.
+- **Hand-drawn:** `roughness` (+ `seed`) via `roughen`.
+- **Variable width / brush:** `taperStart` · `taperEnd` · `widthProfile(t)→mult` · `minWidth` — any of
+  these switches the renderer to outline-fill "brush" mode (normal-offset polygon).
+- **Themed defaults:** unset `color`/`width`/`roughness` fall back to `theme.palette.ink` /
+  `theme.lineStyle`.
 
-```ts
-import { describe, expect, it } from "vitest";
-import { partialPolyline } from "./strokes";
+### Verbs (`strokeVerbs.ts`, all built on the window)
+`drawOn(p, {from: start|end|center|both})` · `erase(p)` · `passingFlash(p, {width, thinning})` (comet)
+· `drawBorderThenFill(p, {fill, fillRule, split})` · `tracedPath(mover, t, {step, dissipate})` ·
+`circumscribe(box, p, {shape, buff})`.
 
-const L: [number, number][] = [[0, 0], [10, 0], [10, 10]]; // total length 20
+### Markers & followers
+`arrowhead(at, {size,color,alpha})` (tangent-oriented, revealed on arrival) · `dot` · `tracerDot`
+(pen tip at the draw head) · `handFollower` (image at head, for whiteboard style) · `pathLength`.
 
-describe("partialPolyline", () => {
-  it("p=0 → just the start point", () => {
-    expect(partialPolyline(L, 0)).toEqual([[0, 0]]);
-  });
-  it("p=1 → the full polyline", () => {
-    expect(partialPolyline(L, 1)).toEqual(L);
-  });
-  it("p=0.5 → half arc length, cut mid-second-segment start", () => {
-    // 50% of 20 = 10 → exactly the corner
-    expect(partialPolyline(L, 0.5)).toEqual([[0, 0], [10, 0]]);
-  });
-  it("p=0.75 → interpolated point halfway up the vertical segment", () => {
-    expect(partialPolyline(L, 0.75)).toEqual([[0, 0], [10, 0], [10, 5]]);
-  });
-  it("clamps out-of-range p", () => {
-    expect(partialPolyline(L, -1)).toEqual([[0, 0]]);
-    expect(partialPolyline(L, 2)).toEqual(L);
-  });
-});
-```
+### Orchestration
+`strokeSequence(paths, t, {start, step, dur, from, style})` — staggered multi-path cascade via
+`motion.stagger` (step 0 = all at once, large = strictly sequential).
 
-- [ ] **Step 2: Run — FAIL.**
-- [ ] **Step 3: Implement `src/render/strokes.ts`:**
-
-```ts
-import { clamp01, roughen } from "../slides/anim"; // clamp01 from anim
-// NOTE: roughen lives in ../render/theme — import from there:
-// import { roughen } from "./theme";
-
-/** First `p` (0..1) of a polyline by arc length, with an interpolated final point. */
-export function partialPolyline(points: [number, number][], p: number): [number, number][] {
-  p = clamp01(p);
-  if (points.length === 0) return [];
-  if (p <= 0) return [[points[0][0], points[0][1]]];
-  // cumulative lengths
-  const cum = [0];
-  for (let i = 1; i < points.length; i++) {
-    cum.push(cum[i - 1] + Math.hypot(points[i][0] - points[i - 1][0], points[i][1] - points[i - 1][1]));
-  }
-  const total = cum[cum.length - 1];
-  if (total === 0 || p >= 1) return points.map((q) => [q[0], q[1]]);
-  const target = p * total;
-  const out: [number, number][] = [[points[0][0], points[0][1]]];
-  for (let i = 1; i < points.length; i++) {
-    if (cum[i] <= target) {
-      out.push([points[i][0], points[i][1]]);
-    } else {
-      const seg = cum[i] - cum[i - 1];
-      const f = (target - cum[i - 1]) / seg;
-      out.push([
-        points[i - 1][0] + (points[i][0] - points[i - 1][0]) * f,
-        points[i - 1][1] + (points[i][1] - points[i - 1][1]) * f,
-      ]);
-      break;
-    }
-  }
-  return out;
-}
-```
-(Correct the import: `clamp01` from `../slides/anim`, `roughen` from `./theme`.)
-
-- [ ] **Step 4: Run — PASS.** — [ ] **Step 5: Commit** `feat: partialPolyline arc-length geometry`.
+### Timing & determinism
+Progress is any easing of `t` (reuses `motion.ts`); geometry-independent because it's arc-length
+normalized; tables cached per call; seeds fixed → frame-exact on any seek.
 
 ---
 
-### Task 2: `strokeOn` — draw-on renderer
+### Task 1: Geometry core — `strokes.ts`
 
-**Interfaces — Produces:**
-```ts
-strokeOn(ctx, points: [number,number][], p: number,
-  style?: { color?: string; width?: number; roughness?: number; seed?: number; cap?: CanvasLineCap }): void
-```
+- [ ] Implement `arcTable`, `windowPolyline` (interpolated cuts at both ends), `partialPolyline`
+  (= `window(0,p)`), `pointAt` (point + tangent), and `smoothPath` with all curve kinds above
+  (centripetal Catmull-Rom via Barry-Goldman with ε-guards for coincident points; natural spline via
+  the Thomas algorithm per axis).
+- [ ] **Verify:** scratch eval — `windowPolyline(L,0,0.5)` on `[[0,0],[10,0],[10,10]]` → `[[0,0],[10,0]]`;
+  `pointAt` returns a sane tangent; each curve returns a denser polyline. Build clean.
 
-- [ ] **Step 1:** Implement in `strokes.ts`:
+### Task 2: `StrokeStyle` + renderer — `strokes.ts`
 
-```ts
-export function strokeOn(
-  ctx: CanvasRenderingContext2D,
-  points: [number, number][],
-  p: number,
-  style: { color?: string; width?: number; roughness?: number; seed?: number; cap?: CanvasLineCap } = {},
-) {
-  let pts = partialPolyline(points, p);
-  if (pts.length < 2) return;
-  if (style.roughness) pts = roughen(pts, style.roughness, style.seed ?? 1);
-  ctx.save();
-  ctx.strokeStyle = style.color ?? "#fff";
-  ctx.lineWidth = style.width ?? 2;
-  ctx.lineCap = style.cap ?? "round";
-  ctx.lineJoin = "round";
-  ctx.beginPath();
-  ctx.moveTo(pts[0][0], pts[0][1]);
-  for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i][0], pts[i][1]);
-  ctx.stroke();
-  ctx.restore();
-}
-```
+- [ ] Implement the full `StrokeStyle` interface, `resolve()` (theme defaults), `strokeWindow`
+  (dash/roughness/blend/shadow + variable-width `fillOutline` mode), and `strokeOn`.
+- [ ] **Verify:** scratch eval strokes a window without throwing under a dpr-scaled transform; build clean.
 
-- [ ] **Step 2:** Add a `strokeOn` render test using a stub ctx that records `moveTo`/`lineTo` counts
-  (assert that at `p=0.5` fewer segments are drawn than at `p=1`).
-- [ ] **Step 3:** `npm run build && npm test` — green.
-- [ ] **Step 4: Browser verify** — temporary demo: a diagram arrow/curve that draws itself as `t` sweeps; screenshot mid-draw. Remove the temp demo or keep behind a demo card.
-- [ ] **Step 5: Commit** `feat: strokeOn draw-on renderer with themed roughness`.
+### Task 3: Verbs, markers, orchestration — `strokeVerbs.ts`
+
+- [ ] Implement `drawOn`/`erase`/`passingFlash`/`drawBorderThenFill`/`tracedPath`/`circumscribe`,
+  `arrowhead`/`dot`/`tracerDot`/`handFollower`/`pathLength`, and `strokeSequence`.
+- [ ] **Verify:** build clean.
+
+### Task 4: Demo scene + card + browser verify
+
+- [ ] `src/slides/strokesDemo.ts` — one seekable scene exercising draw-on+arrowhead+tracer, a
+  Catmull-Rom curve, a tapered brush, a passing-flash comet, border-then-fill, a dissipating traced
+  path, circumscribe, and a staggered ray sequence. Add a card to `App.tsx`.
+- [ ] **Browser verify:** scrub the demo; confirm each verb; confirm the other two films don't regress.
+  Screenshot. **Leave uncommitted.**
+
+> **Latent-bug fix folded in here (important):** the player's first `draw(0)` can run before the canvas
+> is laid out (`clientWidth/Height === 0`), producing a 0×0 layer canvas and an `InvalidStateError` from
+> `finish()`'s `drawImage`. This is a pre-existing race (it was the real cause of the intermittent
+> "blank card" seen in Step 03, not HMR). Fix with two guards: bail out of `CanvasSlide.draw` when the
+> canvas has no size (the `ResizeObserver` redraws once it does), and skip compositing in
+> `frame.finish()` when the target canvas area is 0.
 
 ---
 
 ## Self-review checklist
 
-- `partialPolyline` exact at endpoints/corners/interpolated cut; clamped; tested. ✅
-- `strokeOn` deterministic, themed width/roughness. ✅
+- One primitive (`windowPolyline`), every verb a thin wrapper. ✅
+- Full option surface present and defaulted; hand-drawn + variable-width both supported. ✅
+- Deterministic/seekable; arc-length normalized; seeds fixed. ✅
+- Strokes compose with Step 03 layer FX (bloom/shadow) and Step 02 themes. ✅
+- 0-size-canvas race guarded. ✅
+
+## Post-review refinements (folded in)
+
+- `arcTable` memoised by array identity (WeakMap) — static paths cost O(1)/frame instead of O(n) on
+  every `windowPolyline`/`pointAt`/`fillOutline` call.
+- Variable-width brush gets **round end-caps** (`cap:"round"`, default) via a disc at each non-tapered
+  end; tapered-to-a-point ends skip it automatically.
+- `basis` spline doubles its endpoints (no end kink) instead of forcing a final point.
+- `passingFlash({ glow: true })` composites the sliver additively (`lighter`) for a light-sweep.
+- Doc note: `dash` is stroke-only (ignored in brush mode, where `cap` selects round vs. flat ends).
 
 ## What this unlocks
 
-Self-drawing diagrams, arrows, geometry, and (with Step 17) equations — used by callouts (07),
-plots (12), maths (17), and maps (16, drawing routes/borders on).
+Self-drawing diagrams, arrows, geometry, and (with Step 17) equations. Direct dependency of callouts
+(07, leader lines), plots/charts (12, axes + curves plotting on), maps (16, routes/borders drawing on),
+and math (17). The stroke vocabulary is the engine's core "construction" verb set.

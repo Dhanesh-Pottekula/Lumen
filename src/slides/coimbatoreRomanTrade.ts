@@ -2,8 +2,17 @@
  * Coimbatore tutorial · slide 2 — "Roman gold on the Noyyal".
  * A Roman ship arrives, gold coins pile up along the river, and the exports —
  * pepper, cloth, beryl — flow back. Pure renderFrame(t).
+ *
+ * Layer routing (Step 01): timeline rule + river ribbon on bg; ship + coins art on mid;
+ * coin shine / spice motes / glows on fg (bloom); all text on annotation; a landfall
+ * flash overlay on fx. Entrances use reveal wipes; the sea route draws on; the coin
+ * beat lands with focus rings using the theme accent. Falls back to the single ctx.
  */
-import { cycle, easeOutCubic, fadeText, lerp, phase, prng } from "./anim";
+import { breathe, cycle, easeOutCubic, fadeText, lerp, phase, prng } from "./anim";
+import { focusRings, highlightRing } from "../render/focus";
+import { wipe } from "../render/reveal";
+import { smoothPath } from "../render/strokes";
+import { drawOn, passingFlash, tracedPath } from "../render/strokeVerbs";
 import type { CanvasSlideDefinition } from "./types";
 
 const W = 920;
@@ -23,6 +32,15 @@ const COINS: Coin[] = Array.from({ length: 12 }, (_, i) => ({
   at: 8 + i * 0.75,
   spin: rand() * Math.PI,
 }));
+
+/* The sea route the ship traces in — a curved approach toward the anchorage. */
+const SEA_ROUTE = smoothPath([
+  [-90, 96],
+  [-10, 118],
+  [70, 138],
+  [140, 150],
+  [172, 150],
+]);
 
 function drawShip(ctx: CanvasRenderingContext2D, x: number, y: number, alpha: number) {
   if (alpha <= 0) return;
@@ -60,15 +78,14 @@ function drawShip(ctx: CanvasRenderingContext2D, x: number, y: number, alpha: nu
   ctx.restore();
 }
 
-function drawCoin(ctx: CanvasRenderingContext2D, c: Coin, t: number) {
+/** The static coin disc (goes on mid) — emperor's profile and rim. */
+function drawCoinBody(ctx: CanvasRenderingContext2D, c: Coin, t: number) {
   const p = phase(t, c.at, c.at + 1.1);
   if (p <= 0) return;
   const fall = easeOutCubic(p);
   const y = lerp(40, c.y, fall);
   ctx.save();
   ctx.translate(c.x, y);
-  // shine sweep passes over the pile
-  const shine = Math.max(0, Math.sin(t * 0.9 + c.spin)) * 0.35;
   ctx.beginPath();
   ctx.arc(0, 0, 10, 0, 7);
   ctx.fillStyle = "#d9a73a";
@@ -84,13 +101,24 @@ function drawCoin(ctx: CanvasRenderingContext2D, c: Coin, t: number) {
   ctx.strokeStyle = "#8a6420";
   ctx.lineWidth = 1.6;
   ctx.stroke();
-  if (shine > 0) {
-    ctx.globalAlpha = shine;
-    ctx.beginPath();
-    ctx.arc(0, 0, 10, 0, 7);
-    ctx.fillStyle = "#fff3cf";
-    ctx.fill();
-  }
+  ctx.restore();
+}
+
+/** The travelling shine sweep over a coin (goes on fg for bloom). */
+function drawCoinShine(ctx: CanvasRenderingContext2D, c: Coin, t: number) {
+  const p = phase(t, c.at, c.at + 1.1);
+  if (p <= 0) return;
+  const fall = easeOutCubic(p);
+  const y = lerp(40, c.y, fall);
+  const shine = Math.max(0, Math.sin(t * 0.9 + c.spin)) * 0.35;
+  if (shine <= 0) return;
+  ctx.save();
+  ctx.translate(c.x, y);
+  ctx.globalAlpha = shine;
+  ctx.beginPath();
+  ctx.arc(0, 0, 10, 0, 7);
+  ctx.fillStyle = "#fff3cf";
+  ctx.fill();
   ctx.restore();
 }
 
@@ -146,71 +174,154 @@ export const coimbatoreRomanTradeSlide: CanvasSlideDefinition = {
     { at: 15, text: "and what walked back: pepper, fine kongu cotton, and beryl — the green gemstone rome adored, mined right here." },
     { at: 21, text: "this is coimbatore's oldest habit: sit on the route, make what travels well, and trade it far." },
   ],
-  render(ctx, t) {
-    ctx.clearRect(0, 0, W, H);
+  render(ctx, t, frame) {
+    const bg = frame?.layer.ctx("bg") ?? ctx;
+    const mid = frame?.layer.ctx("mid") ?? ctx;
+    const fg = frame?.layer.ctx("fg") ?? ctx;
+    const ann = frame?.layer.ctx("annotation") ?? ctx;
+    const fx = frame?.layer.ctx("fx") ?? ctx;
+    const accent = frame?.theme.palette.accent ?? "#5cc8ae";
+    if (!frame) ctx.clearRect(0, 0, W, H);
 
-    // timeline across the top
+    // timeline across the top — wipes on left→right (bg rule, fg marker glow, annotation labels)
     const tlIn = phase(t, 0.5, 2.5);
     if (tlIn > 0) {
-      ctx.save();
-      ctx.globalAlpha = tlIn;
-      ctx.strokeStyle = "#2b3640";
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(150, 40);
-      ctx.lineTo(770, 40);
-      ctx.stroke();
+      wipe(
+        bg,
+        tlIn,
+        W,
+        H,
+        (c) => {
+          c.save();
+          c.strokeStyle = "#2b3640";
+          c.lineWidth = 2;
+          c.beginPath();
+          c.moveTo(150, 40);
+          c.lineTo(770, 40);
+          c.stroke();
+          c.restore();
+        },
+        { dir: "left", ease: easeOutCubic },
+      );
       const marker = lerp(150, 770, Math.min(1, t / 24));
-      ctx.beginPath();
-      ctx.arc(marker, 40, 5, 0, 7);
-      ctx.fillStyle = "#e8a13c";
-      ctx.fill();
-      ctx.restore();
-      fadeText(ctx, "300 BCE", 150, 62, tlIn, "11px -apple-system, sans-serif", "#93a4b0");
-      fadeText(ctx, "SANGAM ERA", 460, 26, tlIn, "600 11px -apple-system, sans-serif", "#7d90a5");
-      fadeText(ctx, "300 CE", 770, 62, tlIn, "11px -apple-system, sans-serif", "#93a4b0");
+      fg.save();
+      fg.globalAlpha = tlIn;
+      fg.beginPath();
+      fg.arc(marker, 40, 5, 0, 7);
+      fg.fillStyle = "#e8a13c";
+      fg.fill();
+      fg.restore();
+      fadeText(ann, "300 BCE", 150, 62, tlIn, "11px -apple-system, sans-serif", "#93a4b0");
+      fadeText(ann, "SANGAM ERA", 460, 26, tlIn, "600 11px -apple-system, sans-serif", "#7d90a5");
+      fadeText(ann, "300 CE", 770, 62, tlIn, "11px -apple-system, sans-serif", "#93a4b0");
     }
 
-    // the Noyyal — a flowing ribbon along the bottom
+    // the Noyyal — a flowing ribbon along the bottom (bg)
     const riverIn = phase(t, 1, 3);
     if (riverIn > 0) {
-      ctx.save();
-      ctx.globalAlpha = riverIn;
+      bg.save();
+      bg.globalAlpha = riverIn;
       for (let line = 0; line < 3; line++) {
-        ctx.beginPath();
+        bg.beginPath();
         for (let x = 0; x <= W; x += 10) {
           const y = 372 + line * 12 + Math.sin(x * 0.02 + t * 1.4 + line) * 6;
-          if (x === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
+          if (x === 0) bg.moveTo(x, y);
+          else bg.lineTo(x, y);
         }
-        ctx.strokeStyle = line === 1 ? "#3e7c8f" : "#2f5d6d";
-        ctx.lineWidth = line === 1 ? 3 : 1.6;
-        ctx.stroke();
+        bg.strokeStyle = line === 1 ? "#3e7c8f" : "#2f5d6d";
+        bg.lineWidth = line === 1 ? 3 : 1.6;
+        bg.stroke();
       }
-      ctx.restore();
-      fadeText(ctx, "the Noyyal", 60, 358, riverIn * 0.9, "italic 12px -apple-system, sans-serif", "#5d8a99", "left");
+      bg.restore();
+      fadeText(ann, "the Noyyal", 60, 358, riverIn * 0.9, "italic 12px -apple-system, sans-serif", "#5d8a99", "left");
     }
 
-    // ship sails in, bobbing
+    // sea route draws on ahead of the ship (fg, faint light-blue), then the ship's wake trails behind it
+    const routeIn = phase(t, 1.2, 4.5);
+    if (routeIn > 0) {
+      drawOn(fg, SEA_ROUTE, routeIn, {
+        style: { color: "rgba(126,208,255,0.5)", width: 2, dash: [7, 8], blend: "lighter" },
+      });
+    }
+
+    // ship sails in, bobbing (mid); wake it leaves is a dissipating traced trail (fg)
     const shipIn = phase(t, 1.5, 8);
-    drawShip(ctx, lerp(-90, 170, easeOutCubic(shipIn)), 150 + Math.sin(t * 1.1) * 4, phase(t, 1.5, 3));
+    const shipX = lerp(-90, 170, easeOutCubic(shipIn));
+    const shipY = 150 + Math.sin(t * 1.1) * 4;
+    if (t < 8.2) {
+      tracedPath(fg, (tt) => [lerp(-90, 170, easeOutCubic(phase(tt, 1.5, 8))), 172], t, {
+        dissipate: 2.2,
+        style: { color: "rgba(200,225,240,0.28)", width: 5, cap: "round", blend: "lighter" },
+      });
+    }
+    drawShip(mid, shipX, shipY, phase(t, 1.5, 3));
 
-    // coins fall into a pile
-    for (const c of COINS) drawCoin(ctx, c, t);
-    fadeText(ctx, "roman gold hoards, found along the river", 395, 352, phase(t, 11, 13) * 0.9, "11px -apple-system, sans-serif", "#b08a3c");
+    // coins fall into a pile — bodies on mid, travelling shine on fg (bloom)
+    for (const c of COINS) drawCoinBody(mid, c, t);
+    for (const c of COINS) drawCoinShine(fg, c, t);
+    fadeText(ann, "roman gold hoards, found along the river", 395, 352, phase(t, 11, 13) * 0.9, "11px -apple-system, sans-serif", "#b08a3c");
 
-    // exports flow to the ship
+    // beat: focus rings converge on the freshly-arrived hoard as the coins settle (fg, accent)
+    const coinBeat = phase(t, 12.2, 13.6);
+    if (coinBeat > 0 && coinBeat < 1) {
+      focusRings(fg, 395, 312, coinBeat, { color: accent, maxR: 130, targetR: 44, count: 3 });
+    }
+    if (t >= 13.2 && t < 15.5) {
+      highlightRing(fg, 395, 312, 46, t, { color: accent, amp: 3, period: 1.6, width: 2, alpha: phase(t, 13.2, 13.8) * (1 - phase(t, 14.6, 15.5)) });
+    }
+
+    // exports flow to the ship — spice motes on fg (bloom); a passing light-sweep marks the route to Rome
     const exportsIn = phase(t, 15, 17);
     for (let k = 0; k < 3; k++) {
       for (let j = 0; j < 3; j++) {
-        drawExport(ctx, k, cycle(t * 0.13 + j / 3 + k * 0.11), exportsIn);
+        drawExport(fg, k, cycle(t * 0.13 + j / 3 + k * 0.11), exportsIn);
       }
     }
     if (exportsIn > 0) {
-      fadeText(ctx, "→ to Rome:  pepper · cotton · beryl", 480, 148, exportsIn, "600 13px -apple-system, sans-serif", "#5cc8ae");
+      const sweep = cycle((t - 15) * 0.35);
+      passingFlash(
+        fg,
+        smoothPath([
+          [760, 172],
+          [520, 168],
+          [280, 190],
+          [210, 210],
+        ]),
+        sweep,
+        { width: 0.3, thinning: true, glow: true, style: { color: "rgba(92,200,174,0.7)", width: 3 } },
+      );
+      fadeText(ann, "→ to Rome:  pepper · cotton · beryl", 480, 148, exportsIn, "600 13px -apple-system, sans-serif", "#5cc8ae");
     }
 
-    // title
-    fadeText(ctx, "the first customers were roman", 460, lerp(220, 96, phase(t, 0.5, 2)), phase(t, 0.2, 1.4), "700 19px -apple-system, sans-serif", "#e8eef2");
+    // a soft landfall flash on the anchorage the moment the ship settles (fx overlay)
+    const landfall = phase(t, 7.2, 9.2);
+    if (landfall > 0 && landfall < 1) {
+      fx.save();
+      fx.globalCompositeOperation = "lighter";
+      fx.globalAlpha = Math.sin(landfall * Math.PI) * 0.5;
+      const g = fx.createRadialGradient(170, 150, 4, 170, 150, 120);
+      g.addColorStop(0, "rgba(255,240,200,0.8)");
+      g.addColorStop(1, "rgba(255,240,200,0)");
+      fx.fillStyle = g;
+      fx.beginPath();
+      fx.arc(170, 150, 120, 0, 7);
+      fx.fill();
+      fx.restore();
+    }
+
+    // title — enters on a wipe, then breathes gently so nothing sits frozen (annotation)
+    const titleIn = phase(t, 0.2, 1.4);
+    const titleY = lerp(220, 96, phase(t, 0.5, 2));
+    if (titleIn > 0) {
+      const bob = 1 + breathe(t, 4, 0.4);
+      wipe(
+        ann,
+        titleIn,
+        W,
+        H,
+        (c) => fadeText(c, "the first customers were roman", 460, titleY * bob, 1, "700 19px -apple-system, sans-serif", "#e8eef2"),
+        { dir: "left", feather: 40, ease: easeOutCubic },
+      );
+    }
   },
 };

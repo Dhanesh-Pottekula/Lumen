@@ -2,8 +2,17 @@
  * Coimbatore tutorial · slide 1 — "The gap in the mountains".
  * A stylised top-down map: the Western Ghats wall, the Palghat Gap, and the trade
  * route that squeezed through it. Pure renderFrame(t) — all motion derives from t.
+ *
+ * Layer routing (Step 01): flat land/sea fills → bg; mountains + city dots → mid (soft shadow
+ * gives depth); gap glow, drawn-on route, caravan dots, Coimbatore halo + attention marks → fg
+ * (they bloom); all text → annotation; the finale spotlight scrim → fx (isolated so its holes
+ * cut the scrim, not the scene). Falls back to the single ctx when no frame is supplied.
  */
-import { cycle, fadeText, lerp, makePath, phase, prng } from "./anim";
+import { breathe, cycle, fadeText, lerp, makePath, phase, prng, smooth } from "./anim";
+import { convergingArrows, dimExcept, focusRings, highlightRing } from "../render/focus";
+import { wipe } from "../render/reveal";
+import { drawOn, passingFlash } from "../render/strokeVerbs";
+import type { Pt } from "../render/strokes";
 import type { CanvasSlideDefinition } from "./types";
 
 const W = 920;
@@ -26,14 +35,20 @@ for (let y = 258; y <= 392; y += 26) {
 }
 
 /* The trade route: Muziris (coast) → through the gap → Coimbatore → Karur → east. */
-const ROUTE = makePath([
+const ROUTE_PTS: [number, number][] = [
   [92, 150],
   [190, 195],
   [300, 222],
   [430, 216],
   [640, 228],
   [880, 232],
-]);
+];
+const ROUTE = makePath(ROUTE_PTS);
+/* Densely sampled polyline for the stroke verbs (drawOn / passingFlash). */
+const ROUTE_POLY: Pt[] = Array.from({ length: 81 }, (_, i) => {
+  const p = ROUTE.at((i / 80) * ROUTE.length);
+  return [p.x, p.y] as Pt;
+});
 const COIMBATORE: [number, number] = [430, 216];
 
 function drawPeak(ctx: CanvasRenderingContext2D, p: Peak, rise: number) {
@@ -88,70 +103,75 @@ export const coimbatoreGeographySlide: CanvasSlideDefinition = {
     { at: 13, text: "so it did — for two thousand years. gold and spices moving one way, cotton and cloth the other, caravan after caravan." },
     { at: 24, text: "the town waiting at the gap's mouth taxed it, traded it, and grew. geography made coimbatore a crossroads before anyone planned one." },
   ],
-  render(ctx, t) {
-    ctx.clearRect(0, 0, W, H);
+  render(ctx, t, frame) {
+    const bg = frame?.layer.ctx("bg") ?? ctx;
+    const mid = frame?.layer.ctx("mid") ?? ctx;
+    const fg = frame?.layer.ctx("fg") ?? ctx;
+    const ann = frame?.layer.ctx("annotation") ?? ctx;
+    const fx = frame?.layer.ctx("fx") ?? ctx;
+    if (!frame) ctx.clearRect(0, 0, W, H);
+
+    const accent = frame?.theme.palette.accent ?? "#5cc8ae";
 
     const landIn = phase(t, 0, 2.5);
 
-    // land
-    ctx.globalAlpha = landIn;
-    ctx.fillStyle = "#232c33";
-    ctx.fillRect(0, 0, W, H);
+    // land + sea wiped in from the west (the coast) instead of a flat fade (bg)
+    const drawLand = (c: CanvasRenderingContext2D) => {
+      c.fillStyle = "#232c33";
+      c.fillRect(0, 0, W, H);
+      // sea along the west with a wavy coastline
+      c.beginPath();
+      c.moveTo(0, 0);
+      c.lineTo(118, 0);
+      for (let y = 0; y <= H; y += 8) c.lineTo(114 + Math.sin(y * 0.045) * 10, y);
+      c.lineTo(0, H);
+      c.closePath();
+      c.fillStyle = "#1b3442";
+      c.fill();
+    };
+    // reveal grammar: sweep the terrain in from the west coast (feathered edge)
+    wipe(bg, landIn, W, H, drawLand, { dir: "left", feather: 60, ease: smooth });
+    fadeText(ann, "A R A B I A N   S E A", 56, 220, landIn * 0.8, "11px -apple-system, sans-serif", "#4d7286");
 
-    // sea along the west with a wavy coastline
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(118, 0);
-    for (let y = 0; y <= H; y += 8) ctx.lineTo(114 + Math.sin(y * 0.045) * 10, y);
-    ctx.lineTo(0, H);
-    ctx.closePath();
-    ctx.fillStyle = "#1b3442";
-    ctx.fill();
-    fadeText(ctx, "A R A B I A N   S E A", 56, 220, landIn * 0.8, "11px -apple-system, sans-serif", "#4d7286");
-    ctx.globalAlpha = 1;
-
-    // mountains rise, staggered
+    // mountains rise, staggered (mid — soft drop-shadow depth)
     const mountainsIn = phase(t, 1.5, 7);
-    for (const p of PEAKS) drawPeak(ctx, p, phase(mountainsIn, p.order * 0.55, p.order * 0.55 + 0.45));
-    fadeText(ctx, "WESTERN GHATS", 296, 34, phase(t, 5, 7) * 0.9, "600 12px -apple-system, sans-serif", "#7d90a5");
+    for (const p of PEAKS) drawPeak(mid, p, phase(mountainsIn, p.order * 0.55, p.order * 0.55 + 0.45));
+    fadeText(ann, "WESTERN GHATS", 296, 34, phase(t, 5, 7) * 0.9, "600 12px -apple-system, sans-serif", "#7d90a5");
 
-    // the gap: a pulsing pass between the ranges
+    // the gap: a pass between the ranges, glow gently breathing (fg — blooms)
     const gapIn = phase(t, 7, 10);
     if (gapIn > 0) {
-      ctx.save();
-      ctx.globalAlpha = gapIn * (0.5 + 0.3 * Math.sin(t * 2.2));
-      const glow = ctx.createRadialGradient(300, 222, 4, 300, 222, 56);
+      fg.save();
+      // breathe() oscillates around 1 by ±0.3 → maps to alpha ~0.25..0.85
+      fg.globalAlpha = gapIn * (breathe(t, 2.2, 0.3) * 0.55);
+      const glow = fg.createRadialGradient(300, 222, 4, 300, 222, 56 * breathe(t, 2.4, 0.08));
       glow.addColorStop(0, "rgba(232, 161, 60, 0.55)");
       glow.addColorStop(1, "rgba(232, 161, 60, 0)");
-      ctx.fillStyle = glow;
-      ctx.fillRect(230, 160, 150, 124);
-      ctx.restore();
-      fadeText(ctx, "PALGHAT GAP", 300, 268, gapIn, "700 12px -apple-system, sans-serif", "#e8a13c");
-      fadeText(ctx, "~30 km wide", 300, 283, gapIn * 0.8, "10px -apple-system, sans-serif", "#93a4b0");
+      fg.fillStyle = glow;
+      fg.fillRect(230, 160, 150, 124);
+      fg.restore();
+      fadeText(ann, "PALGHAT GAP", 300, 268, gapIn, "700 12px -apple-system, sans-serif", "#e8a13c");
+      fadeText(ann, "~30 km wide", 300, 283, gapIn * 0.8, "10px -apple-system, sans-serif", "#93a4b0");
     }
 
-    // route line dashes flowing
+    // route: draws ON through the gap, then a bright glow sliver re-energizes it (fg)
     const routeIn = phase(t, 12, 15);
     if (routeIn > 0) {
-      ctx.save();
-      ctx.globalAlpha = routeIn * 0.5;
-      ctx.setLineDash([7, 9]);
-      ctx.lineDashOffset = -t * 26;
-      ctx.beginPath();
-      const steps = 60;
-      for (let i = 0; i <= steps; i++) {
-        const p = ROUTE.at((i / steps) * ROUTE.length);
-        if (i === 0) ctx.moveTo(p.x, p.y);
-        else ctx.lineTo(p.x, p.y);
-      }
-      ctx.strokeStyle = "#8ea2b5";
-      ctx.lineWidth = 1.6;
-      ctx.stroke();
-      ctx.restore();
+      drawOn(fg, ROUTE_POLY, routeIn, {
+        from: "start",
+        style: { color: "#8ea2b5", width: 1.8, alpha: 0.6, cap: "round" },
+      });
+      // repeating light-sweep along the drawn portion, cycling every ~3.5s
+      passingFlash(fg, ROUTE_POLY, cycle(t * 0.28), {
+        width: 0.16,
+        thinning: true,
+        glow: true,
+        style: { color: "#e8c98a", width: 2.6, alpha: routeIn },
+      });
     }
-    drawCaravan(ctx, t, phase(t, 13, 16));
+    drawCaravan(fg, t, phase(t, 13, 16));
 
-    // ports and towns
+    // ports and towns (dots on mid, labels on annotation)
     const cities: [string, number, number, number][] = [
       ["Muziris (port)", 92, 150, 3],
       ["Karur", 640, 228, 14],
@@ -160,35 +180,36 @@ export const coimbatoreGeographySlide: CanvasSlideDefinition = {
     for (const [label, x, y, appear] of cities) {
       const a = phase(t, appear, appear + 1.5);
       if (a <= 0) continue;
-      ctx.save();
-      ctx.globalAlpha = a;
-      ctx.beginPath();
-      ctx.arc(x, y, 4, 0, 7);
-      ctx.fillStyle = "#c3d0da";
-      ctx.fill();
-      ctx.restore();
-      fadeText(ctx, label, x, y - 10, a, "11px -apple-system, sans-serif", "#aebbc6");
+      mid.save();
+      mid.globalAlpha = a;
+      mid.beginPath();
+      mid.arc(x, y, 4, 0, 7);
+      mid.fillStyle = "#c3d0da";
+      mid.fill();
+      mid.restore();
+      fadeText(ann, label, x, y - 10, a, "11px -apple-system, sans-serif", "#aebbc6");
     }
 
     // Coimbatore — the star of the show
     const cbeIn = phase(t, 10, 12);
+    const finale = phase(t, 24, 27);
     if (cbeIn > 0) {
       const pulse = 1 + 0.25 * Math.sin(t * 3);
-      const finale = phase(t, 24, 27);
-      ctx.save();
-      ctx.globalAlpha = cbeIn;
-      const halo = ctx.createRadialGradient(COIMBATORE[0], COIMBATORE[1], 2, COIMBATORE[0], COIMBATORE[1], 26 * pulse * (1 + finale));
+      // halo + dot on fg (blooms)
+      fg.save();
+      fg.globalAlpha = cbeIn;
+      const halo = fg.createRadialGradient(COIMBATORE[0], COIMBATORE[1], 2, COIMBATORE[0], COIMBATORE[1], 26 * pulse * (1 + finale));
       halo.addColorStop(0, "rgba(92, 200, 174, 0.8)");
       halo.addColorStop(1, "rgba(92, 200, 174, 0)");
-      ctx.fillStyle = halo;
-      ctx.fillRect(COIMBATORE[0] - 60, COIMBATORE[1] - 60, 120, 120);
-      ctx.beginPath();
-      ctx.arc(COIMBATORE[0], COIMBATORE[1], 5.5, 0, 7);
-      ctx.fillStyle = "#5cc8ae";
-      ctx.fill();
-      ctx.restore();
+      fg.fillStyle = halo;
+      fg.fillRect(COIMBATORE[0] - 60, COIMBATORE[1] - 60, 120, 120);
+      fg.beginPath();
+      fg.arc(COIMBATORE[0], COIMBATORE[1], 5.5, 0, 7);
+      fg.fillStyle = "#5cc8ae";
+      fg.fill();
+      fg.restore();
       fadeText(
-        ctx,
+        ann,
         "COIMBATORE",
         COIMBATORE[0],
         COIMBATORE[1] - 16,
@@ -196,28 +217,60 @@ export const coimbatoreGeographySlide: CanvasSlideDefinition = {
         `700 ${13 + finale * 5}px -apple-system, sans-serif`,
         "#e8eef2",
       );
-      fadeText(ctx, "the crossroads town", COIMBATORE[0], COIMBATORE[1] + 30, finale, "12px -apple-system, sans-serif", "#93a4b0");
+      fadeText(ann, "the crossroads town", COIMBATORE[0], COIMBATORE[1] + 30, finale, "12px -apple-system, sans-serif", "#93a4b0");
     }
 
-    // legend for the caravan colors
+    // finale attention: spotlight scrim + converging focus rings land on Coimbatore
+    if (finale > 0) {
+      // brief scrim on the isolated fx layer so its holes cut the scrim, not the scene
+      const dim = Math.sin(phase(t, 24, 26.5) * Math.PI); // rises then releases
+      dimExcept(fx, [{ cx: COIMBATORE[0], cy: COIMBATORE[1], r: 70 }], {
+        intensity: dim * 0.45,
+        feather: 40,
+      });
+      // rings converge onto the town, then a steady wobble ring holds the emphasis (fg)
+      focusRings(fg, COIMBATORE[0], COIMBATORE[1], phase(t, 24, 26), {
+        count: 3,
+        maxR: 120,
+        targetR: 16,
+        color: accent,
+      });
+      highlightRing(fg, COIMBATORE[0], COIMBATORE[1], 22, t, {
+        amp: 3,
+        period: 1.6,
+        color: accent,
+        width: 2.5,
+        alpha: finale * 0.9,
+      });
+      convergingArrows(fg, COIMBATORE[0], COIMBATORE[1], phase(t, 24.5, 26.5), {
+        count: 4,
+        ring: 96,
+        targetR: 28,
+        color: accent,
+        width: 2.5,
+        rotation: Math.PI / 4,
+      });
+    }
+
+    // legend for the caravan colors (dots on fg, text on annotation)
     const legendIn = phase(t, 15, 17);
     if (legendIn > 0) {
-      ctx.save();
-      ctx.globalAlpha = legendIn * 0.9;
-      ctx.fillStyle = "#e8a13c";
-      ctx.beginPath();
-      ctx.arc(560, 388, 4, 0, 7);
-      ctx.fill();
-      ctx.fillStyle = "#5cc8ae";
-      ctx.beginPath();
-      ctx.arc(560, 406, 4, 0, 7);
-      ctx.fill();
-      ctx.restore();
-      fadeText(ctx, "gold & spices moving inland", 572, 392, legendIn, "11px -apple-system, sans-serif", "#93a4b0", "left");
-      fadeText(ctx, "cotton & cloth moving to the coast", 572, 410, legendIn, "11px -apple-system, sans-serif", "#93a4b0", "left");
+      fg.save();
+      fg.globalAlpha = legendIn * 0.9;
+      fg.fillStyle = "#e8a13c";
+      fg.beginPath();
+      fg.arc(560, 388, 4, 0, 7);
+      fg.fill();
+      fg.fillStyle = "#5cc8ae";
+      fg.beginPath();
+      fg.arc(560, 406, 4, 0, 7);
+      fg.fill();
+      fg.restore();
+      fadeText(ann, "gold & spices moving inland", 572, 392, legendIn, "11px -apple-system, sans-serif", "#93a4b0", "left");
+      fadeText(ann, "cotton & cloth moving to the coast", 572, 410, legendIn, "11px -apple-system, sans-serif", "#93a4b0", "left");
     }
 
-    // title
-    fadeText(ctx, "why here?", 460, lerp(210, 26, phase(t, 0.8, 2.5)), phase(t, 0.3, 1.4), "700 20px -apple-system, sans-serif", "#e8eef2");
+    // title (annotation)
+    fadeText(ann, "why here?", 460, lerp(210, 26, phase(t, 0.8, 2.5)), phase(t, 0.3, 1.4), "700 20px -apple-system, sans-serif", "#e8eef2");
   },
 };

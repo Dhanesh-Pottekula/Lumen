@@ -6,7 +6,7 @@
  * Pure renderFrame(t).
  */
 import { img } from "../assets/photosynthesis";
-import { drawSvg, fadeText, phase, prng } from "./anim";
+import { breathe, drawSvg, fadeText, phase, prng } from "./anim";
 import type { CanvasSlideDefinition } from "./types";
 
 const W = 920;
@@ -51,7 +51,8 @@ export const photoChloroplastSlide: CanvasSlideDefinition = {
     const bodyIn = phase(t, 0.3, 2.5);
     const cutaway = img("chloroplastCutaway");
     if (cutaway) {
-      drawSvg(mid, cutaway, CX, CY, RX * 2 + 24, RY * 2 + 24, { alpha: bodyIn });
+      const b = breathe(t, 7, 0.012); // gentle idle "breath" so the hero is never perfectly frozen
+      drawSvg(mid, cutaway, CX, CY, (RX * 2 + 24) * b, (RY * 2 + 24) * b, { alpha: bodyIn });
     } else {
       mid.save();
       mid.globalAlpha = bodyIn;

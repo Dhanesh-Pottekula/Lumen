@@ -6,7 +6,7 @@
  * Pure renderFrame(t).
  */
 import { img } from "../assets/photosynthesis";
-import { clamp01, drawSvg, fadeText, lerp, phase, prng } from "./anim";
+import { breathe, clamp01, drawSvg, fadeText, lerp, phase, prng } from "./anim";
 import type { CanvasSlideDefinition } from "./types";
 
 const W = 920;
@@ -103,7 +103,8 @@ export const photoLeafCellSlide: CanvasSlideDefinition = {
       // cell body — SVG hero art, with a primitive fallback
       const cellImg = img("cell");
       if (cellImg) {
-        drawSvg(mid, cellImg, CELL.x, CELL.y, CELL.r * 2.08, CELL.r * 2.08);
+        const b = breathe(t, 8, 0.01); // barely-there idle breath so the cell isn't perfectly frozen
+        drawSvg(mid, cellImg, CELL.x, CELL.y, CELL.r * 2.08 * b, CELL.r * 2.08 * b);
       } else {
         mid.fillStyle = "#20323f";
         mid.strokeStyle = "#6db06a";
