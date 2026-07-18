@@ -61,6 +61,11 @@ export interface CategoryDatumSpec {
   category?: string;
 }
 
+export type MapIconToken =
+  | "arrow" | "check" | "cross" | "plus" | "minus" | "star" | "heart" | "circle" | "square" | "triangle"
+  | "gear" | "bolt" | "drop" | "sun" | "leaf" | "flame" | "factory" | "home" | "person" | "book"
+  | "flask" | "atom" | "clock" | "pin" | "warning" | "info" | "search" | "cloud" | "mountain" | "seed";
+
 export interface MapFeatureSpec {
   id: string;
   rings: [number, number][][];
@@ -90,7 +95,26 @@ export interface SvgCompositePartSpec {
   initial?: "hidden" | "visible";
   /** Teaching aid that must be explicitly hidden before the scene finishes. */
   temporary?: boolean;
+  /** Compiler-produced targeting confidence. Not accepted in authored svg-composite JSON. */
+  boundsPrecision?: "exact" | "conservative" | "viewbox-fallback";
+  /** Why automatic targeting had to use conservative or whole-artwork bounds. */
+  boundsReason?: string;
 }
+
+interface ChartBase {
+  xDomain?: [number, number];
+  yDomain?: [number, number];
+  axes?: boolean;
+  xLabel?: string;
+  yLabel?: string;
+}
+
+export type ChartObjectSpec = ObjectBase & ChartBase & (
+  | { kind: "chart"; chart: "bar" | "pie" | "donut"; data: CategoryDatumSpec[] }
+  | { kind: "chart"; chart: "line" | "area" | "scatter"; series: [number, number][] }
+  | { kind: "chart"; chart: "function"; function: string }
+  | { kind: "chart"; chart: "riemann"; function: string; rectangles?: "few" | "several" | "many" | "dense" }
+);
 
 export type ObjectSpec =
   | (ObjectBase & {
@@ -149,24 +173,12 @@ export type ObjectSpec =
       domain?: [number, number];
       appearance?: "solid" | "dashed";
     })
-  | (ObjectBase & {
-      kind: "chart";
-      chart: "bar" | "line" | "area" | "scatter" | "pie" | "donut" | "function" | "riemann";
-      data?: CategoryDatumSpec[];
-      series?: [number, number][];
-      function?: string;
-      rectangles?: "few" | "several" | "many" | "dense";
-      xDomain?: [number, number];
-      yDomain?: [number, number];
-      axes?: boolean;
-      xLabel?: string;
-      yLabel?: string;
-    })
+  | ChartObjectSpec
   | (ObjectBase & { kind: "legend"; categories: string[] })
   | (ObjectBase & {
       kind: "map";
       features: MapFeatureSpec[];
-      markers?: Array<{ lon: number; lat: number; label?: string; icon?: string; category?: string }>;
+      markers?: Array<{ lon: number; lat: number; label?: string; icon?: MapIconToken; category?: string }>;
       places?: MapPlaceSpec[];
       flows?: MapFlowSpec[];
       outline?: [number, number][];
@@ -209,24 +221,36 @@ export type ActionSpec =
       returnTo?: "overview";
       stops: Array<{ target: string; label: string; shot?: ShotToken }>;
     }
+  | { do: "motion"; target: string; motion: "move"; to: string }
+  | { do: "motion"; target: string; motion: "fall"; to: string; bounce?: "none" | "soft" | "strong" }
   | {
       do: "motion";
       target: string;
-      motion: "move" | "fall" | "orbit" | "along" | "spin";
-      to?: string;
-      around?: string;
-      along?: string;
+      motion: "orbit";
+      around: string;
       orbit?: "small" | "medium" | "large";
       turns?: "half" | "one" | "two" | "many";
-      bounce?: "none" | "soft" | "strong";
       direction?: "clockwise" | "counterclockwise";
     }
+  | { do: "motion"; target: string; motion: "along"; along: string }
+  | { do: "motion"; target: string; motion: "spin"; direction?: "clockwise" | "counterclockwise" }
   | { do: "emphasize"; target: string; emphasis: "punch" | "shake" | "pulse" | "wiggle"; strength?: "subtle" | "normal" | "strong" }
   | {
       do: "attention";
       target: string;
-      verb: "callout" | "highlight" | "spotlight" | "dim" | "pointer" | "box" | "brackets" | "encircle" | "converge" | "spark" | "vignette" | "rings";
+      verb: "callout" | "highlight" | "spotlight" | "dim" | "box" | "brackets" | "encircle" | "converge" | "spark" | "vignette" | "rings";
       from?: string;
+      text?: string;
+      title?: string;
+      side?: "auto" | "north" | "south" | "east" | "west";
+      route?: "auto" | "straight" | "elbow" | "curve";
+      style?: "text" | "pill" | "rect" | "tag" | "bubble" | "badge";
+    }
+  | {
+      do: "attention";
+      target: string;
+      verb: "pointer";
+      from: string;
       text?: string;
       title?: string;
       side?: "auto" | "north" | "south" | "east" | "west";

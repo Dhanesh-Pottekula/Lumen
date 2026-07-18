@@ -525,17 +525,18 @@ function drawComponentInstance(
   };
 
   const drawEmphasized = (target: CanvasRenderingContext2D) => {
-    if (!c.emphasis) {
+    const emphasisWindows = c.emphasis ? (Array.isArray(c.emphasis) ? c.emphasis : [c.emphasis]) : [];
+    const activeEmphasis = [...emphasisWindows].reverse().find((candidate) => {
+      const candidateAt = candidate.at ?? (candidate.cue != null ? cueTimes[candidate.cue] : undefined) ?? at;
+      return t >= candidateAt && (candidate.dur === undefined || t <= candidateAt + candidate.dur);
+    });
+    if (!activeEmphasis) {
       drawGhostMagnify(target);
       return;
     }
-    const kind = c.emphasis.kind ?? "punch";
-    const emAt = c.emphasis.at ?? (c.emphasis.cue != null ? cueTimes[c.emphasis.cue] : undefined) ?? at;
-    if (t < emAt) {
-      drawGhostMagnify(target);
-      return;
-    }
-    const strength = c.emphasis.amp ?? 1;
+    const kind = activeEmphasis.kind ?? "punch";
+    const emAt = activeEmphasis.at ?? (activeEmphasis.cue != null ? cueTimes[activeEmphasis.cue] : undefined) ?? at;
+    const strength = activeEmphasis.amp ?? 1;
     if (kind === "punch") withPunch(target, cx, cy, t, emAt, drawGhostMagnify, { amp: 0.12 * strength });
     else if (kind === "shake") withShake(target, t, emAt, drawGhostMagnify, { mag: 5 * strength });
     else if (kind === "pulse") pulseScale(target, cx, cy, t, drawGhostMagnify, { amp: 0.05 * strength });

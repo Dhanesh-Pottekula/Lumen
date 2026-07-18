@@ -18,7 +18,35 @@ const SYMBOLS: Record<string, string> = {
   equiv: "≡", to: "→", rightarrow: "→", Rightarrow: "⇒", leftarrow: "←", leftrightarrow: "↔",
   infty: "∞", partial: "∂", nabla: "∇", int: "∫", sum: "∑", prod: "∏", cdots: "⋯", ldots: "…",
   deg: "°", propto: "∝", in: "∈", forall: "∀", exists: "∃", angle: "∠", perp: "⊥", cup: "∪", cap: "∩",
+  lim: "lim", ln: "ln", ",": " ", ";": " ", " ": " ",
 };
+
+export const MATH_TEXT_COMMANDS = [...Object.keys(SYMBOLS), "frac", "sqrt", "text"] as const;
+
+export type MathTextValidationResult = { valid: true } | { valid: false; error: string };
+
+/** Validate the deterministic math-text subset before the renderer sees it. */
+export function validateMathText(src: string): MathTextValidationResult {
+  let depth = 0;
+  for (let index = 0; index < src.length; index++) {
+    const char = src[index];
+    if (char === "{") depth += 1;
+    if (char === "}") {
+      depth -= 1;
+      if (depth < 0) return { valid: false, error: `unexpected '}' at position ${index}` };
+    }
+    if (char !== "\\") continue;
+    let end = index + 1;
+    while (end < src.length && /[A-Za-z]/.test(src[end])) end += 1;
+    const command = end > index + 1 ? src.slice(index + 1, end) : src[index + 1];
+    if (!command) return { valid: false, error: "trailing backslash" };
+    if (!(MATH_TEXT_COMMANDS as readonly string[]).includes(command)) {
+      return { valid: false, error: `unsupported command \\${command} at position ${index}` };
+    }
+    index = end > index + 1 ? end - 1 : end;
+  }
+  return depth === 0 ? { valid: true } : { valid: false, error: `${depth} unclosed math group${depth === 1 ? "" : "s"}` };
+}
 
 const SCRIPT = 0.85; // script-style shrink for fraction numerator/denominator (real math typesetting)
 
@@ -30,7 +58,7 @@ interface Box {
 }
 
 interface Token {
-  kind: "char" | "cmd" | "^" | "_" | "{" | "}";
+  kind: "char" | "text" | "cmd" | "^" | "_" | "{" | "}";
   v: string;
 }
 
@@ -43,6 +71,20 @@ function tokenize(src: string): Token[] {
       let name = "";
       while (j < src.length && /[a-zA-Z]/.test(src[j])) name += src[j++];
       if (name) {
+        if (name === "text" && src[j] === "{") {
+          let depth = 1;
+          let end = j + 1;
+          while (end < src.length && depth > 0) {
+            if (src[end] === "{") depth += 1;
+            else if (src[end] === "}") depth -= 1;
+            end += 1;
+          }
+          if (depth === 0) {
+            out.push({ kind: "text", v: src.slice(j + 1, end - 1) });
+            i = end - 1;
+            continue;
+          }
+        }
         out.push({ kind: "cmd", v: name });
         i = j - 1;
       } else if (j < src.length) {
@@ -208,6 +250,7 @@ function parseRun(tokens: Token[], start: number, size: number, stopAtBrace: boo
       const sym = SYMBOLS[tk.v];
       return { box: atom(sym ?? tk.v, size), next: idx + 1 };
     }
+    if (tk.kind === "text") return { box: atom(tk.v, size, false), next: idx + 1 };
     return { box: atom(tk.v, size, /[a-zA-Z]/.test(tk.v)), next: idx + 1 };
   };
   while (i < tokens.length) {
@@ -249,6 +292,7 @@ function parseArg(tokens: Token[], start: number, size: number): { box: Box; nex
     const sym = SYMBOLS[tk.v];
     return { box: atom(sym ?? tk.v, size), next: start + 1 };
   }
+  if (tk.kind === "text") return { box: atom(tk.v, size, false), next: start + 1 };
   return { box: atom(tk.v, size, /[a-zA-Z]/.test(tk.v)), next: start + 1 };
 }
 

@@ -55,7 +55,14 @@ const numberPair = {
   prefixItems: [{ type: "number" }, { type: "number" }],
 } as const;
 
-const ring = { type: "array", minItems: 3, items: numberPair } as const;
+const geoPair = {
+  type: "array",
+  minItems: 2,
+  maxItems: 2,
+  prefixItems: [{ type: "number", minimum: -180, maximum: 180 }, { type: "number", minimum: -90, maximum: 90 }],
+} as const;
+
+const ring = { type: "array", minItems: 3, items: geoPair } as const;
 
 const numberQuad = {
   type: "array",
@@ -74,6 +81,20 @@ const categoryDatum = {
     category: { type: "string", minLength: 1 },
   },
 } as const;
+
+export const SIMPLE_JSON_MAP_ICONS = [
+  "arrow", "check", "cross", "plus", "minus", "star", "heart", "circle", "square", "triangle",
+  "gear", "bolt", "drop", "sun", "leaf", "flame", "factory", "home", "person", "book",
+  "flask", "atom", "clock", "pin", "warning", "info", "search", "cloud", "mountain", "seed",
+] as const;
+
+const chartBase = {
+  xDomain: numberPair,
+  yDomain: numberPair,
+  axes: { type: "boolean" },
+  xLabel: { type: "string" },
+  yLabel: { type: "string" },
+};
 
 const object = {
   oneOf: [
@@ -136,12 +157,24 @@ const object = {
       kind: { const: "curve" }, x: { type: "string", minLength: 1 }, y: { type: "string", minLength: 1 },
       domain: numberPair, appearance: enumOf("solid", "dashed"),
     }),
-    strictObject(["chart"], {
-      kind: { const: "chart" }, chart: enumOf("bar", "line", "area", "scatter", "pie", "donut", "function", "riemann"),
+    strictObject(["chart", "data"], {
+      kind: { const: "chart" }, chart: enumOf("bar", "pie", "donut"),
       data: { type: "array", minItems: 1, items: categoryDatum },
+      ...chartBase,
+    }),
+    strictObject(["chart", "series"], {
+      kind: { const: "chart" }, chart: enumOf("line", "area", "scatter"),
       series: { type: "array", minItems: 2, items: numberPair },
-      function: { type: "string", minLength: 1 }, rectangles: enumOf("few", "several", "many", "dense"),
-      xDomain: numberPair, yDomain: numberPair, axes: { type: "boolean" }, xLabel: { type: "string" }, yLabel: { type: "string" },
+      ...chartBase,
+    }),
+    strictObject(["chart", "function"], {
+      kind: { const: "chart" }, chart: { const: "function" }, function: { type: "string", minLength: 1 },
+      ...chartBase,
+    }),
+    strictObject(["chart", "function"], {
+      kind: { const: "chart" }, chart: { const: "riemann" }, function: { type: "string", minLength: 1 },
+      rectangles: enumOf("few", "several", "many", "dense"),
+      ...chartBase,
     }),
     strictObject(["categories"], {
       kind: { const: "legend" }, categories: { type: "array", minItems: 1, uniqueItems: true, items: { type: "string", minLength: 1 } },
@@ -149,9 +182,9 @@ const object = {
     strictObject(["features"], {
       kind: { const: "map" },
       features: { type: "array", minItems: 1, items: { type: "object", additionalProperties: false, required: ["id", "rings"], properties: { id, rings: { type: "array", minItems: 1, items: ring }, category: { type: "string", minLength: 1 } } } },
-      markers: { type: "array", items: { type: "object", additionalProperties: false, required: ["lon", "lat"], properties: { lon: { type: "number" }, lat: { type: "number" }, label: { type: "string" }, icon: { type: "string" }, category: { type: "string" } } } },
-      places: { type: "array", items: { type: "object", additionalProperties: false, required: ["name", "lon", "lat"], properties: { name: { type: "string", minLength: 1 }, lon: { type: "number" }, lat: { type: "number" } } } },
-      flows: { type: "array", items: { type: "object", additionalProperties: false, required: ["from", "to"], properties: { from: { oneOf: [{ type: "string", minLength: 1 }, numberPair] }, to: { oneOf: [{ type: "string", minLength: 1 }, numberPair] }, category: { type: "string" }, bend: enumOf("left", "right", "direct"), pace: enumOf("instant", "quick", "normal", "slow", "dramatic") } } },
+      markers: { type: "array", items: { type: "object", additionalProperties: false, required: ["lon", "lat"], properties: { lon: { type: "number", minimum: -180, maximum: 180 }, lat: { type: "number", minimum: -90, maximum: 90 }, label: { type: "string" }, icon: enumOf(...SIMPLE_JSON_MAP_ICONS), category: { type: "string" } } } },
+      places: { type: "array", items: { type: "object", additionalProperties: false, required: ["name", "lon", "lat"], properties: { name: { type: "string", minLength: 1 }, lon: { type: "number", minimum: -180, maximum: 180 }, lat: { type: "number", minimum: -90, maximum: 90 } } } },
+      flows: { type: "array", items: { type: "object", additionalProperties: false, required: ["from", "to"], properties: { from: { oneOf: [{ type: "string", minLength: 1 }, geoPair] }, to: { oneOf: [{ type: "string", minLength: 1 }, geoPair] }, category: { type: "string" }, bend: enumOf("left", "right", "direct"), pace: enumOf("instant", "quick", "normal", "slow", "dramatic") } } },
       outline: ring, growth: { type: "array", minItems: 2, items: ring }, growthPace: enumOf("instant", "quick", "normal", "slow", "dramatic"), stagger: enumOf("instant", "quick", "normal", "slow", "dramatic"),
     }),
     strictObject(["from", "to"], {
@@ -241,16 +274,27 @@ const action = {
       },
     },
     {
-      type: "object",
-      additionalProperties: false,
-      required: ["do", "target", "motion"],
+      type: "object", additionalProperties: false, required: ["do", "target", "motion", "to"],
+      properties: { do: { const: "motion" }, target: { type: "string", minLength: 1 }, motion: { const: "move" }, to: { type: "string", minLength: 1 } },
+    },
+    {
+      type: "object", additionalProperties: false, required: ["do", "target", "motion", "to"],
+      properties: { do: { const: "motion" }, target: { type: "string", minLength: 1 }, motion: { const: "fall" }, to: { type: "string", minLength: 1 }, bounce: enumOf("none", "soft", "strong") },
+    },
+    {
+      type: "object", additionalProperties: false, required: ["do", "target", "motion", "around"],
       properties: {
-        do: { const: "motion" }, target: { type: "string", minLength: 1 },
-        motion: enumOf("move", "fall", "orbit", "along", "spin"),
-        to: { type: "string", minLength: 1 }, around: { type: "string", minLength: 1 }, along: { type: "string", minLength: 1 },
-        orbit: enumOf("small", "medium", "large"), turns: enumOf("half", "one", "two", "many"),
-        bounce: enumOf("none", "soft", "strong"), direction: enumOf("clockwise", "counterclockwise"),
+        do: { const: "motion" }, target: { type: "string", minLength: 1 }, motion: { const: "orbit" }, around: { type: "string", minLength: 1 },
+        orbit: enumOf("small", "medium", "large"), turns: enumOf("half", "one", "two", "many"), direction: enumOf("clockwise", "counterclockwise"),
       },
+    },
+    {
+      type: "object", additionalProperties: false, required: ["do", "target", "motion", "along"],
+      properties: { do: { const: "motion" }, target: { type: "string", minLength: 1 }, motion: { const: "along" }, along: { type: "string", minLength: 1 } },
+    },
+    {
+      type: "object", additionalProperties: false, required: ["do", "target", "motion"],
+      properties: { do: { const: "motion" }, target: { type: "string", minLength: 1 }, motion: { const: "spin" }, direction: enumOf("clockwise", "counterclockwise") },
     },
     {
       type: "object",
@@ -267,10 +311,20 @@ const action = {
       required: ["do", "target", "verb"],
       properties: {
         do: { const: "attention" }, target: { type: "string", minLength: 1 },
-        verb: enumOf("callout", "highlight", "spotlight", "dim", "pointer", "box", "brackets", "encircle", "converge", "spark", "vignette", "rings"),
+        verb: enumOf("callout", "highlight", "spotlight", "dim", "box", "brackets", "encircle", "converge", "spark", "vignette", "rings"),
         from: { type: "string", minLength: 1 }, text: { type: "string" }, title: { type: "string" },
         side: enumOf("auto", "north", "south", "east", "west"), route: enumOf("auto", "straight", "elbow", "curve"),
         style: enumOf("text", "pill", "rect", "tag", "bubble", "badge"),
+      },
+    },
+    {
+      type: "object",
+      additionalProperties: false,
+      required: ["do", "target", "verb", "from"],
+      properties: {
+        do: { const: "attention" }, target: { type: "string", minLength: 1 }, verb: { const: "pointer" }, from: { type: "string", minLength: 1 },
+        text: { type: "string" }, title: { type: "string" }, side: enumOf("auto", "north", "south", "east", "west"),
+        route: enumOf("auto", "straight", "elbow", "curve"), style: enumOf("text", "pill", "rect", "tag", "bubble", "badge"),
       },
     },
     {

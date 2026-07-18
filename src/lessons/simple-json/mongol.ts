@@ -38,7 +38,7 @@ export const mongolLessonSpec: LessonSpec = {
           places: PLACES,
           outline: EURASIA,
           growth: [MONGOLIA, MONGOLIA],
-          size: "fill",
+          size: "small",
           placement: { mode: "zone", zone: "main" },
           flows: [
             { from: [88, 51], to: "karakorum", category: "tribes", bend: "right", pace: "slow" },
@@ -62,7 +62,7 @@ export const mongolLessonSpec: LessonSpec = {
       id: "conquest",
       composition: "map",
       objects: [
-        { id: "map", kind: "map", features: LAND, places: PLACES, outline: EURASIA, growth: [MONGOLIA, BORDER_1227], growthPace: "dramatic", size: "fill", placement: { mode: "zone", zone: "main" }, flows: [
+        { id: "map", kind: "map", features: LAND, places: PLACES, outline: EURASIA, growth: [MONGOLIA, BORDER_1227], growthPace: "dramatic", size: "small", placement: { mode: "zone", zone: "main" }, flows: [
           { from: "karakorum", to: "beijing", category: "conquest", bend: "right", pace: "normal" },
           { from: "karakorum", to: "samarkand", category: "conquest", bend: "right", pace: "normal" },
           { from: "karakorum", to: "baghdad", category: "conquest", bend: "right", pace: "slow" },
@@ -87,14 +87,14 @@ export const mongolLessonSpec: LessonSpec = {
       id: "borders-over-time",
       composition: "map",
       objects: [
-        { id: "map", kind: "map", features: LAND, places: PLACES, outline: EURASIA, growth: [MONGOLIA, BORDER_1227, BORDER_1260], growthPace: "dramatic", size: "fill", placement: { mode: "zone", zone: "main" } },
+        { id: "map", kind: "map", features: LAND, places: PLACES, outline: EURASIA, growth: [MONGOLIA, BORDER_1227, BORDER_1260], growthPace: "dramatic", size: "small", placement: { mode: "zone", zone: "main" } },
         { id: "title", kind: "text", text: "54 YEARS TO PEAK EXTENT", textRole: "heading", placement: { mode: "zone", zone: "title" } },
         { id: "peak", kind: "stat", value: 24000000, unit: "km²", label: "at peak extent", commas: true, size: "small", placement: { mode: "zone", zone: "hud" }, space: "screen" },
         { id: "timeline", kind: "timeline", from: 1200, to: 1280, eras: [
           { from: 1206, to: 1227, label: "Genghis Khan", category: "founding" },
           { from: 1227, to: 1260, label: "expansion", category: "growth" },
           { from: 1260, to: 1280, label: "peak", category: "peak" },
-        ], events: [{ at: 1206, label: "Empire founded" }, { at: 1227, label: "Genghis dies" }, { at: 1260, label: "Peak extent" }], playhead: { from: 1206, to: 1260, pace: "dramatic" }, size: "fill", placement: { mode: "zone", zone: "footer" } },
+        ], events: [{ at: 1206, label: "Empire founded" }, { at: 1227, label: "Genghis dies" }, { at: 1260, label: "Peak extent" }], playhead: { from: 1206, to: 1260, pace: "dramatic" }, size: "small", placement: { mode: "zone", zone: "footer" } },
       ],
       beats: [
         { id: "grow", pace: "dramatic", actions: [{ do: "show", targets: ["map", "title", "timeline"], entrance: "draw" }] },
@@ -106,7 +106,7 @@ export const mongolLessonSpec: LessonSpec = {
       id: "four-khanates",
       composition: "map",
       objects: [
-        { id: "map", kind: "map", features: KHANATES, places: PLACES, outline: EURASIA, stagger: "normal", size: "fill", placement: { mode: "zone", zone: "main" } },
+        { id: "map", kind: "map", features: KHANATES, places: PLACES, outline: EURASIA, stagger: "normal", size: "small", placement: { mode: "zone", zone: "main" } },
         { id: "title", kind: "text", text: "FOUR SUCCESSOR KHANATES", textRole: "heading", placement: { mode: "zone", zone: "title" } },
         { id: "legend", kind: "legend", categories: ["Golden Horde", "Ilkhanate", "Chagatai", "Yuan"], size: "small", space: "screen", placement: { mode: "zone", zone: "support" } },
         { id: "split-note", kind: "text", text: "Genghis Khan's descendants rule separate successor states.", textRole: "caption", size: "small", placement: { mode: "zone", zone: "footer" } },
@@ -126,7 +126,7 @@ export const mongolLessonSpec: LessonSpec = {
       id: "pax-mongolica",
       composition: "map",
       objects: [
-        { id: "map", kind: "map", features: LAND, places: PLACES, outline: EURASIA, growth: [BORDER_1260, BORDER_1260], size: "fill", placement: { mode: "zone", zone: "main" }, flows: [
+        { id: "map", kind: "map", features: LAND, places: PLACES, outline: EURASIA, growth: [BORDER_1260, BORDER_1260], size: "small", placement: { mode: "zone", zone: "main" }, flows: [
           { from: "beijing", to: "samarkand", category: "trade", bend: "right", pace: "normal" },
           { from: "samarkand", to: "beijing", category: "knowledge", bend: "left", pace: "normal" },
           { from: "samarkand", to: "baghdad", category: "trade", bend: "right", pace: "slow" },
@@ -135,7 +135,7 @@ export const mongolLessonSpec: LessonSpec = {
         { id: "title", kind: "text", text: "EXCHANGE ACROSS EURASIA", textRole: "heading", placement: { mode: "zone", zone: "title" } },
         { id: "legend", kind: "legend", categories: ["trade", "knowledge", "disease"], size: "small", space: "screen", placement: { mode: "zone", zone: "hud" } },
         { id: "message", kind: "text", text: "trade • knowledge • disease", textRole: "caption", role: "annotation", size: "tiny", placement: { mode: "zone", zone: "support" } },
-        { id: "timeline", kind: "timeline", from: 1250, to: 1350, events: [{ at: 1271, label: "Marco Polo travels east" }, { at: 1300, label: "Silk Road at its height" }, { at: 1347, label: "Plague spreads west", side: "below" }], playhead: { from: 1250, to: 1350, pace: "dramatic" }, size: "fill", placement: { mode: "zone", zone: "footer" } },
+        { id: "timeline", kind: "timeline", from: 1250, to: 1350, events: [{ at: 1271, label: "Marco Polo travels east" }, { at: 1300, label: "Silk Road at its height" }, { at: 1347, label: "Plague spreads west", side: "below" }], playhead: { from: 1250, to: 1350, pace: "dramatic" }, size: "small", placement: { mode: "zone", zone: "footer" } },
       ],
       beats: [
         { id: "network", pace: "dramatic", actions: [{ do: "show", targets: ["map", "title", "legend", "timeline"], entrance: "draw" }] },
@@ -155,7 +155,7 @@ export const mongolLessonSpec: LessonSpec = {
         { id: "later-label", kind: "text", text: "four separately ruled khanates", textRole: "caption", size: "small", placement: { mode: "relative", target: "later-map", relation: "above" } },
         { id: "split-arrow", kind: "line", from: "peak-map.right", to: "later-map.left", form: "arrow", role: "annotation" },
         { id: "successor-legend", kind: "legend", categories: ["Golden Horde", "Ilkhanate", "Chagatai", "Yuan"], size: "small", temporary: true, placement: { mode: "zone", zone: "support" } },
-        { id: "decline-timeline", kind: "timeline", from: 1255, to: 1380, events: [{ at: 1260, label: "succession crisis" }, { at: 1335, label: "Ilkhanate fragments" }, { at: 1368, label: "Yuan loses China", side: "below" }], playhead: { from: 1260, to: 1368, pace: "dramatic" }, size: "fill", placement: { mode: "zone", zone: "footer" } },
+        { id: "decline-timeline", kind: "timeline", from: 1255, to: 1380, events: [{ at: 1260, label: "succession crisis" }, { at: 1335, label: "Ilkhanate fragments" }, { at: 1368, label: "Yuan loses China", side: "below" }], playhead: { from: 1260, to: 1368, pace: "dramatic" }, size: "small", placement: { mode: "zone", zone: "footer" } },
       ],
       beats: [
         { id: "compare-borders", pace: "dramatic", actions: [{ do: "show", targets: ["title", "peak-map", "later-map", "peak-label", "later-label", "split-arrow", "successor-legend"], entrance: "fade" }] },

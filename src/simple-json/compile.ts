@@ -41,7 +41,7 @@ function objectAction(scene: ResolvedScene, object: ResolvedObject, kind: "show"
   return undefined;
 }
 
-function targetedAction(scene: ResolvedScene, id: string, kind: "motion" | "emphasize"): ResolvedSimpleAction | undefined {
+function targetedAction(scene: ResolvedScene, id: string, kind: "motion"): ResolvedSimpleAction | undefined {
   for (const beat of scene.beats) {
     for (const action of beat.actions) {
       if (action.kind !== kind) continue;
@@ -49,6 +49,13 @@ function targetedAction(scene: ResolvedScene, id: string, kind: "motion" | "emph
     }
   }
   return undefined;
+}
+
+function targetedActions(scene: ResolvedScene, id: string, kind: "emphasize"): ResolvedSimpleAction[] {
+  return scene.beats.flatMap((beat) => beat.actions.filter((action): action is ResolvedSimpleAction =>
+    action.kind === kind
+    && action.source.do === "emphasize"
+    && action.source.target === id));
 }
 
 const ORBIT_RADII = { small: 70, medium: 112, large: 156 } as const;
@@ -86,7 +93,7 @@ function motionFor(scene: ResolvedScene, object: ResolvedObject): Base["motion"]
   const action = targetedAction(scene, object.id, "motion");
   if (!action || action.source.do !== "motion") return undefined;
   const source = action.source;
-  const direction = source.direction === "counterclockwise" ? -1 : 1;
+  const direction = "direction" in source && source.direction === "counterclockwise" ? -1 : 1;
   if (source.motion === "move") return { kind: "move", to: source.to ?? object.id, at: action.start, dur: action.duration };
   if (source.motion === "fall") {
     const bounce = source.bounce === "strong" ? 14 : source.bounce === "soft" ? 7 : 0;
@@ -125,10 +132,17 @@ function motionFor(scene: ResolvedScene, object: ResolvedObject): Base["motion"]
 }
 
 function emphasisFor(scene: ResolvedScene, object: ResolvedObject): Base["emphasis"] {
-  const action = targetedAction(scene, object.id, "emphasize");
-  if (!action || action.source.do !== "emphasize") return undefined;
-  const strength = STRENGTH[action.source.strength ?? "normal"];
-  return { kind: action.source.emphasis, at: action.start, amp: strength };
+  const actions = targetedActions(scene, object.id, "emphasize");
+  if (!actions.length) return undefined;
+  return actions.map((action) => {
+    if (action.source.do !== "emphasize") throw new Error("unreachable emphasis action");
+    return {
+      kind: action.source.emphasis,
+      at: action.start,
+      dur: action.duration,
+      amp: STRENGTH[action.source.strength ?? "normal"],
+    };
+  });
 }
 
 function entranceFor(object: ResolvedObject, action: ResolvedSimpleAction | undefined) {
@@ -282,16 +296,16 @@ function compileContent(scene: ResolvedScene, object: ResolvedObject, base: Cont
       };
     }
     case "chart": {
-      const data = source.data?.map((datum, index) => ({ ...datum, color: categoryColor(scene.theme, datum.category ?? datum.label, index) }));
+      const data = "data" in source ? source.data.map((datum, index) => ({ ...datum, color: categoryColor(scene.theme, datum.category ?? datum.label, index) })) : undefined;
       const scale = Math.min(object.size, 1.65);
       return {
         ...base,
         type: "chart",
         chart: source.chart === "donut" ? "pie" : source.chart,
         data,
-        series: source.series,
-        fn: source.function,
-        n: source.rectangles ? RECTANGLE_COUNTS[source.rectangles] : undefined,
+        series: "series" in source ? source.series : undefined,
+        fn: "function" in source ? source.function : undefined,
+        n: "rectangles" in source && source.rectangles ? RECTANGLE_COUNTS[source.rectangles] : undefined,
         xDomain: source.xDomain,
         yDomain: source.yDomain,
         axes: source.axes,
@@ -393,7 +407,7 @@ function compileObject(scene: ResolvedScene, object: ResolvedObject): Component 
     enter: { type: enter.type, dur: enter.dur },
     exit,
     layer: style.layer,
-    fixed: object.source.space === "screen",
+    fixed: object.source.space === "screen" || object.source.role === "hud",
     motion: motionFor(scene, object),
     emphasis: emphasisFor(scene, object),
   } as const;

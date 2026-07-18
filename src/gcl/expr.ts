@@ -256,20 +256,30 @@ function evalRpn(rpn: RpnItem[], vars: Record<string, number>): number {
  * On any parse error, returns a function that always yields `NaN` — callers (chart/parametric
  * render paths) should treat NaN samples as "nothing to draw" rather than throwing.
  */
-export function compileExpr(src: string): (vars: Record<string, number>) => number {
+export type ExpressionParseResult =
+  | { valid: true; evaluate: (vars: Record<string, number>) => number }
+  | { valid: false; error: string };
+
+/** Parse an authored expression without hiding the failure from validators and LLM repair loops. */
+export function parseExpr(src: string): ExpressionParseResult {
   let rpn: RpnItem[];
   try {
     const toks = insertImplicitMultiplication(tokenize(src));
     rpn = toRpn(toks);
     if (rpn.length === 0) throw new Error("empty expression");
-  } catch {
-    return () => NaN;
+  } catch (error) {
+    return { valid: false, error: error instanceof Error ? error.message : "invalid expression" };
   }
-  return (vars: Record<string, number>) => {
+  return { valid: true, evaluate: (vars: Record<string, number>) => {
     try {
       return evalRpn(rpn, vars);
     } catch {
       return NaN;
     }
-  };
+  } };
+}
+
+export function compileExpr(src: string): (vars: Record<string, number>) => number {
+  const parsed = parseExpr(src);
+  return parsed.valid ? parsed.evaluate : () => NaN;
 }

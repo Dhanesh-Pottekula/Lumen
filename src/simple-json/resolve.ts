@@ -121,7 +121,7 @@ const ZONES: Record<CompositionToken, Record<ZoneToken, Point>> = {
   },
   comparison: {
     title: [460, 42], main: [460, 215], "main-left": [245, 215], "main-right": [675, 215], support: [460, 350],
-    footer: [460, 398], background: [460, 215], overlay: [460, 215], hud: [790, 54],
+    footer: [460, 370], background: [460, 215], overlay: [460, 215], hud: [790, 54],
   },
   process: {
     title: [460, 42], main: [460, 205], "main-left": [220, 205], "main-right": [700, 205], support: [460, 330],
@@ -137,7 +137,7 @@ const ZONES: Record<CompositionToken, Record<ZoneToken, Point>> = {
   },
   map: {
     title: [460, 36], main: [455, 220], "main-left": [250, 220], "main-right": [680, 220], support: [760, 335],
-    footer: [460, 400], background: [460, 215], overlay: [460, 215], hud: [790, 54],
+    footer: [460, 370], background: [460, 215], overlay: [460, 215], hud: [790, 54],
   },
   timeline: {
     title: [460, 42], main: [460, 205], "main-left": [270, 205], "main-right": [650, 205], support: [460, 325],

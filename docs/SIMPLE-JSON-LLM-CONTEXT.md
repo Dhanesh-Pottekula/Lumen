@@ -1,12 +1,306 @@
-# Simple JSON Authoring Guide
+<!--
+  SINGLE-FILE LLM AUTHORING CONTEXT for Lumen Simple JSON v1.
+  This file = Part I (how to generate) + Part II (the complete format reference, appended verbatim
+  from SIMPLE-JSON-AUTHORING-GUIDE.md). Hand this whole file to the lesson-authoring model.
+  Regenerate the cheat-sheet in §I.7 from `getSimpleJsonCapabilities()` if the schema changes.
+-->
 
-This is the human reference for Lumen's **Simple JSON** lesson format. It explains the format as it exists in the codebase today: every field, every allowed option, the automatic defaults, how references and visibility work, and how to combine the pieces into complete animated lessons.
+# Simple JSON — Complete LLM Authoring Context (v1)
 
-Simple JSON is the high-level authoring layer above GCL. You describe educational intent—objects, relationships, and ordered actions—and the compiler supplies coordinates, colors, timing values, drawing primitives, camera math, and deterministic animation details.
+You generate short, deterministic, animated teaching videos. You do this by writing **one Simple JSON
+lesson object**. A compiler turns your JSON into low-level render instructions and then into a
+seekable canvas film — you never write pixels, colors, timings, or drawing code. You describe
+**educational intent** (objects, relationships, ordered actions) in semantic terms and the compiler
+supplies every coordinate, color, font size, animation second, camera value, and physics constant.
 
-The format directly builds a lesson from scenes, objects, and beats. There is no recipe or predefined-film mode.
+This document has two parts:
+
+- **Part I (below)** — how to generate: your task, the output contract, how your output is judged, how
+  to plan, how to choose and draw visuals/SVGs, and a one-page cheat-sheet of every option.
+- **Part II** — the complete field-by-field reference (every object, action, field, and default).
+  Consult it for exact fields whenever Part I points you to a kind or action.
 
 ---
+
+## I.1 Your task and output contract
+
+Author one complete Lumen Simple JSON **version 1** lesson.
+
+**Output exactly one JSON object and nothing else** — no Markdown, no code fences, no comments, no
+prose, no JavaScript, no imports. The first character is `{` and the last is `}`.
+
+Hard rules (these are enforced by the compiler; violating them fails the lesson):
+
+1. **Obey the JSON Schema exactly.** Never invent fields, tokens, assets, anchors, icons, or SVG
+   elements. Everything you use must appear in the capabilities/schema you are given.
+2. **Strict JSON.** Double-quoted keys and strings, no trailing commas, no `undefined`, no comments.
+3. **Stable unique IDs.** IDs match `^[a-z][a-z0-9-]*$` (lowercase, start with a letter). Every
+   reference must resolve to an existing object, SVG part, asset anchor, chart anchor, map place, or
+   timeline event.
+4. **Declared ≠ visible.** An object listed in a scene starts hidden unless its `initial` is
+   `"visible"` or a `show` action reveals it. You must `show` an object before you target it.
+5. **Show and hide are lifecycle events.** Any temporary object or temporary SVG part that becomes
+   visible **must** be hidden before the scene ends, or you get `TEMPORARY_VISUAL_PERSISTS`.
+6. **Beats are sequential; actions inside one beat run in parallel.** Order teaching steps as beats;
+   put things that should happen together in the same beat.
+7. **Chart data by chart kind:** `bar`/`pie`/`donut` need `data`; `line`/`area`/`scatter` need
+   `series`; `function`/`riemann` need `function`.
+8. **Motion fields by motion kind:** `move`/`fall` need `to`; `orbit` needs `around`; `along` needs
+   `along`; `spin` needs no destination. One motion per object per scene. The authored resting
+   position **is** motion frame zero — put an orbiting object on its visible ring, and an along-path
+   object at one endpoint.
+9. **Screen-fixed content:** use `role: "hud"` for readouts, or `space: "screen"` for other
+   camera-independent content. Everything else lives in world space and moves with the camera.
+10. **Keep important objects in separate composition zones.** Use `anchor` placement for exact
+    attachment, `relative` placement for labels. Never crowd several large objects into one zone.
+11. **Prefer a named visual asset when one exists.** For custom diagrams use one `svg-artwork` whose
+    root-level named `<g>` elements are meaningful, independently targetable parts (see §I.6).
+12. **SVG uses only the supplied tags/attributes.** Put every drawn root child inside a named `<g>`.
+    Avoid transforms on groups you will target; use explicit coordinates.
+13. **Curves use the safe expression language, not JavaScript. Equations use only supplied math-text
+    commands.**
+14. **Attention and effects must communicate a teaching relationship.** Never add decorative
+    particles, sparks, fire, confetti, or repeated glow.
+15. **One scene teaches one claim.** Show the evidence first, then label or summarize it. Prefer
+    visual change over sentences describing change.
+16. **Keep text concise:** headings under 8 words, labels under 12 words, callout bodies under 18
+    words.
+
+---
+
+## I.2 How your output is judged (so aim for zero-touch)
+
+Your JSON is not sent straight to the renderer. It runs a quality gate:
+
+```
+request → visual plan → your Simple JSON draft
+  → structural + semantic compilation  (must return valid:true)
+  → diagnostic repair loop             (must return zero warnings)
+  → deterministic keyframe render      (every review frame must render)
+  → visual review                      (must be approved with no errors)
+  → publish
+```
+
+A lesson is publishable only when **compilation returns zero errors and zero warnings**, every review
+frame renders, and the visual reviewer approves. Write as if there is no repair pass: satisfy every
+rule above the first time. The reviewer specifically checks that each frame visually proves its scene
+claim; that moving objects are attached to their path/ring/target at the first and last motion frames;
+that temporary guides disappear; that labels sit on the correct visible part without covering it; that
+equations/units/chart values/motion are mutually consistent; and that nothing is clipped, inverted,
+mis-scaled, overlapping unrelated content, or off-frame.
+
+---
+
+## I.3 Plan before you write
+
+Before emitting JSON, plan the lesson so every scene teaches **exactly one claim through visible
+evidence**. For each scene decide: the single claim; the visual evidence that proves it; what changes
+over time; the labels; the facts (with units); and the source URLs (only URLs supplied in the
+request — never invent citations). Then:
+
+- Prefer diagrams, position, comparison, motion, charts, maps, and timelines over paragraphs.
+- Use text only for titles, concise labels, equations, values, and conclusions you cannot read
+  directly from the visual.
+- One focal relationship per scene, plus at most two simultaneous supporting relationships.
+- Distinguish permanent subject matter from temporary teaching marks (arrows, projections, traces,
+  guides) — and clean the temporary ones up.
+- Respect any complexity budget (max scenes, objects per scene, simultaneous visuals, words per
+  frame). Count simultaneously visible focal/supporting visuals, not background layers.
+
+---
+
+## I.4 The lesson shape at a glance
+
+```
+lesson
+└── scenes (played in order)
+    ├── objects  (what CAN appear in the scene)
+    └── beats    (what happens, in order)
+        └── actions (show, move, label, camera, attention, effect, …)  ← parallel within a beat
+```
+
+Minimal complete lesson:
+
+```json
+{
+  "version": "1",
+  "title": "Area under a curve",
+  "theme": "blueprint",
+  "scenes": [
+    {
+      "composition": "equation-plot",
+      "objects": [
+        { "id": "title", "kind": "text", "text": "Area under a curve", "role": "hero",
+          "placement": { "mode": "zone", "zone": "title" } },
+        { "id": "curve", "kind": "curve", "function": "x^2", "domain": [0, 3],
+          "placement": { "mode": "zone", "zone": "main" } }
+      ],
+      "beats": [
+        { "actions": [ { "do": "show", "target": "title" } ] },
+        { "actions": [ { "do": "show", "target": "curve", "pace": "slow" } ] }
+      ]
+    }
+  ]
+}
+```
+
+Top-level fields: `version` (always `"1"`), `title`, `theme` (see cheat-sheet), optional narration
+metadata, and `scenes[]`. Each scene has a `composition` (a layout intent), `objects[]`, and `beats[]`.
+Full field lists are in Part II §4–§5.
+
+---
+
+## I.5 Targets and references (how you point at things)
+
+A **target** is a string naming an object or a meaningful point on it:
+
+- `"cannon"` — the whole object.
+- `"cannon.muzzle"` — a named part/anchor of it (asset anchors, SVG part ids, chart/map/timeline
+  anchors). Generic anchors on any object: `center`, `top`, `bottom`, `left`, `right`.
+- Chart example: `"plot.peak"`; map example: `"map.beijing"`; timeline example: `"tl.1206"`.
+
+You may only target something that is currently shown. Part II §7 lists every anchor family; the
+cheat-sheet lists each visual asset's anchors.
+
+---
+
+## I.6 Choosing and drawing a picture (visual / SVG decision guide)
+
+This is the part most authors get wrong. There are four ways to put a drawn picture on screen. Pick in
+this order:
+
+**1. `visual` — a named premade asset (always prefer this when one fits).**
+A reusable, semantically-anchored illustration. Tint with `color`, face it with `orientation`.
+```json
+{ "id": "cannon", "kind": "visual", "asset": "physics.cannon", "orientation": "right",
+  "placement": { "mode": "zone", "zone": "main-left" } }
+```
+Its anchors (e.g. `cannon.muzzle`, `cannon.wheels`) are meaningful targets. The available assets and
+their anchors are in the cheat-sheet (§I.7). Use this whenever a named asset represents your object.
+
+**2. `svg-artwork` — one custom SVG (recommended for any custom multi-part diagram).**
+Write one ordinary `<svg viewBox='…'>`. **Every root-level `<g id="…">` automatically becomes a
+targetable part** named `object.groupId`:
+```json
+{ "id": "neuron", "kind": "svg-artwork", "size": "large",
+  "placement": { "mode": "zone", "zone": "main" },
+  "svg": "<svg viewBox='0 0 620 220'><g id='dendrites'><path d='…'/></g><g id='soma'><circle cx='165' cy='110' r='49'/></g><g id='axon'><path d='…'/></g></svg>" }
+```
+→ gives you `neuron.dendrites`, `neuron.soma`, `neuron.axon` as real targets. Rules:
+- Root `viewBox` is required (four finite numbers, positive width/height). Every drawn element must
+  sit inside a named root `<g>` — no bare root shapes, no unnamed root groups.
+- **Do not put transforms on a group you will target**; use explicit coordinates, or the compiler
+  can only infer a whole-viewBox box and targeting it raises `IMPRECISE_SVG_BOUNDS`.
+- Disposable teaching layers (an arrow, a projected shot) go in `temporaryParts: ["shot-slow", …]`
+  and **must** be hidden before the scene ends.
+- Only the sanitized tag/attribute subset is allowed; only local `url(#id)` references; timing comes
+  from beats, never native SVG animation. Limits: ≤ 48,000 chars, ≤ 220 elements. (Subset in §I.7.)
+
+**3. `svg-composite` — advanced normalized artwork (only when you need exact per-part bounds).**
+Parts share one `viewBox`; each part declares its own `bounds`, so parts can't drift and each is a
+precise target. Use for multi-color/gradient/clipped artwork or when you need exact addressable bounds
+the artwork can't infer. Set `temporary: true` on a part to auto-clean it. (Full fields: Part II §9.7.)
+
+**4. `vector` — one raw path (custom stroke geometry).**
+A single Path2D `d` string with `fill`/`stroke`/`strokeWidth`/`scale`/`rotate`. Use when you need one
+piece of exact custom geometry, stroke **draw-on**, or **runtime recoloring** — things `svg-artwork`
+does not do.
+
+Quick chooser: named asset exists → **visual**; custom diagram with a few meaningful parts →
+**svg-artwork**; needs exact bounds / gradients / clips / many independently-addressable parts →
+**svg-composite**; one custom stroke that must draw on or recolor → **vector**.
+
+---
+
+## I.7 Complete option cheat-sheet (live values)
+
+Every value below is generated from the compiler's `getSimpleJsonCapabilities()` — these are the only
+legal tokens. Part II explains how each behaves.
+
+| Category | Legal values |
+|---|---|
+| **Themes** | `textbook`, `parchment`, `blueprint`, `chalkboard` |
+| **Compositions** | `hero`, `hero-diagram`, `equation`, `overview-detail`, `split`, `comparison`, `process`, `equation-plot`, `data`, `map`, `timeline`, `table`, `custom-relational` |
+| **Object kinds** | `text`, `equation`, `stat`, `visual`, `vector`, `svg-artwork`, `svg-composite`, `line`, `shape`, `curve`, `chart`, `legend`, `map`, `timeline`, `table`, `group` |
+| **Actions (`do`)** | `show`, `hide`, `camera`, `label`, `tour`, `motion`, `emphasize`, `attention`, `effect` |
+| **Placement modes** | `zone`, `relative`, `anchor` |
+| **Zones** | `title`, `main`, `main-left`, `main-right`, `support`, `footer`, `background`, `overlay`, `hud` |
+| **Relative relations** | `above`, `below`, `left-of`, `right-of`, `near` |
+| **Roles** | `background`, `support`, `primary`, `hero`, `annotation`, `hud` |
+| **Sizes** | `tiny`, `small`, `medium`, `large`, `hero`, `fill` |
+| **Initial state** | `hidden`, `visible` |
+| **Spaces** | `world`, `screen` |
+| **Paces** | `instant`, `quick`, `normal`, `slow`, `dramatic` |
+| **Entrances** | `instant`, `fade`, `draw`, `wipe`, `iris`, `slam`, `word-by-word`, `typewriter`, `scramble` |
+| **Exits** | `instant`, `fade`, `erase`, `wipe`, `iris`, `dissolve`, `slide`, `shrink` |
+| **Camera shots** | `overview`, `wide`, `medium`, `close`, `detail` |
+| **Camera movement** | `cut`, `move`, `push` |
+| **Label styles** | `text`, `pill`, `rect`, `tag`, `bubble`, `badge` |
+| **Motions** | `move`, `fall`, `orbit`, `along`, `spin` |
+| **Emphasis** | `punch`, `shake`, `pulse`, `wiggle` |
+| **Strength / intensity** | `subtle`, `normal`, `strong` |
+| **Attention verbs** | `callout`, `highlight`, `spotlight`, `dim`, `pointer`, `box`, `brackets`, `encircle`, `converge`, `spark`, `vignette`, `rings` |
+| **Particle presets** | `fire`, `smoke`, `sparks`, `rain`, `snow`, `dust`, `confetti`, `energy` |
+
+**Visual assets** (`kind: "visual"`, `asset:` value → targetable anchors):
+
+| Asset | Anchors |
+|---|---|
+| `biology.ion-channel` | center, top, bottom, left, right, pore |
+| `biology.neuron.cell` | center, top, bottom, left, right, soma, dendriteTip1–4, axonRoot |
+| `biology.neuron.full` | center, top, bottom, left, right, soma, dendriteTip1–4, axonRoot, axonEnd, terminalTop, terminalMiddle, terminalBottom |
+| `nature.apple` | center, top, bottom, left, right, stem |
+| `nature.tree` | center, top, bottom, left, right, trunk |
+| `physics.cannon` | center, top, bottom, left, right, muzzle, breech, wheels |
+| `physics.planet` | center, top, bottom, left, right, ring |
+| `symbols.arrow` | center, top, bottom, left, right, tip, tail |
+| `symbols.star` | center, top, bottom, left, right |
+
+**Map icons** (`map` places): `arrow, check, cross, plus, minus, star, heart, circle, square, triangle,
+gear, bolt, drop, sun, leaf, flame, factory, home, person, book, flask, atom, clock, pin, warning,
+info, search, cloud, mountain, seed`.
+
+**SVG subset** (for `svg-artwork` / `svg-composite`): limits ≤ 48,000 characters, ≤ 220 elements.
+Tags: `svg, g, path, circle, ellipse, rect, line, polyline, polygon, defs, linearGradient,
+radialGradient, stop, clipPath, mask, title, desc`. Attributes: `xmlns, viewBox, preserveAspectRatio,
+role, aria-label, id, d, x, y, x1, y1, x2, y2, cx, cy, r, rx, ry, width, height, points, fill, stroke,
+stroke-width, stroke-linecap, stroke-linejoin, stroke-miterlimit, opacity, fill-opacity, stroke-opacity,
+transform, gradientUnits, gradientTransform, offset, stop-color, stop-opacity, clip-path, mask,
+fill-rule, clip-rule`. Public parts = root-level `<g id="…">`. Only local `url(#id)` refs; no scripts,
+handlers, external resources, `foreignObject`, `style` attributes, or nested `<svg>`.
+
+**Math:** curve/plot expressions use the safe expression language (Part II §10 — variables, operators,
+constants, functions), not JavaScript. Equation text uses only the supplied math-text commands (66 of
+them; e.g. `\frac`, `\sqrt`, `\sum`, `\int`, Greek letters — full list in the capabilities payload).
+
+---
+
+## I.8 Common mistakes to avoid (maps to compiler diagnostics)
+
+- Targeting an object you never `show`ed, or before its show beat → reference / lifecycle error.
+- A temporary object or `temporaryParts`/`temporary` SVG part left visible at scene end →
+  `TEMPORARY_VISUAL_PERSISTS`. Add the `hide`.
+- Orbit/along motion whose authored resting position isn't already on the ring/path (frame zero must
+  match the geometry) → motion-continuity warning.
+- Transformed or unmeasurable SVG group used as a target → `IMPRECISE_SVG_BOUNDS`. Use explicit
+  coordinates or an `svg-composite` part with exact `bounds`.
+- Crowding several large objects into one zone, or overlong text → overflow / collision warnings.
+  Re-zone, shorten, resize, or re-time reveals.
+- Inventing a field, token, asset, anchor, icon, chart kind, or SVG tag not in the cheat-sheet →
+  schema error. If it isn't listed, it doesn't exist.
+- Decorative particles/glow/camera motion that don't encode the subject → visual-review rejection.
+
+When a diagnostic comes back: fix it at its JSON path; never delete an educationally necessary visual
+to silence a reference error, and never shrink the whole scene to solve overflow — repair the specific
+cause.
+
+---
+
+# Part II — Complete field-by-field format reference
+
+Everything below is the authoritative reference for every top-level field, scene field, placement
+mode, target/anchor family, object kind, action, and the math expression language, with worked
+examples. When Part I told you to "see Part II §N," this is where to look.
 
 ## 1. The mental model
 
@@ -275,6 +569,18 @@ Use one of the composition's predefined regions. `mode` selects the placement st
 
 Objects assigned to the same zone are automatically stacked downward with spacing. A zone is currently a center point followed by automatic stacking, not a collision-proof bounding rectangle. Do not put many large objects in one zone; use multiple zones or relative placement.
 
+Layout budget for the 920×430 safe frame:
+
+| Region | Recommended budget | Authoring guidance |
+|---|---:|---|
+| `title` | up to 800×58 | One heading, normally under eight words. |
+| `main` | up to 700×280 | One primary diagram, map, chart, table, or SVG. |
+| `main-left` / `main-right` | about 360×260 each | Use for a real comparison or cause/effect pair. |
+| `support` / `footer` | up to 700×60 | A concise label, conclusion, or small timeline—not a paragraph. |
+| `hud` | about 180×90 | One compact screen-fixed stat or legend. |
+
+These are authoring budgets, not clipping rectangles. Final boxes are computed from object kind and semantic size. General overflow and simultaneous-visibility collision diagnostics are authoritative; change placement, text, size, or reveal timing until the lesson has zero warnings.
+
 ### 6.2 `relative`
 
 ```json
@@ -436,11 +742,11 @@ Every object has `id` and `kind`. The following fields are shared and optional.
 |---|---:|---|---|
 | `id` | yes | valid ID | Unique within the scene. |
 | `kind` | yes | one object kind | Selects the object's fields and renderer. |
-| `role` | no | `background`, `support`, `primary`, `hero`, `annotation`, `hud` | Defaults to `primary`; controls semantic color, layer, and sometimes placement/size. |
+| `role` | no | `background`, `support`, `primary`, `hero`, `annotation`, `hud` | Defaults to `primary`; controls semantic color, layer, and sometimes placement/size. `hud` is screen-fixed. |
 | `placement` | no | a placement object | Derived from role/kind when omitted. |
 | `size` | no | `tiny`, `small`, `medium`, `large`, `hero`, `fill` | Semantic scale; derived when omitted. |
 | `initial` | no | `hidden`, `visible` | Omitted behaves as hidden unless a `show` action exists. |
-| `space` | no | `world`, `screen` | `world` follows camera; `screen` stays fixed like a HUD. |
+| `space` | no | `world`, `screen` | `world` follows camera; `screen` stays fixed. `role: "hud"` implies the same fixed behavior. |
 | `temporary` | no | boolean | When `true`, validation requires a later `hide`; use it for projections, guides, arrows, and other teaching marks. |
 
 ### 8.1 Roles
@@ -508,7 +814,15 @@ JSON object kinds.
 |---|---:|---|---|
 | `value` | yes | non-empty string | Math-text expression to typeset. |
 
-The equation renderer supports the GCL math-text notation used by the project, including common superscripts, subscripts, fractions, roots, Greek symbols, arrows, sums, and integrals.
+The equation renderer is a deterministic math-text subset, not full LaTeX. Plain characters,
+balanced `{...}` groups, superscript `^`, and subscript `_` are supported. Commands are limited to:
+
+- Greek: `\alpha`, `\beta`, `\gamma`, `\delta`, `\Delta`, `\epsilon`, `\zeta`, `\eta`, `\theta`, `\Theta`, `\lambda`, `\mu`, `\nu`, `\xi`, `\pi`, `\Pi`, `\rho`, `\sigma`, `\Sigma`, `\tau`, `\phi`, `\Phi`, `\chi`, `\psi`, `\omega`, `\Omega`;
+- arithmetic/relations: `\times`, `\cdot`, `\div`, `\pm`, `\mp`, `\leq`, `\geq`, `\neq`, `\approx`, `\equiv`, `\propto`, `\in`, `\forall`, `\exists`, `\angle`, `\perp`, `\cup`, `\cap`;
+- arrows/calculus: `\to`, `\rightarrow`, `\Rightarrow`, `\leftarrow`, `\leftrightarrow`, `\infty`, `\partial`, `\nabla`, `\int`, `\sum`, `\prod`, `\lim`, `\ln`;
+- structure/text: `\frac{...}{...}`, `\sqrt{...}`, `\text{...}`, `\cdots`, `\ldots`, `\deg` and the spacing commands `\,`, `\;`, `\ `.
+
+Unsupported commands or unbalanced groups produce `UNSUPPORTED_MATH_COMMAND` before rendering.
 
 ### 9.3 `stat`
 
@@ -619,13 +933,23 @@ The LLM writes one ordinary SVG. Every root-level named group becomes a part aut
 
 Shared `<defs>` may stay once at the root; the compiler copies them into each generated layer. Paint
 order follows the order of the named groups. The compiler derives display width and height from
-`size`, infers focused bounds for ordinary circles, ellipses, rectangles, lines, polygons, and common
-absolute `M`/`L`/`C` paths, and falls back safely to the complete viewBox for advanced transformed or
-unsupported geometry. Authors do not provide `parts`, `bounds`, `width`, or `height`.
+`size` and infers focused bounds for ordinary SVG geometry and absolute or relative
+`M/L/H/V/C/S/Q/T/A/Z` path commands. Curve and arc bounds are conservative envelopes. Transformed or
+otherwise unmeasurable groups fall back to the complete viewBox. Authors do not provide `parts`,
+`bounds`, `width`, or `height`.
 
 SVG scripts, handlers, external references, style attributes, nested SVG roots, unnamed root groups,
 and root-level drawing elements outside a named group are rejected. Timing remains controlled by
 beats, not by native SVG animation.
+
+Exact SVG capability subset (matching `getSimpleJsonCapabilities()`):
+
+- tags: `svg`, `g`, `path`, `circle`, `ellipse`, `rect`, `line`, `polyline`, `polygon`, `defs`, `linearGradient`, `radialGradient`, `stop`, `clipPath`, `mask`, `title`, `desc`;
+- attributes: `xmlns`, `viewBox`, `preserveAspectRatio`, `role`, `aria-label`, `id`, `d`, `x`, `y`, `x1`, `y1`, `x2`, `y2`, `cx`, `cy`, `r`, `rx`, `ry`, `width`, `height`, `points`, `fill`, `stroke`, `stroke-width`, `stroke-linecap`, `stroke-linejoin`, `stroke-miterlimit`, `opacity`, `fill-opacity`, `stroke-opacity`, `transform`, `gradientUnits`, `gradientTransform`, `offset`, `stop-color`, `stop-opacity`, `clip-path`, `mask`, `fill-rule`, `clip-rule`;
+- limits: at most 48,000 markup characters and 220 elements.
+
+Names are matched case-insensitively by the sanitizer. Only local paint references such as
+`url(#gradient-id)` are allowed.
 
 ### 9.7 `svg-composite` — advanced normalized form
 
@@ -689,11 +1013,11 @@ attributes, XML entities, and unsupported SVG elements/attributes are rejected. 
 beats, not native SVG animation. Use `vector` when stroke draw-on or runtime recoloring matters; use
 `svg-composite` for multi-color, gradient, clipped, or independently addressable authored artwork.
 
-Named SVG-part bounds are also used for anchors, labels, attention, and motion. Bounds are inferred
-precisely for circles, ellipses, rectangles, lines, polygons, polylines, and the common absolute
-`M`/`L`/`C` path subset. Advanced or relative path commands conservatively use the complete artwork
-viewBox. If a part needs precise targeting, keep its targetable outline in the supported subset or
-declare it as an explicit `svg-composite` part with `bounds`.
+Named SVG-part bounds are also used for anchors, labels, attention, and motion. The parser records
+whether each inferred box is exact, conservative, or a whole-viewBox fallback. A fallback is allowed
+for paint-only decoration, but targeting or spatially placing that part produces
+`IMPRECISE_SVG_BOUNDS`. Remove the transform/special geometry, wrap a simpler target group around the
+part, or declare an explicit `svg-composite` part with accurate `bounds`.
 
 ### 9.8 `line`
 
@@ -781,9 +1105,9 @@ Use `curve` for free parametric geometry. Use a `chart` with `chart: "function"`
 | Field | Required | Options / type | Meaning |
 |---|---:|---|---|
 | `chart` | yes | `bar`, `line`, `area`, `scatter`, `pie`, `donut`, `function`, `riemann` | Chart renderer. |
-| `data` | depends on chart | array of category data | Bar/pie/donut-style values. |
-| `series` | depends on chart | at least two `[x, y]` pairs | Line/area/scatter data. |
-| `function` | depends on chart | expression string | Function/riemann equation in variable `x`. |
+| `data` | yes for `bar`/`pie`/`donut` | non-empty category-data array | Bar/pie/donut-style values. Forbidden on other chart variants. |
+| `series` | yes for `line`/`area`/`scatter` | at least two `[x, y]` pairs | Sampled data. Forbidden on other chart variants. |
+| `function` | yes for `function`/`riemann` | expression string | Equation in variable `x`. Forbidden on data/series variants. |
 | `rectangles` | no | `few`, `several`, `many`, `dense` | Riemann rectangle density. |
 | `xDomain` | no | exactly two numbers | Horizontal domain. |
 | `yDomain` | no | exactly two numbers | Vertical domain. |
@@ -817,7 +1141,7 @@ Recommended fields by chart type:
 | `function` | `function`; normally `xDomain`, `yDomain`, `axes`, labels |
 | `riemann` | `function`; normally domains, `rectangles`, axes, labels |
 
-The structural schema allows optional chart-specific fields, so use the table above to avoid a valid object that has too little information to draw meaningfully.
+The structural schema is a discriminated union keyed by `chart`. A chart with the wrong payload is rejected before layout or rendering. Domains must be strictly increasing, and expressions must parse and produce at least one finite value over the authored domain.
 
 Rectangle counts are deterministic: `few` = 4, `several` = 8, `many` = 16, `dense` = 32. A `donut` is rendered as a pie with an automatic inner hole.
 
@@ -867,7 +1191,7 @@ Use the same category strings in charts, maps, timelines, and legends for consis
 }
 ```
 
-Map coordinates are geographic-like `[longitude, latitude]` pairs. A ring is an array of at least three coordinate pairs.
+Map coordinates are geographic-like `[longitude, latitude]` pairs. Longitude must be from −180 to 180 and latitude from −90 to 90. A ring is an array of at least three coordinate pairs and must contain at least three distinct points.
 
 | Field | Required | Type / options | Meaning |
 |---|---:|---|---|
@@ -895,7 +1219,7 @@ A marker:
 | `lon` | yes | Horizontal geographic coordinate. |
 | `lat` | yes | Vertical geographic coordinate. |
 | `label` | no | Visible label and targetable anchor. |
-| `icon` | no | Marker icon name understood by the map renderer. |
+| `icon` | no | One of `arrow`, `check`, `cross`, `plus`, `minus`, `star`, `heart`, `circle`, `square`, `triangle`, `gear`, `bolt`, `drop`, `sun`, `leaf`, `flame`, `factory`, `home`, `person`, `book`, `flask`, `atom`, `clock`, `pin`, `warning`, `info`, `search`, `cloud`, `mountain`, `seed`. |
 | `category` | no | Semantic color key. |
 
 A place:
@@ -1008,7 +1332,7 @@ Keep row lengths consistent even though the structural schema does not require e
 | `build` | no | pace token | Stagger child entrances. Without it, children enter together. |
 | `clip` | no | boolean | Clip children to the group bounds. |
 
-Children use the same object schema, but their placement is controlled by the group layout. Use unique child IDs.
+Children use the same content schema, but their placement and visibility are controlled by the group. Child IDs must be unique inside the group. Do not put `placement`, `initial`, `space`, or `temporary` on a child; place and animate the group itself. Nested child data still receives the same chart, equation, timeline, map, and expression validation as top-level objects.
 
 ---
 
@@ -1304,9 +1628,9 @@ Each stop requires `target` and `label`; optional `shot` accepts all shot tokens
 | `do` | yes | exactly `motion` |
 | `target` | yes | object to animate |
 | `motion` | yes | `move`, `fall`, `orbit`, `along`, `spin` |
-| `to` | by convention for `move`/`fall` | destination target |
-| `around` | no | orbit center target; defaults to scene `center` |
-| `along` | by convention for `along` | line object ID used as path |
+| `to` | yes for `move`/`fall` | destination target |
+| `around` | yes for `orbit` | orbit-center object or anchor target |
+| `along` | yes for `along` | line object ID used as path |
 | `orbit` | no | `small`, `medium`, `large`; default `medium` |
 | `turns` | no | `half`, `one`, `two`, `many`; default `one` |
 | `bounce` | no | `none`, `soft`, `strong`; default `none` |
@@ -1340,7 +1664,7 @@ along-path motion whose first frame differs from the object's resolved resting p
 
 Fall uses automatic gravity and bounce strength.
 
-The current compiler applies the first motion targeting an object. Prefer one motion action per object per scene.
+Exactly one motion action may target an object in a scene. Multiple independent motion programs are ambiguous and are rejected with `MULTIPLE_MOTION`; split them across objects or scenes.
 
 ### 12.7 `emphasize`
 
@@ -1360,7 +1684,7 @@ The current compiler applies the first motion targeting an object. Prefer one mo
 | `emphasis` | yes | `punch`, `shake`, `pulse`, `wiggle` |
 | `strength` | no | `subtle`, `normal`, `strong`; default `normal` |
 
-The current compiler applies the first emphasis targeting an object. Prefer one emphasis action per object per scene.
+Repeated emphasis is supported. Every emphasis is scoped to its beat's start and duration, so a later pulse, shake, punch, or wiggle does not overwrite the earlier one and does not continue forever.
 
 ### 12.8 `attention`
 
@@ -1382,7 +1706,7 @@ The current compiler applies the first emphasis targeting an object. Prefer one 
 | `do` | yes | exactly `attention` |
 | `target` | yes | visible object or anchor |
 | `verb` | yes | one attention verb |
-| `from` | no | origin target for directional verbs |
+| `from` | yes for `pointer`; otherwise optional | origin target for directional verbs |
 | `text` | no | annotation body |
 | `title` | no | annotation heading |
 | `side` | no | `auto`, `north`, `south`, `east`, `west` |
@@ -1732,13 +2056,17 @@ Checks:
 
 - duplicate scene/object/beat IDs;
 - unknown object and anchor targets;
-- unknown visual assets;
+- unknown visual assets and map icons;
+- invalid chart domains, payloads, expressions, and equation commands;
+- invalid timeline ranges, table rows, map rings, place names, and group children;
 - placement cycles;
 - invalid show/hide lifecycle;
 - action targets that are missing or never visible;
+- multiple motion programs targeting one object;
 - canonical GCL consistency after compilation.
 
-After layout resolution, the compiler also checks safe-frame overflow and motion geometry. These
+After layout resolution, the compiler also checks safe-frame overflow, simultaneous-object collisions,
+SVG-part bound precision, callout geometry, and motion geometry. These
 checks need final view-space boxes, so schema validation alone cannot perform them.
 
 `compileLessonSpec` returns valid canonical output together with repairable warnings so an LLM can
@@ -1758,17 +2086,29 @@ generate JSON → compile → repair every diagnostic → compile again → rend
 | `DUPLICATE_ID` | An ID is reused in a scope where it must be unique. |
 | `UNKNOWN_TARGET` | Referenced object does not exist. |
 | `UNKNOWN_ASSET` | Visual asset name is not registered. |
+| `UNKNOWN_ICON` | A map-marker icon is outside the renderer's exact icon vocabulary. |
 | `INVALID_ANCHOR` | Object exists, but the named anchor does not. |
 | `INVALID_ACTION_TARGET` | An action used an invalid target form, such as an anchor in `show.targets`. |
 | `INVALID_LIFECYCLE` | Show/hide order or visibility declaration is impossible. |
+| `INVALID_SVG` | SVG markup, structure, tag, attribute, reference, or named-part convention is unsafe or unsupported. |
+| `INVALID_SVG_BOUNDS` | An explicit SVG-composite part box is non-positive or lies outside its viewBox. |
+| `INVALID_EXPRESSION` | A safe expression cannot be parsed or has no finite value on its domain. |
+| `UNSUPPORTED_MATH_COMMAND` | Equation markup uses a command the renderer does not implement. |
+| `INVALID_DOMAIN` | A numeric domain or timeline range is reversed, equal, or out of bounds. |
+| `INVALID_DATA` | Object data is structurally present but semantically unusable. |
+| `UNKNOWN_MAP_PLACE` | A map flow names a place not declared by that map. |
+| `INVALID_GROUP_CHILD` | A group child has forbidden placement/lifecycle fields or duplicate IDs. |
+| `MULTIPLE_MOTION` | More than one motion program targets the same object in one scene. |
 | `PLACEMENT_CYCLE` | Relative placements depend on each other circularly. |
 | `CANONICAL_ERROR` | Compiled GCL violates the renderer's canonical contract. |
 | `TARGET_NOT_VISIBLE` | A target is used before it has appeared; warning if it becomes visible later. |
 | `TEMPORARY_VISUAL_PERSISTS` | An object or SVG part marked temporary is still visible at the scene's final frame. |
-| `LAYOUT_OVERFLOW` | Resolved text, equation, stat, or legend extends outside the safe 920×430 frame. |
+| `LAYOUT_OVERFLOW` | A resolved top-level object extends outside the safe 920×430 frame. |
+| `LAYOUT_COLLISION` | Two objects overlap substantially while simultaneously visible without an explicit relational placement. |
+| `CALLOUT_OVERFLOW` | A callout cannot fit safely around its target. |
+| `IMPRECISE_SVG_BOUNDS` | A spatially targeted SVG part fell back to whole-viewBox bounds. |
 | `MOTION_GEOMETRY_FALLBACK` | Orbit target begins on its center, so the compiler must use the semantic fallback radius. |
 | `MOTION_PATH_ADJUSTED` | Along-path target does not begin at either path endpoint; a lead-in was inserted to avoid a jump. |
-| `UNKNOWN_RECIPE` | Recipe ID is not registered. |
 
 Diagnostics include a JSON path and, where possible, suggestions and available targets. Fix the earliest structural error first because later reference errors may be consequences of it.
 
@@ -1787,7 +2127,8 @@ Diagnostics include a JSON path and, where possible, suggestions and available t
 9. Put parallel actions in one beat and sequential actions in separate beats.
 10. Use labels/tours only after targets are visible.
 11. Use camera movement to clarify scale or detail, not on every beat.
-12. Validate, render, and scrub the entire film, including the last frame of every scene.
+12. Validate every generated keyframe: scene boundaries, beat boundaries, and motion quartiles.
+13. Render and visually review those keyframes, including the last frame of every scene.
 
 Treat warnings as repair requests, not optional decoration. A lesson is ready only when it compiles
 without warnings and orbit/path motion remains continuous at the exact beat boundary when scrubbing
@@ -1853,6 +2194,9 @@ This guide describes the implementation in:
 - `src/simple-json/validate.ts`, `src/simple-json/lifecycle.ts`, and `src/simple-json/diagnostics.ts` — source, lifecycle, and resolved-layout diagnostics;
 - `src/simple-json/resolve.ts` and `src/simple-json/registry.ts` — layout, sizes, themes, paces, shots, and anchors;
 - `src/simple-json/compile.ts` and `src/simple-json/canonical.ts` — deterministic compilation and canonical motion-continuity checks;
+- `src/simple-json/keyframes.ts` — deterministic review-frame collection and finite-geometry checks;
+- `src/simple-json/capabilities.ts` — machine-readable schema, tokens, asset anchors, SVG limits, and math vocabulary;
+- `src/simple-json/prompts.ts` — planner, author, repair, and visual-review prompt contracts;
 - `src/lessons/simple-json/` — the four complete lesson implementations.
 
 When the implementation changes, update this document in the same change so the human contract remains accurate.

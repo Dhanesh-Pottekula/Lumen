@@ -4,6 +4,7 @@ import type { Film } from "../gcl/schema";
 import { compileResolvedLesson } from "./compile";
 import { validateCanonicalFilm } from "./canonical";
 import { analyzeResolvedLesson, type Diagnostic } from "./diagnostics";
+import { validateResolvedKeyframes } from "./keyframes";
 import { resolveLesson, type ResolvedLesson } from "./resolve";
 import type { LessonSpec } from "./types";
 import { validateLessonSpec } from "./validate";
@@ -49,6 +50,8 @@ export function compileLessonSpec(input: unknown): CompileLessonResult {
   const validated = validateLessonSpec(decoded.value);
   if (!validated.valid) return validated;
   const resolved = resolveLesson(validated.value);
+  const keyframes = validateResolvedKeyframes(resolved);
+  if (!keyframes.valid) return keyframes;
   const resolvedWarnings = analyzeResolvedLesson(resolved);
   const gcl = compileResolvedLesson(resolved);
   const canonical = validateCanonicalFilm(gcl);
@@ -72,8 +75,23 @@ export function renderLessonSpec(input: unknown): RenderLessonResult {
   return { ...compiled, slide: renderFilm(compiled.gcl) };
 }
 
-export { LESSON_INPUT_SCHEMA, LESSON_SPEC_SCHEMA } from "./schema";
+export { LESSON_INPUT_SCHEMA, LESSON_SPEC_SCHEMA, SIMPLE_JSON_MAP_ICONS } from "./schema";
+export { getSimpleJsonCapabilities } from "./capabilities";
+export type { SimpleJsonCapabilities } from "./capabilities";
+export {
+  SIMPLE_JSON_AUTHOR_SYSTEM_PROMPT,
+  SIMPLE_JSON_PLANNER_SYSTEM_PROMPT,
+  SIMPLE_JSON_REPAIR_SYSTEM_PROMPT,
+  SIMPLE_JSON_VISUAL_REVIEW_SYSTEM_PROMPT,
+  buildLessonGenerationPrompt,
+  buildLessonPlanningPrompt,
+  buildLessonRepairPrompt,
+  buildLessonVisualReviewPrompt,
+} from "./prompts";
+export type { LessonAuthoringRequest, VisualLessonPlan } from "./prompts";
 export { validateCanonicalFilm } from "./canonical";
+export { collectLessonKeyframes, validateResolvedKeyframes } from "./keyframes";
+export type { LessonKeyframe } from "./keyframes";
 export {
   availableVisualAssets,
   resolveVisualAsset,

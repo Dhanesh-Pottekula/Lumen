@@ -40,7 +40,7 @@ export const calculusLessonSpec: LessonSpec = {
         { id: "width", kind: "equation", value: "\\Delta x=\\frac{2-0}{4}=0.5", size: "small", placement: { mode: "zone", zone: "main-right" } },
         { id: "sum", kind: "equation", value: "A_4=\\sum_{i=0}^{3}f(x_i)\\Delta x", size: "small", placement: { mode: "relative", target: "width", relation: "below" } },
         { id: "count", kind: "stat", value: 4, label: "rectangles", decimals: 0, size: "tiny", placement: { mode: "relative", target: "sum", relation: "below" } },
-        { id: "estimate", kind: "stat", value: 1.75, label: "lower estimate", decimals: 2, size: "tiny", placement: { mode: "zone", zone: "support" } },
+        { id: "estimate", kind: "stat", value: 1.75, label: "lower estimate", decimals: 2, size: "tiny", placement: { mode: "relative", target: "count", relation: "left-of" } },
         { id: "rectangle-rule", kind: "text", text: "width × left-edge height, then add", textRole: "caption", size: "small", placement: { mode: "zone", zone: "footer" } },
       ],
       beats: [
@@ -146,7 +146,7 @@ export const calculusLessonSpec: LessonSpec = {
         { id: "show-coarse", pace: "slow", actions: [{ do: "show", targets: ["title", "stages.coarse", "coarse-label"], entrance: "draw" }] },
         { id: "show-refinement", pace: "slow", actions: [{ do: "show", targets: ["stages.refine-arrow", "stages.fine", "fine-label"], entrance: "draw" }] },
         { id: "show-limit", pace: "slow", actions: [{ do: "show", targets: ["stages.limit-arrow", "stages.exact", "exact-label"], entrance: "draw" }] },
-        { id: "show-exact-value", pace: "slow", actions: [{ do: "show", targets: ["equation"], entrance: "fade" }, { do: "attention", target: "stages.exact", verb: "callout", text: "one shaded region, one exact value", side: "east", style: "tag" }] },
+        { id: "show-exact-value", pace: "slow", actions: [{ do: "show", targets: ["equation"], entrance: "fade" }, { do: "attention", target: "stages.exact", verb: "callout", text: "one shaded region, one exact value", side: "west", style: "tag" }] },
         { id: "hold-payoff", pace: "dramatic", actions: [{ do: "emphasize", target: "equation", emphasis: "pulse", strength: "subtle" }] },
       ],
     },

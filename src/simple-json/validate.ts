@@ -1,4 +1,6 @@
 import Ajv2020 from "ajv/dist/2020.js";
+import { parseExpr } from "../gcl/expr";
+import { validateMathText } from "../render/mathtext";
 import type { Diagnostic, ValidationResult } from "./diagnostics";
 import { formatAjvErrors } from "./diagnostics";
 import { LESSON_SPEC_SCHEMA } from "./schema";
@@ -63,7 +65,7 @@ function referenceDiagnostic(
       if (object.kind === "chart") {
         const count = object.chart === "riemann"
           ? ({ few: 4, several: 8, many: 16, dense: 32 }[object.rectangles ?? "several"])
-          : object.data?.length ?? object.series?.length ?? 0;
+          : "data" in object ? object.data.length : "series" in object ? object.series.length : 0;
         const prefix = object.chart === "bar" || object.chart === "riemann" ? "bar" : object.chart === "pie" || object.chart === "donut" ? "slice" : "pt";
         anchors = [...generic, "peak", "first", "last", ...Array.from({ length: count }, (_, index) => `${prefix}${index}`)];
       }
@@ -101,21 +103,170 @@ function actionReferences(action: ActionSpec): Array<{ target: string; suffix: s
     case "camera":
     case "label":
     case "emphasize":
-    case "attention":
       return [{ target: action.target, suffix: "/target" }];
-    case "motion":
+    case "attention":
       return [
         { target: action.target, suffix: "/target" },
-        ...(action.to ? [{ target: action.to, suffix: "/to" }] : []),
-        ...(action.around ? [{ target: action.around, suffix: "/around" }] : []),
-        ...(action.along ? [{ target: action.along, suffix: "/along" }] : []),
+        ...(action.verb === "pointer" ? [{ target: action.from, suffix: "/from" }] : []),
       ];
+    case "motion":
+      if (action.motion === "move" || action.motion === "fall") return [{ target: action.target, suffix: "/target" }, { target: action.to, suffix: "/to" }];
+      if (action.motion === "orbit") return [{ target: action.target, suffix: "/target" }, { target: action.around, suffix: "/around" }];
+      if (action.motion === "along") return [{ target: action.target, suffix: "/target" }, { target: action.along, suffix: "/along" }];
+      return [{ target: action.target, suffix: "/target" }];
     case "effect":
       if (action.effect === "flow") return [{ target: action.from, suffix: "/from" }, { target: action.to, suffix: "/to" }];
       return [{ target: action.target, suffix: "/target" }];
     case "tour":
       return action.stops.map((stop, index) => ({ target: stop.target, suffix: `/stops/${index}/target` }));
   }
+}
+
+function increasingDomain(domain: [number, number] | undefined, path: string): Diagnostic[] {
+  if (!domain || domain[0] < domain[1]) return [];
+  return [{
+    code: "INVALID_DOMAIN",
+    path,
+    message: `Domain minimum must be less than its maximum`,
+    received: domain,
+  }];
+}
+
+function expressionDiagnostics(
+  expression: string,
+  path: string,
+  variable: "x" | "u",
+  domain: [number, number],
+): Diagnostic[] {
+  const parsed = parseExpr(expression);
+  if (!parsed.valid) {
+    return [{ code: "INVALID_EXPRESSION", path, message: parsed.error, received: expression }];
+  }
+  const values = Array.from({ length: 17 }, (_value, index) => {
+    const input = domain[0] + (domain[1] - domain[0]) * (index / 16);
+    return parsed.evaluate({ [variable]: input });
+  });
+  if (values.some(Number.isFinite)) return [];
+  return [{
+    code: "INVALID_EXPRESSION",
+    path,
+    message: `Expression produces no finite values across ${variable} in [${domain[0]}, ${domain[1]}]`,
+    received: expression,
+  }];
+}
+
+function duplicateNamedValues(values: string[], path: string, label: string): Diagnostic[] {
+  const seen = new Set<string>();
+  const diagnostics: Diagnostic[] = [];
+  values.forEach((value, index) => {
+    if (seen.has(value)) diagnostics.push({ code: "INVALID_DATA", path: `${path}/${index}`, message: `Duplicate ${label} '${value}'`, received: value });
+    seen.add(value);
+  });
+  return diagnostics;
+}
+
+function objectSemanticDiagnostics(object: ObjectSpec, path: string): Diagnostic[] {
+  const errors: Diagnostic[] = [];
+  if (object.kind === "equation") {
+    const math = validateMathText(object.value);
+    if (!math.valid) errors.push({ code: "UNSUPPORTED_MATH_COMMAND", path: `${path}/value`, message: math.error, received: object.value });
+  }
+  if (object.kind === "curve") {
+    errors.push(...increasingDomain(object.domain, `${path}/domain`));
+    const domain = object.domain ?? [0, 1];
+    errors.push(...expressionDiagnostics(object.x, `${path}/x`, "u", domain));
+    errors.push(...expressionDiagnostics(object.y, `${path}/y`, "u", domain));
+  }
+  if (object.kind === "chart") {
+    errors.push(...increasingDomain(object.xDomain, `${path}/xDomain`));
+    errors.push(...increasingDomain(object.yDomain, `${path}/yDomain`));
+    if (object.chart === "bar" || object.chart === "pie" || object.chart === "donut") {
+      errors.push(...duplicateNamedValues(object.data.map((datum) => datum.label), `${path}/data`, "chart label"));
+      if ((object.chart === "pie" || object.chart === "donut") && object.data.some((datum) => datum.value < 0)) {
+        errors.push({ code: "INVALID_DATA", path: `${path}/data`, message: `${object.chart} chart values cannot be negative`, received: object.data });
+      }
+      if ((object.chart === "pie" || object.chart === "donut") && object.data.every((datum) => datum.value === 0)) {
+        errors.push({ code: "INVALID_DATA", path: `${path}/data`, message: `${object.chart} chart requires at least one positive value`, received: object.data });
+      }
+    }
+    if (object.chart === "line" || object.chart === "area") {
+      object.series.slice(1).forEach(([x], index) => {
+        if (x <= object.series[index][0]) errors.push({
+          code: "INVALID_DATA",
+          path: `${path}/series/${index + 1}/0`,
+          message: `${object.chart} series x-values must be strictly increasing`,
+          received: x,
+        });
+      });
+    }
+    if (object.chart === "function" || object.chart === "riemann") {
+      errors.push(...expressionDiagnostics(object.function, `${path}/function`, "x", object.xDomain ?? [-5, 5]));
+    }
+  }
+  if (object.kind === "shape") {
+    if (object.shape === "polygon" && object.sides === undefined) {
+      errors.push({ code: "INVALID_DATA", path: `${path}/sides`, message: "Polygon shapes require sides", received: object.sides });
+    }
+    if (object.shape !== "polygon" && object.sides !== undefined) {
+      errors.push({ code: "INVALID_DATA", path: `${path}/sides`, message: `sides is only valid for polygon shapes`, received: object.sides });
+    }
+  }
+  if (object.kind === "timeline") {
+    if (!(object.from < object.to)) errors.push({ code: "INVALID_DOMAIN", path, message: "Timeline from must be less than to", received: [object.from, object.to] });
+    object.events?.forEach((event, index) => {
+      if (event.at < object.from || event.at > object.to) errors.push({ code: "INVALID_DATA", path: `${path}/events/${index}/at`, message: "Timeline event lies outside the timeline range", received: event.at });
+    });
+    object.eras?.forEach((era, index) => {
+      if (!(era.from < era.to) || era.from < object.from || era.to > object.to) errors.push({ code: "INVALID_DATA", path: `${path}/eras/${index}`, message: "Timeline era must be ordered and remain inside the timeline range", received: era });
+    });
+    const playhead = object.playhead;
+    if (typeof playhead === "number" && (playhead < object.from || playhead > object.to)) errors.push({ code: "INVALID_DATA", path: `${path}/playhead`, message: "Timeline playhead lies outside the timeline range", received: playhead });
+    if (typeof playhead === "object" && (!(playhead.from < playhead.to) || playhead.from < object.from || playhead.to > object.to)) errors.push({ code: "INVALID_DATA", path: `${path}/playhead`, message: "Animated playhead must be ordered and remain inside the timeline range", received: playhead });
+  }
+  if (object.kind === "table") {
+    const columns = object.rows[0]?.length ?? 0;
+    object.rows.forEach((row, index) => {
+      if (row.length !== columns) errors.push({ code: "INVALID_DATA", path: `${path}/rows/${index}`, message: `Table row has ${row.length} columns; expected ${columns}`, received: row });
+    });
+  }
+  if (object.kind === "map") {
+    errors.push(...duplicateNamedValues(object.features.map((feature) => feature.id), `${path}/features`, "feature id"));
+    errors.push(...duplicateNamedValues((object.places ?? []).map((place) => place.name), `${path}/places`, "place name"));
+    errors.push(...duplicateNamedValues((object.markers ?? []).flatMap((marker) => marker.label ? [marker.label] : []), `${path}/markers`, "marker label"));
+    const names = new Set([
+      ...object.features.map((feature) => feature.id),
+      ...(object.places ?? []).map((place) => place.name),
+      ...(object.markers ?? []).flatMap((marker) => marker.label ? [marker.label] : []),
+    ]);
+    object.features.forEach((feature, featureIndex) => feature.rings.forEach((ring, ringIndex) => {
+      const distinct = new Set(ring.map(([x, y]) => `${x}:${y}`));
+      if (distinct.size < 3) errors.push({
+        code: "INVALID_DATA",
+        path: `${path}/features/${featureIndex}/rings/${ringIndex}`,
+        message: "Map rings require at least three distinct points",
+        received: ring,
+      });
+    }));
+    object.flows?.forEach((flow, index) => {
+      if (typeof flow.from === "string" && !names.has(flow.from)) errors.push({ code: "UNKNOWN_MAP_PLACE", path: `${path}/flows/${index}/from`, message: `Unknown map place '${flow.from}'`, received: flow.from, availableTargets: [...names] });
+      if (typeof flow.to === "string" && !names.has(flow.to)) errors.push({ code: "UNKNOWN_MAP_PLACE", path: `${path}/flows/${index}/to`, message: `Unknown map place '${flow.to}'`, received: flow.to, availableTargets: [...names] });
+    });
+  }
+  if (object.kind === "group") {
+    errors.push(...duplicateNamedValues(object.children.map((child) => child.id), `${path}/children`, "group child id"));
+    object.children.forEach((child, index) => {
+      if (child.placement || child.initial || child.space || child.temporary) {
+        errors.push({
+          code: "INVALID_GROUP_CHILD",
+          path: `${path}/children/${index}`,
+          message: "Group children are layout content; placement, initial, space, and temporary belong on the parent group",
+          received: child,
+        });
+      }
+      errors.push(...objectSemanticDiagnostics(child, `${path}/children/${index}`));
+    });
+  }
+  return errors;
 }
 
 function semanticScene(scene: SceneSpec, sceneIndex: number): { errors: Diagnostic[]; warnings: Diagnostic[] } {
@@ -125,6 +276,15 @@ function semanticScene(scene: SceneSpec, sceneIndex: number): { errors: Diagnost
     ...duplicateDiagnostics(scene.beats.map((beat) => beat.id), `${base}/beats`),
   ];
   const warnings: Diagnostic[] = [];
+  const spatialReferences = new Set<string>();
+  scene.objects.forEach((object) => {
+    if (object.kind === "line") { spatialReferences.add(object.from); spatialReferences.add(object.to); }
+    if (object.placement?.mode === "relative" || object.placement?.mode === "anchor") spatialReferences.add(object.placement.target);
+  });
+  scene.beats.forEach((beat) => beat.actions.forEach((action) => {
+    if (action.do === "show" || action.do === "hide") return;
+    actionReferences(action).forEach(({ target }) => spatialReferences.add(target));
+  }));
   const objects = new Map<string, ObjectSpec>();
   for (const object of scene.objects) {
     objects.set(object.id, object);
@@ -150,6 +310,7 @@ function semanticScene(scene: SceneSpec, sceneIndex: number): { errors: Diagnost
     }
   };
   scene.objects.forEach((object, objectIndex) => {
+    errors.push(...objectSemanticDiagnostics(object, `${base}/objects/${objectIndex}`));
     if (object.temporary) requireTemporaryCleanup(object.id, `${base}/objects/${objectIndex}/temporary`);
     if (object.kind === "svg-composite") {
       object.parts.forEach((part, partIndex) => {
@@ -250,6 +411,20 @@ function semanticScene(scene: SceneSpec, sceneIndex: number): { errors: Diagnost
           message: svgError,
           received: object.svg,
         });
+      } else {
+        const parsed = parseSvgArtwork(object.svg).value;
+        parsed?.parts.forEach((part) => {
+          if (part.boundsPrecision !== "viewbox-fallback") return;
+          const target = `${object.id}.${part.id}`;
+          if (![...spatialReferences].some((reference) => reference === target || reference.startsWith(`${target}.`))) return;
+          warnings.push({
+            code: "IMPRECISE_SVG_BOUNDS",
+            path: `${base}/objects/${objectIndex}/svg`,
+            message: `Targeted SVG part '${target}' uses whole-viewBox bounds: ${part.boundsReason ?? "geometry could not be measured"}`,
+            received: target,
+            suggestions: ["Use ordinary untransformed SVG primitives or simple path commands for independently targeted groups"],
+          });
+        });
       }
     }
     const references =
@@ -309,6 +484,19 @@ function semanticScene(scene: SceneSpec, sceneIndex: number): { errors: Diagnost
       });
     });
   });
+  const motions = new Map<string, string>();
+  scene.beats.forEach((beat, beatIndex) => beat.actions.forEach((action, actionIndex) => {
+    if (action.do !== "motion") return;
+    const previous = motions.get(action.target);
+    const path = `${base}/beats/${beatIndex}/actions/${actionIndex}`;
+    if (previous) errors.push({
+      code: "MULTIPLE_MOTION",
+      path,
+      message: `Object '${action.target}' already has a motion at ${previous}; one motion per object is currently supported`,
+      received: action,
+    });
+    else motions.set(action.target, path);
+  }));
   return { errors, warnings };
 }
 

@@ -65,6 +65,14 @@ export interface OscillateSpec {
   mode?: "breathe" | "wobble" | "pulse";
 }
 
+export interface EmphasisSpec {
+  kind?: "punch" | "shake" | "pulse" | "wiggle";
+  at?: number;
+  cue?: number;
+  dur?: number;
+  amp?: number;
+}
+
 /** Fields shared by every component. Most are plumbed now, exercised in later phases. */
 export interface Base {
   id?: string;
@@ -84,7 +92,7 @@ export interface Base {
   oscillate?: OscillateSpec;
   // Subject modifiers (Family D, Phase 4) — wrap THIS component's own content draw via the (A)-class
   // verbs (withPunch/withShake/pulseScale/wiggle/ghost/magnify) and predictReveal gating.
-  emphasis?: { kind?: "punch" | "shake" | "pulse" | "wiggle"; at?: number; cue?: number; amp?: number };
+  emphasis?: EmphasisSpec | EmphasisSpec[];
   ghost?: number;   // 0..1 residual opacity (de-emphasize this element)
   magnify?: { zoom?: number; r?: number };
   predict?: { revealAt?: number; revealCue?: number; poseAt?: number };
