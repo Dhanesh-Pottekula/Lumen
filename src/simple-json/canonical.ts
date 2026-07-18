@@ -34,10 +34,12 @@ function validateScene(components: Component[], offset: number): Diagnostic[] {
   const errors: Diagnostic[] = [];
   const ids = new Set<string>();
   const geo = new Set<string>();
+  const positions = new Map<string, [number, number]>();
   components.forEach((component, index) => {
     if (component.id) {
       if (ids.has(component.id)) errors.push({ code: "CANONICAL_ERROR", path: `/${offset + index}/id`, message: `Duplicate canonical id '${component.id}'`, received: component.id });
       ids.add(component.id);
+      if (Array.isArray(component.at) && component.at.length === 2) positions.set(component.id, component.at);
     }
     if (component.type === "map") {
       component.features.forEach((feature) => geo.add(feature.id));
@@ -51,6 +53,38 @@ function validateScene(components: Component[], offset: number): Diagnostic[] {
     for (const target of stringTargets(component)) {
       if (typeof target.value === "string" && !known(target.value)) {
         errors.push({ code: "CANONICAL_ERROR", path: `/${offset + index}/${target.field}`, message: `Unknown generated canonical target '${target.value}'`, received: target.value });
+      }
+    }
+
+    const resting = component.id ? positions.get(component.id) : undefined;
+    if (resting && component.motion?.kind === "orbit" && typeof component.motion.center === "string") {
+      const center = positions.get(component.motion.center);
+      if (center) {
+        const from = component.motion.from ?? 0;
+        const rx = component.motion.rx ?? component.motion.radius ?? 80;
+        const ry = component.motion.ry ?? component.motion.radius ?? 80;
+        const expected: [number, number] = [center[0] + Math.cos(from) * rx, center[1] + Math.sin(from) * ry];
+        const jump = Math.hypot(resting[0] - expected[0], resting[1] - expected[1]);
+        if (jump > 0.5) {
+          errors.push({
+            code: "CANONICAL_ERROR",
+            path: `/${offset + index}/motion`,
+            message: `Orbit motion would jump ${jump.toFixed(1)} view units on its first frame`,
+            received: component.motion,
+          });
+        }
+      }
+    }
+    if (resting && component.motion?.kind === "along" && component.motion.path.length > 0) {
+      const first = component.motion.path[0];
+      const jump = Math.hypot(resting[0] - first[0], resting[1] - first[1]);
+      if (jump > 0.5) {
+        errors.push({
+          code: "CANONICAL_ERROR",
+          path: `/${offset + index}/motion/path/0`,
+          message: `Along-path motion would jump ${jump.toFixed(1)} view units on its first frame`,
+          received: first,
+        });
       }
     }
   });

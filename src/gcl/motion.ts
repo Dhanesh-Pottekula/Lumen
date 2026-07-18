@@ -55,6 +55,11 @@ export function motionTransform(
   const [bcx, bcy] = boxCenter(box);
   const at = spec.at ?? 0;
 
+  // A scheduled motion must not alter the resting layout before its beat.
+  // In particular, orbit/along compute absolute path positions, so without
+  // this guard they could move an object even while an earlier beat is shown.
+  if (t < at) return IDENTITY;
+
   switch (spec.kind) {
     case "move": {
       const dur = spec.dur ?? 1;

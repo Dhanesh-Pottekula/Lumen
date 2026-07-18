@@ -55,6 +55,33 @@ const ORBIT_RADII = { small: 70, medium: 112, large: 156 } as const;
 const TURN_COUNTS = { half: 0.5, one: 1, two: 2, many: 4 } as const;
 const STRENGTH = { subtle: 0.55, normal: 1, strong: 1.55 } as const;
 
+/**
+ * Resolve an orbit in the same coordinate system used by the renderer.
+ *
+ * Artwork and its named SVG parts are scaled during layout. Using a fixed
+ * semantic radius after that scaling makes the target jump on the first
+ * animation frame and no longer match an authored orbit path. The resolved
+ * resting distance is therefore the authoritative radius. The semantic token
+ * remains a deterministic fallback for degenerate/missing geometry.
+ */
+function orbitGeometry(
+  scene: ResolvedScene,
+  object: ResolvedObject,
+  centerId: string | undefined,
+  fallback: keyof typeof ORBIT_RADII,
+): { from: number; radius: number } {
+  const centerObject = scene.objects.find((candidate) => candidate.id === centerId);
+  if (!centerObject) return { from: 0, radius: ORBIT_RADII[fallback] };
+
+  const dx = object.position[0] - centerObject.position[0];
+  const dy = object.position[1] - centerObject.position[1];
+  const radius = Math.hypot(dx, dy);
+  return {
+    from: Math.atan2(dy, dx),
+    radius: Number.isFinite(radius) && radius > 0.001 ? radius : ORBIT_RADII[fallback],
+  };
+}
+
 function motionFor(scene: ResolvedScene, object: ResolvedObject): Base["motion"] {
   const action = targetedAction(scene, object.id, "motion");
   if (!action || action.source.do !== "motion") return undefined;
@@ -66,15 +93,12 @@ function motionFor(scene: ResolvedScene, object: ResolvedObject): Base["motion"]
     return { kind: "fall", to: source.to, gravity: 420, bounce, at: action.start, dur: action.duration };
   }
   if (source.motion === "orbit") {
-    const centerObject = scene.objects.find((candidate) => candidate.id === source.around);
-    const from = centerObject
-      ? Math.atan2(object.position[1] - centerObject.position[1], object.position[0] - centerObject.position[0])
-      : 0;
+    const geometry = orbitGeometry(scene, object, source.around, source.orbit ?? "medium");
     return {
       kind: "orbit",
       center: source.around ?? "center",
-      radius: ORBIT_RADII[source.orbit ?? "medium"],
-      from,
+      radius: geometry.radius,
+      from: geometry.from,
       turns: TURN_COUNTS[source.turns ?? "one"] * direction,
       at: action.start,
       dur: action.duration,
@@ -83,7 +107,18 @@ function motionFor(scene: ResolvedScene, object: ResolvedObject): Base["motion"]
   if (source.motion === "along") {
     const pathObject = scene.objects.find((candidate) => candidate.id === source.along);
     const endpoints = pathObject?.endpoints;
-    const path = endpoints ? curvedPoints(endpoints.from, endpoints.to, pathObject?.source.kind === "line" && pathObject.source.form !== "straight") : [object.position, object.position];
+    let path = endpoints
+      ? curvedPoints(endpoints.from, endpoints.to, pathObject?.source.kind === "line" && pathObject.source.form !== "straight")
+      : [object.position, object.position];
+    if (endpoints) {
+      const distanceFrom = Math.hypot(object.position[0] - endpoints.from[0], object.position[1] - endpoints.from[1]);
+      const distanceTo = Math.hypot(object.position[0] - endpoints.to[0], object.position[1] - endpoints.to[1]);
+      if (distanceTo < distanceFrom) path = [...path].reverse();
+      const start = path[0];
+      if (Math.hypot(object.position[0] - start[0], object.position[1] - start[1]) > 0.001) {
+        path = [object.position, ...path];
+      }
+    }
     return { kind: "along", path, at: action.start, dur: action.duration };
   }
   return { kind: "spin", omega: direction * 2.2, at: action.start, dur: action.duration };

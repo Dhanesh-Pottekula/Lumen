@@ -8,8 +8,6 @@ const EURASIA: [number, number][] = [
 const MONGOLIA: [number, number][] = [[96, 50], [104, 52], [112, 51], [116, 47], [113, 43], [106, 42], [99, 44], [95, 47], [96, 50]];
 const BORDER_1227: [number, number][] = [[72, 52], [88, 55], [104, 55], [118, 52], [124, 45], [120, 37], [108, 33], [92, 35], [80, 40], [70, 45], [67, 49], [72, 52]];
 const BORDER_1260: [number, number][] = [[32, 48], [50, 58], [72, 59], [96, 58], [116, 55], [128, 48], [126, 38], [116, 30], [100, 30], [82, 34], [66, 34], [52, 34], [40, 38], [32, 42], [32, 48]];
-const BORDER_1368: [number, number][] = [[88, 52], [102, 54], [116, 53], [126, 47], [122, 37], [110, 31], [96, 34], [88, 42], [84, 47], [88, 52]];
-
 const PLACES: MapPlaceSpec[] = [
   { name: "beijing", lon: 116, lat: 40 }, { name: "samarkand", lon: 67, lat: 39.5 },
   { name: "baghdad", lon: 44.4, lat: 33.3 }, { name: "kiev", lon: 30.5, lat: 50.5 },
@@ -49,9 +47,9 @@ export const mongolLessonSpec: LessonSpec = {
             { from: [96, 40], to: "karakorum", category: "tribes", bend: "left", pace: "slow" },
           ],
         },
-        { id: "title", kind: "text", text: "1206: RIVAL TRIBES UNITE", textRole: "heading", placement: { mode: "zone", zone: "title" } },
+        { id: "title", kind: "text", text: "RIVAL TRIBES UNITE", textRole: "heading", placement: { mode: "zone", zone: "title" } },
         { id: "year", kind: "stat", value: 1206, unit: "CE", label: "one Mongol state", size: "small", placement: { mode: "zone", zone: "hud" }, space: "screen" },
-        { id: "subtitle", kind: "text", text: "Genghis Khan turns competing steppe tribes into one political and military force.", textRole: "caption", size: "small", placement: { mode: "zone", zone: "footer" } },
+        { id: "subtitle", kind: "text", text: "The four incoming routes converge into one state around Karakorum.", textRole: "caption", size: "small", placement: { mode: "zone", zone: "footer" } },
       ],
       beats: [
         { id: "steppe", pace: "dramatic", actions: [{ do: "show", targets: ["map", "title", "year"], entrance: "draw" }] },
@@ -70,15 +68,18 @@ export const mongolLessonSpec: LessonSpec = {
           { from: "karakorum", to: "baghdad", category: "conquest", bend: "right", pace: "slow" },
           { from: "karakorum", to: "kiev", category: "conquest", bend: "right", pace: "slow" },
         ] },
-        { id: "title", kind: "text", text: "FROM THE STEPPE IN TWO DIRECTIONS", textRole: "heading", placement: { mode: "zone", zone: "title" } },
+        { id: "title", kind: "text", text: "EXPANSION EAST AND WEST", textRole: "heading", placement: { mode: "zone", zone: "title" } },
         { id: "year", kind: "stat", value: 1227, unit: "CE", label: "at Genghis Khan's death", size: "small", placement: { mode: "zone", zone: "hud" }, space: "screen" },
         { id: "direction-note", kind: "text", text: "east into northern China  •  west through Central Asia toward Europe", textRole: "caption", size: "small", placement: { mode: "zone", zone: "footer" } },
       ],
       beats: [
         { id: "sweep", pace: "dramatic", actions: [{ do: "show", targets: ["map", "title", "year"], entrance: "draw" }] },
-        { id: "east", pace: "slow", actions: [{ do: "label", target: "map.beijing", title: "east", text: "northern China", style: "tag" }] },
-        { id: "central-asia", pace: "slow", actions: [{ do: "label", target: "map.samarkand", title: "west", text: "Central Asia", style: "tag" }] },
-        { id: "farther-west", pace: "slow", actions: [{ do: "label", target: "map.kiev", title: "farther west", text: "the Rus' lands", style: "tag" }] },
+        { id: "follow-routes", pace: "dramatic", actions: [{ do: "tour", labelMode: "one-at-a-time", returnTo: "overview", stops: [
+          { target: "map.beijing", label: "east: northern China", shot: "wide" },
+          { target: "map.samarkand", label: "west: Central Asia", shot: "wide" },
+          { target: "map.baghdad", label: "southwest: Persia and Baghdad", shot: "wide" },
+          { target: "map.kiev", label: "farther west: the Rus' lands", shot: "wide" },
+        ] }] },
         { id: "directions", pace: "slow", actions: [{ do: "show", targets: ["direction-note"], entrance: "word-by-word" }] },
       ],
     },
@@ -87,7 +88,7 @@ export const mongolLessonSpec: LessonSpec = {
       composition: "map",
       objects: [
         { id: "map", kind: "map", features: LAND, places: PLACES, outline: EURASIA, growth: [MONGOLIA, BORDER_1227, BORDER_1260], growthPace: "dramatic", size: "fill", placement: { mode: "zone", zone: "main" } },
-        { id: "title", kind: "text", text: "FROM UNIFICATION TO PEAK IN 54 YEARS", textRole: "heading", placement: { mode: "zone", zone: "title" } },
+        { id: "title", kind: "text", text: "54 YEARS TO PEAK EXTENT", textRole: "heading", placement: { mode: "zone", zone: "title" } },
         { id: "peak", kind: "stat", value: 24000000, unit: "km²", label: "at peak extent", commas: true, size: "small", placement: { mode: "zone", zone: "hud" }, space: "screen" },
         { id: "timeline", kind: "timeline", from: 1200, to: 1280, eras: [
           { from: 1206, to: 1227, label: "Genghis Khan", category: "founding" },
@@ -106,16 +107,18 @@ export const mongolLessonSpec: LessonSpec = {
       composition: "map",
       objects: [
         { id: "map", kind: "map", features: KHANATES, places: PLACES, outline: EURASIA, stagger: "normal", size: "fill", placement: { mode: "zone", zone: "main" } },
-        { id: "title", kind: "text", text: "ONE EMPIRE BECOMES FOUR KHANATES", textRole: "heading", placement: { mode: "zone", zone: "title" } },
-        { id: "legend", kind: "legend", categories: ["Golden Horde", "Ilkhanate", "Chagatai", "Yuan"], size: "small", space: "screen", placement: { mode: "zone", zone: "hud" } },
+        { id: "title", kind: "text", text: "FOUR SUCCESSOR KHANATES", textRole: "heading", placement: { mode: "zone", zone: "title" } },
+        { id: "legend", kind: "legend", categories: ["Golden Horde", "Ilkhanate", "Chagatai", "Yuan"], size: "small", space: "screen", placement: { mode: "zone", zone: "support" } },
         { id: "split-note", kind: "text", text: "Genghis Khan's descendants rule separate successor states.", textRole: "caption", size: "small", placement: { mode: "zone", zone: "footer" } },
       ],
       beats: [
         { id: "split", pace: "dramatic", actions: [{ do: "show", targets: ["map", "title", "legend"], entrance: "fade" }] },
-        { id: "yuan", pace: "slow", actions: [{ do: "attention", target: "map.yuan", verb: "callout", title: "Yuan", text: "China and Mongolia", side: "east", route: "straight", style: "tag" }] },
-        { id: "chagatai", pace: "slow", actions: [{ do: "attention", target: "map.chagatai", verb: "callout", title: "Chagatai", text: "Central Asia", side: "south", route: "straight", style: "tag" }] },
-        { id: "ilkhanate", pace: "slow", actions: [{ do: "attention", target: "map.ilkhanate", verb: "callout", title: "Ilkhanate", text: "Persia", side: "south", route: "straight", style: "tag" }] },
-        { id: "golden-horde", pace: "slow", actions: [{ do: "attention", target: "map.golden-horde", verb: "callout", title: "Golden Horde", text: "the western steppe and Rus'", side: "north", route: "straight", style: "tag" }] },
+        { id: "tour-successors", pace: "dramatic", actions: [{ do: "tour", labelMode: "one-at-a-time", returnTo: "overview", stops: [
+          { target: "map.yuan", label: "Yuan: China and Mongolia", shot: "wide" },
+          { target: "map.chagatai", label: "Chagatai: Central Asia", shot: "wide" },
+          { target: "map.ilkhanate", label: "Ilkhanate: Persia", shot: "wide" },
+          { target: "map.golden-horde", label: "Golden Horde: western steppe and Rus'", shot: "wide" },
+        ] }] },
         { id: "successors", pace: "slow", actions: [{ do: "show", targets: ["split-note"], entrance: "word-by-word" }] },
       ],
     },
@@ -129,9 +132,9 @@ export const mongolLessonSpec: LessonSpec = {
           { from: "samarkand", to: "baghdad", category: "trade", bend: "right", pace: "slow" },
           { from: "beijing", to: "kiev", category: "disease", bend: "left", pace: "slow" },
         ] },
-        { id: "title", kind: "text", text: "PAX MONGOLICA: A CONNECTED EURASIA", textRole: "heading", placement: { mode: "zone", zone: "title" } },
+        { id: "title", kind: "text", text: "EXCHANGE ACROSS EURASIA", textRole: "heading", placement: { mode: "zone", zone: "title" } },
         { id: "legend", kind: "legend", categories: ["trade", "knowledge", "disease"], size: "small", space: "screen", placement: { mode: "zone", zone: "hud" } },
-        { id: "message", kind: "text", text: "The same routes carry merchants, ideas, travellers — and disease.", textRole: "caption", role: "annotation", size: "small", placement: { mode: "zone", zone: "support" } },
+        { id: "message", kind: "text", text: "trade • knowledge • disease", textRole: "caption", role: "annotation", size: "tiny", placement: { mode: "zone", zone: "support" } },
         { id: "timeline", kind: "timeline", from: 1250, to: 1350, events: [{ at: 1271, label: "Marco Polo travels east" }, { at: 1300, label: "Silk Road at its height" }, { at: 1347, label: "Plague spreads west", side: "below" }], playhead: { from: 1250, to: 1350, pace: "dramatic" }, size: "fill", placement: { mode: "zone", zone: "footer" } },
       ],
       beats: [
@@ -145,16 +148,20 @@ export const mongolLessonSpec: LessonSpec = {
       id: "legacy-decline",
       composition: "comparison",
       objects: [
-        { id: "title", kind: "text", text: "FROM ONE EMPIRE TO SUCCESSOR STATES", textRole: "heading", placement: { mode: "zone", zone: "title" } },
+        { id: "title", kind: "text", text: "ONE EMPIRE SPLITS INTO FOUR STATES", textRole: "heading", placement: { mode: "zone", zone: "title" } },
         { id: "peak-map", kind: "map", features: LAND, outline: EURASIA, growth: [BORDER_1260, BORDER_1260], size: "tiny", placement: { mode: "zone", zone: "main-left" } },
-        { id: "later-map", kind: "map", features: LAND, outline: EURASIA, growth: [BORDER_1368, BORDER_1368], size: "tiny", placement: { mode: "zone", zone: "main-right" } },
-        { id: "peak-label", kind: "text", text: "1260 — peak extent", textRole: "caption", size: "small", placement: { mode: "relative", target: "peak-map", relation: "above" } },
-        { id: "later-label", kind: "text", text: "1368 — fragmented rule", textRole: "caption", size: "small", placement: { mode: "relative", target: "later-map", relation: "above" } },
+        { id: "later-map", kind: "map", features: KHANATES, outline: EURASIA, stagger: "quick", size: "tiny", placement: { mode: "zone", zone: "main-right" } },
+        { id: "peak-label", kind: "text", text: "1260 — one imperial system", textRole: "caption", size: "small", placement: { mode: "relative", target: "peak-map", relation: "above" } },
+        { id: "later-label", kind: "text", text: "four separately ruled khanates", textRole: "caption", size: "small", placement: { mode: "relative", target: "later-map", relation: "above" } },
+        { id: "split-arrow", kind: "line", from: "peak-map.right", to: "later-map.left", form: "arrow", role: "annotation" },
+        { id: "successor-legend", kind: "legend", categories: ["Golden Horde", "Ilkhanate", "Chagatai", "Yuan"], size: "small", temporary: true, placement: { mode: "zone", zone: "support" } },
         { id: "decline-timeline", kind: "timeline", from: 1255, to: 1380, events: [{ at: 1260, label: "succession crisis" }, { at: 1335, label: "Ilkhanate fragments" }, { at: 1368, label: "Yuan loses China", side: "below" }], playhead: { from: 1260, to: 1368, pace: "dramatic" }, size: "fill", placement: { mode: "zone", zone: "footer" } },
       ],
       beats: [
-        { id: "compare-borders", pace: "dramatic", actions: [{ do: "show", targets: ["title", "peak-map", "later-map", "peak-label", "later-label"], entrance: "fade" }] },
-        { id: "trace-fragmentation", pace: "slow", actions: [{ do: "show", targets: ["decline-timeline"], entrance: "draw" }] },
+        { id: "compare-borders", pace: "dramatic", actions: [{ do: "show", targets: ["title", "peak-map", "later-map", "peak-label", "later-label", "split-arrow", "successor-legend"], entrance: "fade" }] },
+        { id: "mark-peak", pace: "slow", actions: [{ do: "attention", target: "peak-map", verb: "brackets", text: "continent-spanning rule", side: "south" }] },
+        { id: "mark-fragments", pace: "slow", actions: [{ do: "attention", target: "later-map", verb: "brackets", text: "the colors now mark separate governments", side: "south" }] },
+        { id: "trace-fragmentation", pace: "slow", actions: [{ do: "hide", targets: ["successor-legend"], exit: "fade" }, { do: "show", targets: ["decline-timeline"], entrance: "draw" }] },
         { id: "hold-legacy", pace: "normal", actions: [{ do: "emphasize", target: "later-map", emphasis: "pulse", strength: "subtle" }] },
       ],
     },

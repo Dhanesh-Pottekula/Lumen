@@ -3,7 +3,7 @@ import { renderFilm } from "../gcl";
 import type { Film } from "../gcl/schema";
 import { compileResolvedLesson } from "./compile";
 import { validateCanonicalFilm } from "./canonical";
-import type { Diagnostic } from "./diagnostics";
+import { analyzeResolvedLesson, type Diagnostic } from "./diagnostics";
 import { resolveLesson, type ResolvedLesson } from "./resolve";
 import type { LessonSpec } from "./types";
 import { validateLessonSpec } from "./validate";
@@ -49,6 +49,7 @@ export function compileLessonSpec(input: unknown): CompileLessonResult {
   const validated = validateLessonSpec(decoded.value);
   if (!validated.valid) return validated;
   const resolved = resolveLesson(validated.value);
+  const resolvedWarnings = analyzeResolvedLesson(resolved);
   const gcl = compileResolvedLesson(resolved);
   const canonical = validateCanonicalFilm(gcl);
   if (!canonical.valid) return canonical;
@@ -57,13 +58,17 @@ export function compileLessonSpec(input: unknown): CompileLessonResult {
     lesson: validated.value,
     resolved,
     gcl,
-    warnings: validated.warnings,
+    warnings: [...validated.warnings, ...resolvedWarnings],
   };
 }
 
 export function renderLessonSpec(input: unknown): RenderLessonResult {
   const compiled = compileLessonSpec(input);
   if (!compiled.valid) return compiled;
+  // Compilation remains diagnostic-friendly so an LLM can inspect and repair
+  // warnings. Rendering is deliberately strict: known geometry, lifecycle, or
+  // safe-frame problems must never be promoted into a user-visible video.
+  if (compiled.warnings.length > 0) return { valid: false, errors: compiled.warnings };
   return { ...compiled, slide: renderFilm(compiled.gcl) };
 }
 

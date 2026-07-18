@@ -689,6 +689,12 @@ attributes, XML entities, and unsupported SVG elements/attributes are rejected. 
 beats, not native SVG animation. Use `vector` when stroke draw-on or runtime recoloring matters; use
 `svg-composite` for multi-color, gradient, clipped, or independently addressable authored artwork.
 
+Named SVG-part bounds are also used for anchors, labels, attention, and motion. Bounds are inferred
+precisely for circles, ellipses, rectangles, lines, polygons, polylines, and the common absolute
+`M`/`L`/`C` path subset. Advanced or relative path commands conservatively use the complete artwork
+viewBox. If a part needs precise targeting, keep its targetable outline in the supported subset or
+declare it as an explicit `svg-composite` part with `bounds`.
+
 ### 9.8 `line`
 
 ```json
@@ -1318,7 +1324,21 @@ Motion-specific forms:
 ]
 ```
 
-Internally, orbit sizes are deterministic (`small` 70, `medium` 112, `large` 156 view units); turns mean 0.5, 1, 2, or 4 revolutions. Fall uses automatic gravity and bounce strength.
+For `orbit`, place the moving target at its intended starting point on the authored orbit. After layout
+and SVG scaling, the compiler measures the resolved target-to-center distance and uses that as the
+orbit radius. This guarantees that the first motion frame equals the resting frame and keeps a target
+on a ring drawn in the same SVG coordinate system. `small` (70), `medium` (112), and `large` (156)
+are deterministic fallback radii only when the target begins exactly at the center or its center
+geometry cannot be resolved. Turns mean 0.5, 1, 2, or 4 revolutions.
+
+For `along`, place the moving target at either endpoint of the line. The compiler automatically chooses
+the nearer endpoint and reverses the path when needed. If neither endpoint matches, it adds a lead-in
+segment to prevent a first-frame jump and returns a `MOTION_PATH_ADJUSTED` warning.
+
+All scheduled motion is inert before its beat starts. Canonical validation rejects an orbit or
+along-path motion whose first frame differs from the object's resolved resting position.
+
+Fall uses automatic gravity and bounce strength.
 
 The current compiler applies the first motion targeting an object. Prefer one motion action per object per scene.
 
@@ -1718,6 +1738,17 @@ Checks:
 - action targets that are missing or never visible;
 - canonical GCL consistency after compilation.
 
+After layout resolution, the compiler also checks safe-frame overflow and motion geometry. These
+checks need final view-space boxes, so schema validation alone cannot perform them.
+
+`compileLessonSpec` returns valid canonical output together with repairable warnings so an LLM can
+inspect the diagnostic paths and revise its JSON. `renderLessonSpec` is the final quality gate and
+refuses to render when any warning remains. The production sequence is therefore:
+
+```text
+generate JSON → compile → repair every diagnostic → compile again → render only with zero warnings
+```
+
 ### 16.3 Diagnostic codes
 
 | Code | Meaning |
@@ -1734,6 +1765,9 @@ Checks:
 | `CANONICAL_ERROR` | Compiled GCL violates the renderer's canonical contract. |
 | `TARGET_NOT_VISIBLE` | A target is used before it has appeared; warning if it becomes visible later. |
 | `TEMPORARY_VISUAL_PERSISTS` | An object or SVG part marked temporary is still visible at the scene's final frame. |
+| `LAYOUT_OVERFLOW` | Resolved text, equation, stat, or legend extends outside the safe 920×430 frame. |
+| `MOTION_GEOMETRY_FALLBACK` | Orbit target begins on its center, so the compiler must use the semantic fallback radius. |
+| `MOTION_PATH_ADJUSTED` | Along-path target does not begin at either path endpoint; a lead-in was inserted to avoid a jump. |
 | `UNKNOWN_RECIPE` | Recipe ID is not registered. |
 
 Diagnostics include a JSON path and, where possible, suggestions and available targets. Fix the earliest structural error first because later reference errors may be consequences of it.
@@ -1754,6 +1788,10 @@ Diagnostics include a JSON path and, where possible, suggestions and available t
 10. Use labels/tours only after targets are visible.
 11. Use camera movement to clarify scale or detail, not on every beat.
 12. Validate, render, and scrub the entire film, including the last frame of every scene.
+
+Treat warnings as repair requests, not optional decoration. A lesson is ready only when it compiles
+without warnings and orbit/path motion remains continuous at the exact beat boundary when scrubbing
+forward and backward.
 
 ---
 
@@ -1812,9 +1850,9 @@ This guide describes the implementation in:
 
 - `src/simple-json/types.ts` — TypeScript contracts;
 - `src/simple-json/schema.ts` — strict JSON Schema;
-- `src/simple-json/validate.ts` and `src/simple-json/lifecycle.ts` — semantic validation;
+- `src/simple-json/validate.ts`, `src/simple-json/lifecycle.ts`, and `src/simple-json/diagnostics.ts` — source, lifecycle, and resolved-layout diagnostics;
 - `src/simple-json/resolve.ts` and `src/simple-json/registry.ts` — layout, sizes, themes, paces, shots, and anchors;
-- `src/simple-json/compile.ts` — deterministic compilation into GCL;
+- `src/simple-json/compile.ts` and `src/simple-json/canonical.ts` — deterministic compilation and canonical motion-continuity checks;
 - `src/lessons/simple-json/` — the four complete lesson implementations.
 
 When the implementation changes, update this document in the same change so the human contract remains accurate.

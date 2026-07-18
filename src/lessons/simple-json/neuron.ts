@@ -59,10 +59,12 @@ export const neuronLessonSpec: LessonSpec = {
           id: "label-anatomy",
           pace: "slow",
           actions: [
-            { do: "attention", target: "anatomy-neuron.dendrites", verb: "callout", text: "dendrites", side: "west", route: "elbow", style: "tag" },
-            { do: "attention", target: "anatomy-neuron.soma", verb: "callout", text: "soma", side: "south", route: "straight", style: "tag" },
-            { do: "attention", target: "anatomy-neuron.myelin", verb: "callout", text: "axon + myelin", side: "north", route: "elbow", style: "tag" },
-            { do: "attention", target: "anatomy-neuron.axon", verb: "callout", text: "axon terminals", side: "east", route: "elbow", style: "tag" },
+            { do: "tour", labelMode: "one-at-a-time", returnTo: "overview", stops: [
+              { target: "anatomy-neuron.dendrites", label: "Dendrites receive inputs", shot: "wide" },
+              { target: "anatomy-neuron.soma", label: "The soma combines those inputs", shot: "wide" },
+              { target: "anatomy-neuron.myelin", label: "Myelin insulates the long axon", shot: "wide" },
+              { target: "anatomy-neuron.axon", label: "Terminals pass the signal onward", shot: "wide" },
+            ] },
           ],
         },
         {
@@ -73,13 +75,13 @@ export const neuronLessonSpec: LessonSpec = {
         {
           id: "hold-connected-overview",
           pace: "slow",
-          actions: [{ do: "effect", effect: "glow", target: "anatomy-neuron.soma", intensity: "subtle" }],
+          actions: [{ do: "effect", effect: "flow", from: "anatomy-neuron.dendrites", to: "anatomy-neuron.soma", intensity: "subtle" }],
         },
         {
           id: "hold-signal-path",
           pace: "dramatic",
           actions: [
-            { do: "effect", effect: "glow", target: "anatomy-neuron.axon", intensity: "subtle" },
+            { do: "effect", effect: "flow", from: "anatomy-neuron.soma", to: "anatomy-neuron.axon", intensity: "subtle" },
           ],
         },
       ],
@@ -88,7 +90,7 @@ export const neuronLessonSpec: LessonSpec = {
       id: "resting-membrane",
       composition: "custom-relational",
       objects: [
-        { id: "rest-title", kind: "text", text: "AT REST, THE INSIDE IS MORE NEGATIVE", textRole: "heading", placement: { mode: "zone", zone: "title" } },
+        { id: "rest-title", kind: "text", text: "AT REST: INSIDE IS NEGATIVE", textRole: "heading", placement: { mode: "zone", zone: "title" } },
         {
           id: "membrane-diagram",
           kind: "svg-artwork",
@@ -115,10 +117,19 @@ export const neuronLessonSpec: LessonSpec = {
             <g id="potassium" fill="url(#kFill)" stroke="#f1d69a" stroke-width="2">
               <circle cx="112" cy="190" r="10" /><circle cx="177" cy="166" r="10" /><circle cx="239" cy="195" r="10" /><circle cx="301" cy="170" r="10" /><circle cx="365" cy="194" r="10" /><circle cx="428" cy="168" r="10" /><circle cx="500" cy="192" r="10" />
             </g>
+            <g id="negative-proteins" fill="#9d78bd" fill-opacity="0.24" stroke="#c9a7e2" stroke-width="3" stroke-linecap="round">
+              <polygon points="63,158 76,151 89,158 89,174 76,181 63,174" /><line x1="69" y1="166" x2="83" y2="166" />
+              <polygon points="260,175 273,168 286,175 286,191 273,198 260,191" /><line x1="266" y1="183" x2="280" y2="183" />
+              <polygon points="527,158 540,151 553,158 553,174 540,181 527,174" /><line x1="533" y1="166" x2="547" y2="166" />
+            </g>
             <g id="channel" fill="#16222c" stroke="#5cc8ae" stroke-width="5" stroke-linejoin="round">
               <polygon points="287,88 304,101 304,139 287,152 270,139 270,101" />
               <polygon points="333,88 350,101 350,139 333,152 316,139 316,101" />
               <rect x="302" y="111" width="16" height="18" rx="8" fill="#5cc8ae" stroke="none" />
+            </g>
+            <g id="charge-separation" fill="none" stroke-linecap="round" stroke-width="4">
+              <path d="M64 64 H82 M73 55 V73 M286 64 H304 M295 55 V73 M506 64 H524 M515 55 V73" stroke="#8de0cc" />
+              <path d="M64 184 H82 M286 184 H304 M506 184 H524" stroke="#c9a7e2" />
             </g>
           </svg>`,
         },
@@ -131,23 +142,32 @@ export const neuronLessonSpec: LessonSpec = {
           id: "build-membrane",
           pace: "slow",
           actions: [
-            { do: "show", targets: ["rest-title", "membrane-diagram"], entrance: "fade" },
+            { do: "show", targets: ["rest-title", "membrane-diagram.compartments", "membrane-diagram.bilayer", "membrane-diagram.channel"], entrance: "fade" },
           ],
         },
         {
           id: "separate-ions",
           pace: "slow",
           actions: [
-            { do: "show", targets: ["rest-value", "rest-explanation"], entrance: "fade" },
-            { do: "attention", target: "membrane-diagram.sodium", verb: "callout", text: "Na⁺ is concentrated outside", side: "north", route: "elbow", style: "tag" },
-            { do: "attention", target: "membrane-diagram.potassium", verb: "callout", text: "K⁺ is concentrated inside", side: "south", route: "elbow", style: "tag" },
+            { do: "show", targets: ["membrane-diagram.sodium", "membrane-diagram.potassium", "membrane-diagram.negative-proteins", "rest-explanation"], entrance: "fade" },
+          ],
+        },
+        {
+          id: "inspect-gradients",
+          pace: "dramatic",
+          actions: [
+            { do: "tour", labelMode: "one-at-a-time", returnTo: "overview", stops: [
+              { target: "membrane-diagram.sodium", label: "more Na⁺ outside", shot: "wide" },
+              { target: "membrane-diagram.potassium", label: "more K⁺ inside", shot: "wide" },
+              { target: "membrane-diagram.negative-proteins", label: "large negative proteins remain inside", shot: "wide" },
+            ] },
           ],
         },
         {
           id: "quantify-rest",
           pace: "slow",
           actions: [
-            { do: "show", targets: ["nernst"], entrance: "wipe" },
+            { do: "show", targets: ["membrane-diagram.charge-separation", "rest-value", "nernst"], entrance: "wipe" },
             { do: "attention", target: "rest-value", verb: "callout", text: "inside is 70 mV lower than outside", side: "west", style: "tag" },
           ],
         },
@@ -158,7 +178,7 @@ export const neuronLessonSpec: LessonSpec = {
       id: "threshold-depolarization",
       composition: "overview-detail",
       objects: [
-        { id: "threshold-title", kind: "text", text: "THRESHOLD OPENS Na⁺ CHANNELS", textRole: "heading", placement: { mode: "zone", zone: "title" } },
+        { id: "threshold-title", kind: "text", text: "THRESHOLD OPENS Na⁺ GATES", textRole: "heading", placement: { mode: "zone", zone: "title" } },
         {
           id: "threshold-diagram",
           kind: "svg-artwork",
@@ -191,9 +211,12 @@ export const neuronLessonSpec: LessonSpec = {
               <polygon points="146,111 158,121 154,160 136,174 128,163 137,151 140,122" />
               <polygon points="174,111 162,121 166,160 184,174 192,163 183,151 180,122" />
             </g>
-            <g id="inside" fill="none" stroke="#b58ad6" stroke-width="3">
-              <ellipse cx="160" cy="205" rx="77" ry="25" />
+            <g id="inside" fill="none" stroke="#b58ad6" stroke-width="3"><ellipse cx="160" cy="205" rx="77" ry="25" /></g>
+            <g id="entered-sodium" fill="#5cc8ae" stroke="#a5ead8" stroke-width="3">
               <circle cx="135" cy="205" r="8" fill="#5cc8ae" stroke="#a5ead8" /><circle cx="160" cy="205" r="8" fill="#5cc8ae" stroke="#a5ead8" /><circle cx="185" cy="205" r="8" fill="#5cc8ae" stroke="#a5ead8" />
+            </g>
+            <g id="positive-inside" fill="none" stroke="#8de0cc" stroke-width="4" stroke-linecap="round">
+              <path d="M91 207 H107 M99 199 V215 M213 207 H229 M221 199 V215" />
             </g>
           </svg>`,
         },
@@ -214,7 +237,6 @@ export const neuronLessonSpec: LessonSpec = {
           placement: { mode: "zone", zone: "main-right" },
         },
         { id: "threshold-value", kind: "equation", value: "V_{threshold}=-55mV", size: "small", placement: { mode: "zone", zone: "footer" } },
-        { id: "threshold-cause", kind: "text", text: "A strong enough stimulus reaches threshold; then sodium gates open.", textRole: "caption", size: "small", placement: { mode: "zone", zone: "support" } },
         { id: "peak-value", kind: "stat", value: 40, prefix: "+", unit: "mV", label: "peak voltage", size: "small", role: "hud", placement: { mode: "zone", zone: "hud" } },
       ],
       beats: [
@@ -222,7 +244,7 @@ export const neuronLessonSpec: LessonSpec = {
           id: "approach-threshold",
           pace: "dramatic",
           actions: [
-            { do: "show", targets: ["threshold-title", "threshold-diagram.compartments", "threshold-diagram.stimulus", "threshold-diagram.stimulus-path", "threshold-diagram.membrane", "threshold-diagram.sodium", "threshold-diagram.channel", "threshold-diagram.inside", "threshold-value", "threshold-cause"], entrance: "fade" },
+            { do: "show", targets: ["threshold-title", "threshold-diagram.compartments", "threshold-diagram.stimulus", "threshold-diagram.stimulus-path", "threshold-diagram.membrane", "threshold-diagram.sodium", "threshold-diagram.channel", "threshold-diagram.inside", "threshold-value"], entrance: "fade" },
             { do: "attention", target: "threshold-diagram.channel", verb: "callout", title: "Will it fire?", text: "the membrane reaches threshold", side: "east", route: "elbow", style: "pill" },
           ],
         },
@@ -231,6 +253,7 @@ export const neuronLessonSpec: LessonSpec = {
           pace: "slow",
           actions: [
             { do: "effect", effect: "flow", from: "threshold-diagram.sodium", to: "threshold-diagram.inside", intensity: "subtle" },
+            { do: "show", targets: ["threshold-diagram.entered-sodium"], entrance: "fade" },
             { do: "attention", target: "threshold-diagram.channel", verb: "callout", title: "Na⁺ enters", text: "positive charge flows inside", side: "east", route: "elbow", style: "pill" },
           ],
         },
@@ -238,7 +261,7 @@ export const neuronLessonSpec: LessonSpec = {
           id: "voltage-rises",
           pace: "dramatic",
           actions: [
-            { do: "show", targets: ["depolarization-chart"], entrance: "draw" },
+            { do: "show", targets: ["threshold-diagram.positive-inside", "depolarization-chart"], entrance: "draw" },
             { do: "attention", target: "depolarization-chart.last", verb: "callout", title: "Depolarization", text: "the voltage rapidly becomes positive", side: "west", route: "elbow", style: "pill" },
           ],
         },
@@ -302,10 +325,13 @@ export const neuronLessonSpec: LessonSpec = {
             <g id="outside" fill="url(#recoveryK)" stroke="#f1d69a" stroke-width="2">
               <circle cx="124" cy="60" r="11" /><circle cx="160" cy="40" r="11" /><circle cx="197" cy="66" r="11" />
             </g>
+            <g id="negative-inside" fill="none" stroke="#c9a7e2" stroke-width="4" stroke-linecap="round">
+              <path d="M88 205 H108 M151 220 H171 M215 204 H235" />
+            </g>
           </svg>`,
         },
-        { id: "recovery-cause", kind: "text", text: "Sodium gates close; potassium gates open and K⁺ leaves the cell.", textRole: "caption", size: "small", placement: { mode: "zone", zone: "support" } },
-        { id: "refractory", kind: "text", text: "The brief undershoot is the refractory period: the neuron is not ready yet.", textRole: "caption", size: "small", placement: { mode: "zone", zone: "support" } },
+        { id: "recovery-cause", kind: "text", text: "Sodium gates close; potassium gates open and K⁺ leaves the cell.", textRole: "caption", size: "small", placement: { mode: "zone", zone: "footer" } },
+        { id: "refractory", kind: "text", text: "The brief undershoot is the refractory period: the neuron is not ready yet.", textRole: "caption", size: "small", placement: { mode: "anchor", target: "recovery-cause.center" } },
         { id: "recovered-value", kind: "stat", value: -70, unit: "mV", label: "ready to fire again", size: "small", role: "hud", placement: { mode: "zone", zone: "hud" } },
       ],
       beats: [
@@ -313,7 +339,7 @@ export const neuronLessonSpec: LessonSpec = {
           id: "show-potassium-gates",
           pace: "slow",
           actions: [
-            { do: "show", targets: ["recovery-title", "recovery-diagram", "recovery-cause"], entrance: "fade" },
+            { do: "show", targets: ["recovery-title", "recovery-diagram.compartments", "recovery-diagram.membrane", "recovery-diagram.potassium", "recovery-diagram.channel", "recovery-diagram.outside", "recovery-cause"], entrance: "fade" },
             { do: "effect", effect: "flow", from: "recovery-diagram.potassium", to: "recovery-diagram.outside", intensity: "subtle" },
             { do: "attention", target: "recovery-diagram.channel", verb: "callout", text: "K⁺ exits through open gates", side: "west", style: "tag" },
           ],
@@ -322,7 +348,7 @@ export const neuronLessonSpec: LessonSpec = {
           id: "voltage-falls",
           pace: "dramatic",
           actions: [
-            { do: "show", targets: ["recovery-chart"], entrance: "draw" },
+            { do: "show", targets: ["recovery-diagram.negative-inside", "recovery-chart"], entrance: "draw" },
             { do: "attention", target: "recovery-chart.pt3", verb: "callout", title: "Repolarization", text: "K⁺ flows out", side: "east", route: "elbow", style: "pill" },
           ],
         },
@@ -333,7 +359,6 @@ export const neuronLessonSpec: LessonSpec = {
             { do: "hide", targets: ["recovery-cause"], exit: "fade" },
             { do: "show", targets: ["refractory"], entrance: "fade" },
             { do: "attention", target: "recovery-chart.pt6", verb: "callout", title: "Hyperpolarization", text: "the voltage dips below rest", side: "north", route: "curve", style: "pill" },
-            { do: "attention", target: "recovery-chart.pt6", verb: "spotlight" },
           ],
         },
         {
@@ -357,6 +382,7 @@ export const neuronLessonSpec: LessonSpec = {
           kind: "svg-artwork",
           size: "large",
           placement: { mode: "zone", zone: "main" },
+          temporaryParts: ["active-1", "active-2", "active-3", "active-4"],
           svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 620 220">
             <defs>
               <radialGradient id="waveSoma"><stop offset="0" stop-color="#9be8d5" /><stop offset="0.68" stop-color="#5cc8ae" /><stop offset="1" stop-color="#2f8b74" /></radialGradient>
@@ -375,50 +401,50 @@ export const neuronLessonSpec: LessonSpec = {
               <rect x="239" y="82" width="36" height="56" rx="18" /><rect x="290" y="82" width="36" height="56" rx="18" />
               <rect x="341" y="82" width="36" height="56" rx="18" /><rect x="392" y="82" width="36" height="56" rx="18" /><rect x="443" y="82" width="26" height="56" rx="13" />
             </g>
-            <g id="nodes" fill="#7fe0c7" stroke="#d7fff4" stroke-width="2">
-              <circle cx="283" cy="110" r="5" /><circle cx="334" cy="110" r="5" /><circle cx="385" cy="110" r="5" /><circle cx="436" cy="110" r="5" />
+            <g id="nodes" fill="#173f35" stroke="#7fe0c7" stroke-width="2">
+              <circle cx="283" cy="110" r="6" /><circle cx="334" cy="110" r="6" /><circle cx="385" cy="110" r="6" /><circle cx="436" cy="110" r="6" />
             </g>
+            <g id="active-1"><circle cx="283" cy="110" r="15" fill="#7fe0c7" fill-opacity="0.35" stroke="#d7fff4" stroke-width="4" /></g>
+            <g id="active-2"><circle cx="334" cy="110" r="15" fill="#7fe0c7" fill-opacity="0.35" stroke="#d7fff4" stroke-width="4" /></g>
+            <g id="active-3"><circle cx="385" cy="110" r="15" fill="#7fe0c7" fill-opacity="0.35" stroke="#d7fff4" stroke-width="4" /></g>
+            <g id="active-4"><circle cx="436" cy="110" r="15" fill="#7fe0c7" fill-opacity="0.35" stroke="#d7fff4" stroke-width="4" /></g>
             <g id="terminals" fill="none" stroke="#cfe0e6" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
               <path d="M515 110 C543 83 565 69 596 57 M515 110 C550 110 572 110 607 108 M515 110 C543 137 566 150 598 164 M557 76 L579 86 M562 145 L582 134" />
             </g>
           </svg>`,
         },
-        { id: "wave-signal-path", kind: "line", from: "wave-neuron.soma.right", to: "wave-neuron.terminals.left", form: "straight", size: "tiny", role: "background" },
-        { id: "signal", kind: "shape", shape: "disc", appearance: "shaded", size: "tiny", role: "hero", placement: { mode: "anchor", target: "wave-neuron.soma.right" } },
-        { id: "wave-caption", kind: "text", text: "Each active gap opens channels in the next gap: the pulse moves node to node.", textRole: "caption", size: "small", placement: { mode: "zone", zone: "support" } },
-        { id: "terminal-caption", kind: "text", text: "message handed to the next cell", textRole: "caption", size: "small", placement: { mode: "zone", zone: "footer" } },
+        { id: "wave-caption", kind: "text", text: "Each active gap opens channels in the next gap: the pulse moves node to node.", textRole: "caption", size: "small", temporary: true, placement: { mode: "zone", zone: "footer" } },
+        { id: "terminal-caption", kind: "text", text: "message handed to the next cell", textRole: "caption", size: "small", placement: { mode: "anchor", target: "wave-caption.center" } },
       ],
       beats: [
         {
           id: "show-wave-path",
           pace: "slow",
           actions: [
-            { do: "show", targets: ["wave-title", "wave-neuron", "wave-signal-path", "signal", "wave-caption"], entrance: "fade" },
+            { do: "show", targets: ["wave-title", "wave-neuron.dendrites", "wave-neuron.axon", "wave-neuron.soma", "wave-neuron.nucleus", "wave-neuron.myelin", "wave-neuron.nodes", "wave-neuron.terminals", "wave-caption"], entrance: "fade" },
             { do: "attention", target: "wave-neuron.nodes", verb: "callout", text: "nodes of Ranvier", side: "north", style: "tag" },
           ],
         },
-        { id: "hold-handoff", pace: "normal", actions: [{ do: "emphasize", target: "terminal-caption", emphasis: "pulse", strength: "subtle" }] },
-        {
-          id: "send-wave",
-          pace: "dramatic",
-          actions: [
-            { do: "motion", target: "signal", motion: "along", along: "wave-signal-path" },
-            { do: "effect", effect: "glow", target: "signal", intensity: "strong" },
-          ],
-        },
+        { id: "activate-node-1", pace: "quick", actions: [{ do: "show", targets: ["wave-neuron.active-1"], entrance: "iris" }] },
+        { id: "activate-node-2", pace: "quick", actions: [{ do: "hide", targets: ["wave-neuron.active-1"], exit: "fade" }, { do: "show", targets: ["wave-neuron.active-2"], entrance: "iris" }] },
+        { id: "activate-node-3", pace: "quick", actions: [{ do: "hide", targets: ["wave-neuron.active-2"], exit: "fade" }, { do: "show", targets: ["wave-neuron.active-3"], entrance: "iris" }] },
+        { id: "activate-node-4", pace: "quick", actions: [{ do: "hide", targets: ["wave-neuron.active-3"], exit: "fade" }, { do: "show", targets: ["wave-neuron.active-4"], entrance: "iris" }] },
         {
           id: "terminal-handoff",
           pace: "slow",
           actions: [
+            { do: "hide", targets: ["wave-neuron.active-4"], exit: "fade" },
+            { do: "hide", targets: ["wave-caption"], exit: "fade" },
             { do: "show", targets: ["terminal-caption"], entrance: "word-by-word" },
             { do: "attention", target: "wave-neuron.terminals", verb: "callout", title: "Axon terminals", text: "pass the message onward", side: "west", route: "elbow", style: "pill" },
           ],
         },
+        { id: "hold-handoff", pace: "normal", actions: [{ do: "emphasize", target: "terminal-caption", emphasis: "pulse", strength: "subtle" }] },
       ],
     },
     {
       id: "neuron-recap",
-      composition: "data",
+      composition: "overview-detail",
       objects: [
         { id: "recap-title", kind: "text", text: "ONE ELECTRICAL PULSE", textRole: "heading", placement: { mode: "zone", zone: "title" } },
         {
@@ -439,9 +465,27 @@ export const neuronLessonSpec: LessonSpec = {
           size: "medium",
           placement: { mode: "zone", zone: "main-left" },
         },
-        { id: "recap-equation", kind: "equation", value: "-70\\rightarrow+40\\rightarrow-70mV", size: "small", placement: { mode: "zone", zone: "main-right" } },
-        { id: "neuron-count", kind: "stat", value: 86000000000, unit: "neurons", label: "approximately in the human brain", commas: true, size: "tiny", role: "hud", placement: { mode: "zone", zone: "hud" } },
-        { id: "recap-summary", kind: "text", text: "Na⁺ in → voltage rises   •   K⁺ out → voltage recovers", textRole: "caption", size: "small", placement: { mode: "relative", target: "recap-equation", relation: "below" } },
+        {
+          id: "cycle-diagram",
+          kind: "svg-artwork",
+          size: "medium",
+          placement: { mode: "zone", zone: "main-right" },
+          svg: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 240">
+            <g id="membrane" stroke="#d6b36a" stroke-width="4" fill="#d6b36a" fill-opacity="0.18">
+              <rect x="34" y="103" width="232" height="34" rx="17" /><circle cx="58" cy="108" r="7" /><circle cx="94" cy="108" r="7" /><circle cx="130" cy="108" r="7" /><circle cx="170" cy="108" r="7" /><circle cx="206" cy="108" r="7" /><circle cx="242" cy="108" r="7" />
+              <circle cx="58" cy="132" r="7" /><circle cx="94" cy="132" r="7" /><circle cx="130" cy="132" r="7" /><circle cx="170" cy="132" r="7" /><circle cx="206" cy="132" r="7" /><circle cx="242" cy="132" r="7" />
+            </g>
+            <g id="sodium-in" stroke="#a5ead8" stroke-width="5" fill="#5cc8ae">
+              <circle cx="105" cy="48" r="12" /><circle cx="142" cy="66" r="12" /><line x1="124" y1="77" x2="124" y2="176" /><path d="M124 194 L111 171 L137 171 Z" />
+            </g>
+            <g id="potassium-out" stroke="#f1d69a" stroke-width="5" fill="#d6b36a">
+              <circle cx="190" cy="190" r="12" /><circle cx="226" cy="174" r="12" /><line x1="207" y1="162" x2="207" y2="65" /><path d="M207 47 L194 70 L220 70 Z" />
+            </g>
+          </svg>`,
+        },
+        { id: "recap-equation", kind: "equation", value: "-70\\rightarrow+40\\rightarrow-70mV", size: "small", placement: { mode: "zone", zone: "support" } },
+        { id: "na-label", kind: "text", text: "Na⁺ enters: voltage rises", textRole: "caption", size: "small", placement: { mode: "relative", target: "cycle-diagram.sodium-in", relation: "left-of" } },
+        { id: "k-label", kind: "text", text: "K⁺ exits: voltage recovers", textRole: "caption", size: "tiny", placement: { mode: "relative", target: "cycle-diagram.potassium-out", relation: "above" } },
         { id: "recap-closing", kind: "text", text: "The same electrical cycle carries each signal from input to axon terminals.", textRole: "caption", size: "small", placement: { mode: "zone", zone: "footer" } },
       ],
       beats: [
@@ -449,28 +493,35 @@ export const neuronLessonSpec: LessonSpec = {
           id: "draw-complete-pulse",
           pace: "dramatic",
           actions: [
-            { do: "show", targets: ["recap-title", "recap-chart", "recap-summary"], entrance: "draw" },
+            { do: "show", targets: ["recap-title", "recap-chart", "cycle-diagram.membrane"], entrance: "draw" },
             { do: "attention", target: "recap-chart.pt4", verb: "callout", text: "threshold", side: "north", style: "tag" },
-            { do: "attention", target: "recap-chart.peak", verb: "callout", text: "Na⁺ in: voltage rises", side: "east", style: "tag" },
-            { do: "attention", target: "recap-chart.pt15", verb: "callout", text: "K⁺ out: recovery", side: "south", style: "tag" },
           ],
         },
         {
-          id: "show-scale",
+          id: "show-sodium-phase",
           pace: "slow",
           actions: [
-            { do: "show", targets: ["recap-equation", "neuron-count"], entrance: "wipe" },
+            { do: "show", targets: ["cycle-diagram.sodium-in", "na-label"], entrance: "draw" },
+            { do: "attention", target: "recap-chart.peak", verb: "callout", text: "positive charge enters", side: "east", style: "tag" },
+          ],
+        },
+        {
+          id: "show-potassium-phase",
+          pace: "slow",
+          actions: [
+            { do: "show", targets: ["cycle-diagram.potassium-out", "k-label"], entrance: "draw" },
+            { do: "attention", target: "recap-chart.pt15", verb: "callout", text: "positive charge leaves", side: "south", style: "tag" },
           ],
         },
         {
           id: "land-closing",
           pace: "dramatic",
           actions: [
-            { do: "show", targets: ["recap-closing"], entrance: "word-by-word" },
-            { do: "attention", target: "neuron-count", verb: "spotlight" },
+            { do: "show", targets: ["recap-equation", "recap-closing"], entrance: "word-by-word" },
+            { do: "attention", target: "cycle-diagram.membrane", verb: "rings" },
           ],
         },
-        { id: "hold-cycle", pace: "normal", actions: [{ do: "emphasize", target: "recap-summary", emphasis: "pulse", strength: "subtle" }] },
+        { id: "hold-cycle", pace: "normal", actions: [{ do: "emphasize", target: "recap-equation", emphasis: "pulse", strength: "subtle" }] },
       ],
     },
   ],
