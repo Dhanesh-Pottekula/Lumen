@@ -1,8 +1,8 @@
-import { PROP_ANCHORS, PROP_CATALOG } from "../gcl/props";
 import { BLUEPRINT, CHALKBOARD, PARCHMENT, TEXTBOOK } from "../render/theme";
 import type { ThemeName } from "../gcl/schema";
 import type { ObjectSpec, RoleToken } from "./types";
 import type { PaceToken, ShotToken, SizeToken, ThemeToken } from "./types";
+import { availableVisualAssets, visualAssetAnchors } from "./visual-catalog";
 
 export interface PaceDefinition {
   duration: number;
@@ -20,8 +20,6 @@ export interface AssetDefinition {
   name: string;
   anchors: string[];
 }
-
-const GENERIC_ANCHORS = ["center", "top", "bottom", "left", "right"] as const;
 
 const THEMES: Record<ThemeToken, "TEXTBOOK" | "PARCHMENT" | "BLUEPRINT" | "CHALKBOARD"> = {
   textbook: "TEXTBOOK",
@@ -48,6 +46,9 @@ const SHOTS: Record<ShotToken, ShotDefinition> = {
 
 const sizeRow = (text: number, equation: number, stat: number, visual: number, line: number): Record<ObjectSpec["kind"], number> => ({
   text, equation, stat, visual, line,
+  vector: visual,
+  "svg-composite": visual,
+  "svg-artwork": visual,
   shape: visual,
   curve: visual,
   chart: visual,
@@ -86,8 +87,7 @@ export function resolveSize(token: SizeToken, kind: ObjectSpec["kind"]): number 
 }
 
 export function assetAnchors(name: string): string[] | undefined {
-  if (!Object.hasOwn(PROP_CATALOG, name)) return undefined;
-  return [...new Set([...GENERIC_ANCHORS, ...Object.keys(PROP_ANCHORS[name] ?? {})])];
+  return visualAssetAnchors(name);
 }
 
 export function resolveAsset(name: string): AssetDefinition | undefined {
@@ -96,7 +96,7 @@ export function resolveAsset(name: string): AssetDefinition | undefined {
 }
 
 export function availableAssets(): string[] {
-  return Object.keys(PROP_CATALOG).sort();
+  return availableVisualAssets();
 }
 
 const THEME_DATA = { TEXTBOOK, PARCHMENT, BLUEPRINT, CHALKBOARD };

@@ -20,5 +20,11 @@ export function renderFilm(film: Film): CanvasSlideDefinition {
   }
   const themeName = scenes[0]?.marker.theme;
   const theme = themeName ? THEMES[themeName] : TEXTBOOK;
-  return composeSlides(scenes.map((s) => compileScene(s, theme)), { theme, filmGrade: true });
+  // Dense instructional scenes should hand off with a clean cut. Any overlap can
+  // leave two diagrams, titles, and equation stacks legible in the same frame.
+  return composeSlides(scenes.map((s) => compileScene(s, theme)), {
+    theme,
+    filmGrade: true,
+    crossfade: 0,
+  });
 }

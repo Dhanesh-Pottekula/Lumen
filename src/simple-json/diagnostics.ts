@@ -9,9 +9,12 @@ export type DiagnosticCode =
   | "INVALID_ANCHOR"
   | "INVALID_ACTION_TARGET"
   | "INVALID_LIFECYCLE"
+  | "INVALID_SVG"
+  | "INVALID_SVG_BOUNDS"
   | "PLACEMENT_CYCLE"
   | "CANONICAL_ERROR"
   | "TARGET_NOT_VISIBLE"
+  | "TEMPORARY_VISUAL_PERSISTS"
   | "UNKNOWN_RECIPE";
 
 export interface Diagnostic {

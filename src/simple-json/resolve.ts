@@ -1,5 +1,5 @@
-import { PROP_ANCHORS } from "../gcl/props";
 import { resolvePace, resolveShot, resolveSize, resolveTheme, type ShotDefinition } from "./registry";
+import { visualAssetAnchorMap, visualAssetBounds, visualOrientationAngle } from "./visual-catalog";
 import type {
   ActionSpec,
   CompositionToken,
@@ -9,9 +9,11 @@ import type {
   SceneSpec,
   ShotToken,
   SizeToken,
+  SvgCompositePartSpec,
   ZoneToken,
 } from "./types";
 import { parseTarget } from "./target";
+import { parseSvgArtwork } from "./svg";
 
 export type Point = [number, number];
 
@@ -24,13 +26,15 @@ export interface ResolvedBox {
 
 export interface ResolvedObject {
   id: string;
-  kind: ObjectSpec["kind"];
+  kind: ObjectSpec["kind"] | "svg-part";
   source: ObjectSpec;
   position: Point;
   box: ResolvedBox;
   size: number;
   angle?: number;
   endpoints?: { from: Point; to: Point };
+  compositeParent?: string;
+  svgPart?: SvgCompositePartSpec;
 }
 
 interface ResolvedActionBase {
@@ -169,8 +173,9 @@ function defaultZone(object: ObjectSpec): ZoneToken {
 }
 
 function orientationAngle(object: ObjectSpec): number | undefined {
-  if (object.kind !== "visual") return undefined;
-  return { left: 0, right: 180, up: 45, down: -135 }[object.orientation ?? "left"];
+  if (object.kind === "vector") return object.rotate;
+  if (object.kind === "visual") return visualOrientationAngle(object.asset, object.orientation);
+  return undefined;
 }
 
 function dimensions(object: ObjectSpec, size: number): [number, number] {
@@ -181,8 +186,25 @@ function dimensions(object: ObjectSpec, size: number): [number, number] {
       return [Math.max(size * 3, object.value.length * size * 0.48), size * 1.5];
     case "stat":
       return [Math.max(100, size * 3.4), size * 1.8];
-    case "visual":
-      return [90 * size, 90 * size];
+    case "visual": {
+      const bounds = visualAssetBounds(object.asset) ?? { width: 90, height: 90 };
+      const angle = visualOrientationAngle(object.asset, object.orientation);
+      const normalized = ((angle % 180) + 180) % 180;
+      const quarterTurn = Math.abs(normalized - 90) < 0.0001;
+      return quarterTurn
+        ? [bounds.height * size, bounds.width * size]
+        : [bounds.width * size, bounds.height * size];
+    }
+    case "vector":
+      return [object.width ?? 220 * size, object.height ?? 140 * size];
+    case "svg-composite":
+      return [object.width, object.height];
+    case "svg-artwork": {
+      const viewBox = parseSvgArtwork(object.svg).value?.viewBox ?? [0, 0, 16, 9];
+      const ratio = viewBox[2] / viewBox[3];
+      const width = Math.min(760, 380 * size);
+      return [width, width / ratio];
+    }
     case "line":
       return [1, 1];
     case "shape":
@@ -223,21 +245,71 @@ function rotate(point: Point, angle: number): Point {
   return [point[0] * Math.cos(radians) - point[1] * Math.sin(radians), point[0] * Math.sin(radians) + point[1] * Math.cos(radians)];
 }
 
+function svgDefinition(source: ObjectSpec): { viewBox: [number, number, number, number]; parts: SvgCompositePartSpec[] } | undefined {
+  if (source.kind === "svg-composite") return { viewBox: source.viewBox, parts: source.parts };
+  if (source.kind === "svg-artwork") return parseSvgArtwork(source.svg).value;
+  return undefined;
+}
+
+function resolvedCompositePart(parent: ResolvedObject, part: SvgCompositePartSpec): { position: Point; box: ResolvedBox } {
+  const definition = svgDefinition(parent.source);
+  if (!definition) return { position: [...parent.position], box: { ...parent.box } };
+  const [vx, vy, vw, vh] = definition.viewBox;
+  const [x, y, width, height] = part.bounds;
+  const scaleX = parent.box.w / vw;
+  const scaleY = parent.box.h / vh;
+  const box: ResolvedBox = {
+    x: parent.box.x + (x - vx) * scaleX,
+    y: parent.box.y + (y - vy) * scaleY,
+    w: width * scaleX,
+    h: height * scaleY,
+  };
+  return { position: [box.x + box.w / 2, box.y + box.h / 2], box };
+}
+
 function resolveReference(target: string, objects: Map<string, ResolvedObject>): Point {
   const exact = objects.get(target);
   if (exact) return [...exact.position];
+  for (const parent of objects.values()) {
+    const definition = parent.compositeParent ? undefined : svgDefinition(parent.source);
+    if (!definition) continue;
+    const prefix = `${parent.id}.`;
+    if (!target.startsWith(prefix)) continue;
+    const remainder = target.slice(prefix.length);
+    const [partId, anchor] = remainder.split(".");
+    const part = definition.parts.find((candidate) => candidate.id === partId);
+    if (!part) continue;
+    const resolved = resolvedCompositePart(parent, part);
+    return anchor ? genericAnchor({ ...parent, box: resolved.box, position: resolved.position }, anchor) ?? resolved.position : resolved.position;
+  }
   const split = target.lastIndexOf(".");
   const object = objects.get(target.slice(0, split));
   const anchor = target.slice(split + 1);
   if (!object) return [460, 215];
   if (object.source.kind === "visual") {
-    const local = PROP_ANCHORS[object.source.asset]?.[anchor];
+    const local = visualAssetAnchorMap(object.source.asset)?.[anchor];
     if (local) {
       const transformed = rotate([local[0] * object.size, local[1] * object.size], object.angle ?? 0);
       return [object.position[0] + transformed[0], object.position[1] + transformed[1]];
     }
   }
   return genericAnchor(object, anchor) ?? [...object.position];
+}
+
+function resolveReferenceBox(target: string, objects: Map<string, ResolvedObject>): ResolvedBox | undefined {
+  const exact = objects.get(target);
+  if (exact) return exact.box;
+  for (const parent of objects.values()) {
+    const definition = parent.compositeParent ? undefined : svgDefinition(parent.source);
+    if (!definition) continue;
+    const prefix = `${parent.id}.`;
+    if (!target.startsWith(prefix)) continue;
+    const partId = target.slice(prefix.length).split(".")[0];
+    const part = definition.parts.find((candidate) => candidate.id === partId);
+    if (part) return resolvedCompositePart(parent, part).box;
+  }
+  const split = target.lastIndexOf(".");
+  return split > 0 ? objects.get(target.slice(0, split))?.box : undefined;
 }
 
 function resolveObjects(scene: SceneSpec): ResolvedObject[] {
@@ -279,12 +351,15 @@ function resolveObjects(scene: SceneSpec): ResolvedObject[] {
     }
     const targetRef = parseTarget(placement.target, new Set(byId.keys()));
     const dependency = byId.get(targetRef.objectId);
-    if (dependency) place(dependency);
+    const compositeDependency = dependency ?? [...byId.values()].find((candidate) =>
+      !candidate.compositeParent
+      && svgDefinition(candidate.source) !== undefined
+      && placement.target.startsWith(`${candidate.id}.`));
+    if (compositeDependency) place(compositeDependency);
     const target = resolveReference(placement.target, byId);
     if (placement.mode === "anchor") object.position = target;
     else {
-      const targetObject = byId.get(targetRef.objectId);
-      const targetBox = targetObject?.box ?? makeBox(target, [1, 1]);
+      const targetBox = resolveReferenceBox(placement.target, byId) ?? makeBox(target, [1, 1]);
       const gap = 24;
       const relation = placement.relation;
       if (relation === "above") object.position = [target[0], targetBox.y - object.box.h / 2 - gap];
@@ -298,6 +373,26 @@ function resolveObjects(scene: SceneSpec): ResolvedObject[] {
     placed.add(object.id);
   };
   objects.forEach(place);
+
+  for (const parent of [...objects]) {
+    const definition = svgDefinition(parent.source);
+    if (!definition) continue;
+    for (const part of definition.parts) {
+      const { box, position } = resolvedCompositePart(parent, part);
+      const resolvedPart: ResolvedObject = {
+        id: `${parent.id}.${part.id}`,
+        kind: "svg-part",
+        source: parent.source,
+        position,
+        box,
+        size: parent.size,
+        compositeParent: parent.id,
+        svgPart: part,
+      };
+      objects.push(resolvedPart);
+      byId.set(resolvedPart.id, resolvedPart);
+    }
+  }
 
   for (const object of objects) {
     if (object.source.kind !== "line") continue;

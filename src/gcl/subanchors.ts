@@ -11,7 +11,7 @@
  */
 import type { Box } from "./anchors";
 import { makePlot } from "../render/charts";
-import { circleShape, heartShape, polygonShape, starShape } from "../render/morph";
+import { heartShape, polygonShape, starShape } from "../render/morph";
 import { fitProjection, featureCenter } from "../render/geo";
 import { makeTimeline } from "../render/timeline";
 import type { Component } from "./schema";

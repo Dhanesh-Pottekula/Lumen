@@ -1,5 +1,3 @@
-import { CINEMATIC_RECIPE_IDS } from "./types";
-
 const enumOf = (...values: string[]) => ({ type: "string", enum: values });
 const id = { type: "string", pattern: "^[A-Za-z][A-Za-z0-9_-]*$" } as const;
 
@@ -40,6 +38,7 @@ const objectBase = {
   size: enumOf("tiny", "small", "medium", "large", "hero", "fill"),
   initial: enumOf("hidden", "visible"),
   space: enumOf("world", "screen"),
+  temporary: { type: "boolean" },
 };
 
 const strictObject = (required: string[], properties: Record<string, unknown>) => ({
@@ -57,6 +56,13 @@ const numberPair = {
 } as const;
 
 const ring = { type: "array", minItems: 3, items: numberPair } as const;
+
+const numberQuad = {
+  type: "array",
+  minItems: 4,
+  maxItems: 4,
+  prefixItems: [{ type: "number" }, { type: "number" }, { type: "number", exclusiveMinimum: 0 }, { type: "number", exclusiveMinimum: 0 }],
+} as const;
 
 const categoryDatum = {
   type: "object",
@@ -82,7 +88,41 @@ const object = {
       label: { type: "string" }, decimals: { type: "integer", minimum: 0, maximum: 8 }, commas: { type: "boolean" }, prefix: { type: "string" },
     }),
     strictObject(["asset"], {
-      kind: { const: "visual" }, asset: { type: "string", minLength: 1 }, orientation: enumOf("left", "right", "up", "down"),
+      kind: { const: "visual" }, asset: { type: "string", minLength: 1 }, color: { type: "string", minLength: 1 }, orientation: enumOf("left", "right", "up", "down"),
+    }),
+    strictObject(["d"], {
+      kind: { const: "vector" }, d: { type: "string", minLength: 1, pattern: "\\S" }, fill: { type: "string", minLength: 1 }, stroke: { type: "string", minLength: 1 },
+      strokeWidth: { type: "number", exclusiveMinimum: 0, maximum: 20 }, width: { type: "number", exclusiveMinimum: 0, maximum: 920 },
+      height: { type: "number", exclusiveMinimum: 0, maximum: 430 }, scale: { type: "number", exclusiveMinimum: 0, maximum: 10 },
+      rotate: { type: "number", minimum: -6.284, maximum: 6.284 },
+    }),
+    strictObject(["viewBox", "width", "height", "parts"], {
+      kind: { const: "svg-composite" },
+      viewBox: numberQuad,
+      width: { type: "number", exclusiveMinimum: 0, maximum: 920 },
+      height: { type: "number", exclusiveMinimum: 0, maximum: 430 },
+      parts: {
+        type: "array",
+        minItems: 1,
+        maxItems: 32,
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: ["id", "svg", "bounds"],
+          properties: {
+            id,
+            svg: { type: "string", minLength: 1, maxLength: 24000, pattern: "\\S" },
+            bounds: numberQuad,
+            initial: enumOf("hidden", "visible"),
+            temporary: { type: "boolean" },
+          },
+        },
+      },
+    }),
+    strictObject(["svg"], {
+      kind: { const: "svg-artwork" },
+      svg: { type: "string", minLength: 1, maxLength: 48000, pattern: "\\S" },
+      temporaryParts: { type: "array", minItems: 1, maxItems: 32, uniqueItems: true, items: id },
     }),
     strictObject(["from", "to"], {
       kind: { const: "line" }, from: { type: "string", minLength: 1 }, to: { type: "string", minLength: 1 },
@@ -307,23 +347,5 @@ export const LESSON_SPEC_SCHEMA = {
   },
 } as const;
 
-const { $schema: _generativeDraft, $id: _generativeId, ...GENERATIVE_LESSON_INPUT_SCHEMA } = LESSON_SPEC_SCHEMA;
-
-export const CINEMATIC_LESSON_SCHEMA = {
-  type: "object",
-  additionalProperties: false,
-  required: ["version", "mode", "title", "recipe"],
-  properties: {
-    version: { const: "1" },
-    mode: { const: "cinematic-recipe" },
-    title: { type: "string", minLength: 1 },
-    recipe: { type: "string", enum: [...CINEMATIC_RECIPE_IDS] },
-  },
-} as const;
-
-/** Complete schema supplied to the LLM: reusable generation or an audited exact-film recipe. */
-export const LESSON_INPUT_SCHEMA = {
-  $schema: "https://json-schema.org/draft/2020-12/schema",
-  $id: "https://lumen.local/schemas/lesson-input-v1.json",
-  oneOf: [GENERATIVE_LESSON_INPUT_SCHEMA, CINEMATIC_LESSON_SCHEMA],
-} as const;
+/** Complete schema supplied to the LLM. Simple JSON has one direct generative format. */
+export const LESSON_INPUT_SCHEMA = LESSON_SPEC_SCHEMA;

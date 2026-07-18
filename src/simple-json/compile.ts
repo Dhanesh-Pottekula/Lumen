@@ -2,6 +2,7 @@ import type { Base, Component, EnterKind, ExitKind, Film, SceneMarker, Vec2 } fr
 import { categoryColor, resolvePace, resolveSize, resolveVisualStyle } from "./registry";
 import type { ResolvedAction, ResolvedLesson, ResolvedObject, ResolvedScene, ResolvedSimpleAction } from "./resolve";
 import type { EntranceToken, ExitToken, ObjectSpec } from "./types";
+import { parseSvgArtwork, svgPartMarkup } from "./svg";
 
 const ENTRANCES: Record<EntranceToken, EnterKind> = {
   instant: "none",
@@ -26,12 +27,15 @@ const EXITS: Record<ExitToken, ExitKind> = {
   shrink: "shrink",
 };
 
-function objectAction(scene: ResolvedScene, id: string, kind: "show" | "hide"): ResolvedSimpleAction | undefined {
+function objectAction(scene: ResolvedScene, object: ResolvedObject, kind: "show" | "hide"): ResolvedSimpleAction | undefined {
   for (const beat of scene.beats) {
     for (const action of beat.actions) {
       if (action.kind !== kind) continue;
       const source = action.source;
-      if ((source.do === "show" || source.do === "hide") && source.targets.includes(id)) return action;
+      if (
+        (source.do === "show" || source.do === "hide")
+        && (source.targets.includes(object.id) || (object.compositeParent !== undefined && source.targets.includes(object.compositeParent)))
+      ) return action;
     }
   }
   return undefined;
@@ -62,10 +66,15 @@ function motionFor(scene: ResolvedScene, object: ResolvedObject): Base["motion"]
     return { kind: "fall", to: source.to, gravity: 420, bounce, at: action.start, dur: action.duration };
   }
   if (source.motion === "orbit") {
+    const centerObject = scene.objects.find((candidate) => candidate.id === source.around);
+    const from = centerObject
+      ? Math.atan2(object.position[1] - centerObject.position[1], object.position[0] - centerObject.position[0])
+      : 0;
     return {
       kind: "orbit",
       center: source.around ?? "center",
       radius: ORBIT_RADII[source.orbit ?? "medium"],
+      from,
       turns: TURN_COUNTS[source.turns ?? "one"] * direction,
       at: action.start,
       dur: action.duration,
@@ -111,7 +120,7 @@ type ContentBase = Pick<Base, "id" | "at" | "start" | "dur" | "enter" | "exit" |
 
 const RECTANGLE_COUNTS = { few: 4, several: 8, many: 16, dense: 32 } as const;
 
-function inlineObject(scene: ResolvedScene, source: ObjectSpec): ResolvedObject {
+function inlineObject(source: ObjectSpec): ResolvedObject {
   const size = resolveSize(source.size ?? "medium", source.kind) ?? 1;
   return {
     id: source.id,
@@ -127,6 +136,16 @@ function compileContent(scene: ResolvedScene, object: ResolvedObject, base: Cont
   const source = object.source;
   const style = resolveVisualStyle(scene.theme, source.role);
 
+  if (object.kind === "svg-part" && object.svgPart) {
+    return {
+      ...base,
+      type: "svg",
+      markup: svgPartMarkup(object.svgPart),
+      w: object.box.w,
+      h: object.box.h,
+    };
+  }
+
   switch (source.kind) {
     case "text": {
       if (source.textRole === "heading") return { ...base, type: "heading", text: source.text, size: object.size, color: style.color };
@@ -134,11 +153,53 @@ function compileContent(scene: ResolvedScene, object: ResolvedObject, base: Cont
       return { ...base, type: "text", text: source.text, role, size: object.size, color: style.color };
     }
     case "equation":
-      return { ...base, type: "equation", tex: source.value, size: object.size, color: style.color };
+      return { ...base, type: "equation", tex: source.value, size: object.size, color: style.color, align: "center" };
     case "stat":
       return { ...base, type: "stat", value: source.value, from: source.from, unit: source.unit, label: source.label, decimals: source.decimals, commas: source.commas, prefix: source.prefix, size: object.size, color: style.color };
     case "visual":
-      return { ...base, type: "prop", name: source.asset, size: object.size, angle: object.angle, color: style.color };
+      return {
+        ...base,
+        type: "prop",
+        name: source.asset,
+        size: object.size,
+        angle: object.angle,
+        color: source.color ?? style.color,
+        w: object.box.w,
+        h: object.box.h,
+      };
+    case "vector":
+      return {
+        ...base,
+        type: "vector",
+        d: source.d,
+        fill: source.fill,
+        stroke: source.stroke ?? style.color,
+        width: source.strokeWidth,
+        w: source.width,
+        h: source.height,
+        scale: source.scale,
+        rotate: source.rotate,
+      };
+    case "svg-composite": {
+      const [x, y, width, height] = source.viewBox;
+      return {
+        ...base,
+        type: "svg",
+        markup: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${x} ${y} ${width} ${height}" width="${width}" height="${height}"></svg>`,
+        w: object.box.w,
+        h: object.box.h,
+      };
+    }
+    case "svg-artwork": {
+      const [x, y, width, height] = parseSvgArtwork(source.svg).value?.viewBox ?? [0, 0, 16, 9];
+      return {
+        ...base,
+        type: "svg",
+        markup: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${x} ${y} ${width} ${height}" width="${width}" height="${height}"></svg>`,
+        w: object.box.w,
+        h: object.box.h,
+      };
+    }
     case "line": {
       const endpoints = object.endpoints ?? { from: [0, 0] as Vec2, to: [120, 0] as Vec2 };
       const points = source.form === "elbow"
@@ -270,7 +331,7 @@ function compileContent(scene: ResolvedScene, object: ResolvedObject, base: Cont
     case "group": {
       const pace = resolvePace(source.build ?? "normal")!;
       const children = source.children.map((child) => {
-        const resolved = inlineObject(scene, child);
+        const resolved = inlineObject(child);
         return compileContent(scene, resolved, { id: child.id, start: 0, dur: pace.transition, enter: { type: "fade", dur: pace.transition }, layer: resolveVisualStyle(scene.theme, child.role).layer });
       });
       return { ...base, type: "group", children, layout: source.layout, gap: 18 * Math.min(object.size, 1.3), cols: source.columns, build: source.build ? { step: pace.transition } : undefined, clip: source.clip };
@@ -279,9 +340,12 @@ function compileContent(scene: ResolvedScene, object: ResolvedObject, base: Cont
 }
 
 function compileObject(scene: ResolvedScene, object: ResolvedObject): Component | undefined {
-  const show = objectAction(scene, object.id, "show");
-  if (object.source.initial !== "visible" && !show) return undefined;
-  const hide = objectAction(scene, object.id, "hide");
+  const show = objectAction(scene, object, "show");
+  const initiallyVisible = object.kind === "svg-part"
+    ? object.svgPart?.initial === "visible" || (object.svgPart?.initial === undefined && object.source.initial === "visible")
+    : object.source.initial === "visible";
+  if (!initiallyVisible && !show) return undefined;
+  const hide = objectAction(scene, object, "hide");
   const enter = entranceFor(object, show);
   const exit = exitFor(hide);
   const start = show?.start ?? 0;
@@ -328,8 +392,9 @@ function seedFor(value: string): number {
 }
 
 function targetRadius(scene: ResolvedScene, target: string): number {
+  const exact = scene.objects.find((candidate) => candidate.id === target);
   const id = target.includes(".") ? target.slice(0, target.indexOf(".")) : target;
-  const object = scene.objects.find((candidate) => candidate.id === id);
+  const object = exact ?? scene.objects.find((candidate) => candidate.id === id);
   return object ? Math.max(18, Math.min(150, Math.hypot(object.box.w, object.box.h) / 2)) : 36;
 }
 

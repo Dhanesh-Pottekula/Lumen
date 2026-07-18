@@ -6,6 +6,7 @@ import { assetAnchors, availableAssets, resolveAsset } from "./registry";
 import { parseTarget } from "./target";
 import { analyzeLifecycle } from "./lifecycle";
 import type { ActionSpec, LessonSpec, ObjectSpec, SceneSpec } from "./types";
+import { parseSvgArtwork, svgArtworkError, svgFragmentError } from "./svg";
 
 const validateStructure = new Ajv2020({ allErrors: true, strict: true }).compile(LESSON_SPEC_SCHEMA);
 
@@ -56,7 +57,9 @@ function referenceDiagnostic(
     const object = objects.get(objectId);
     if (object) {
       const generic = ["center", "top", "bottom", "left", "right"];
-      let anchors = object.kind === "visual" ? assetAnchors(object.asset) ?? [] : generic;
+      let anchors = object.kind === "visual"
+        ? assetAnchors(object.asset) ?? []
+        : generic;
       if (object.kind === "chart") {
         const count = object.chart === "riemann"
           ? ({ few: 4, several: 8, many: 16, dense: 32 }[object.rectangles ?? "several"])
@@ -122,9 +125,54 @@ function semanticScene(scene: SceneSpec, sceneIndex: number): { errors: Diagnost
     ...duplicateDiagnostics(scene.beats.map((beat) => beat.id), `${base}/beats`),
   ];
   const warnings: Diagnostic[] = [];
-  const objects = new Map(scene.objects.map((object) => [object.id, object]));
+  const objects = new Map<string, ObjectSpec>();
+  for (const object of scene.objects) {
+    objects.set(object.id, object);
+    if (object.kind === "svg-composite") {
+      for (const part of object.parts) objects.set(`${object.id}.${part.id}`, object);
+    }
+    if (object.kind === "svg-artwork") {
+      for (const part of parseSvgArtwork(object.svg).value?.parts ?? []) objects.set(`${object.id}.${part.id}`, object);
+    }
+  }
   const lifecycle = analyzeLifecycle(scene, sceneIndex);
   errors.push(...lifecycle.errors);
+  const requireTemporaryCleanup = (id: string, path: string) => {
+    const window = lifecycle.windows.get(id);
+    const becomesVisible = window?.initiallyVisible || window?.showBeat !== undefined;
+    if (becomesVisible && window?.hideBeat === undefined) {
+      errors.push({
+        code: "TEMPORARY_VISUAL_PERSISTS",
+        path,
+        message: `Temporary visual '${id}' remains visible at the end of the scene; add a later hide action`,
+        received: id,
+      });
+    }
+  };
+  scene.objects.forEach((object, objectIndex) => {
+    if (object.temporary) requireTemporaryCleanup(object.id, `${base}/objects/${objectIndex}/temporary`);
+    if (object.kind === "svg-composite") {
+      object.parts.forEach((part, partIndex) => {
+        if (part.temporary) requireTemporaryCleanup(`${object.id}.${part.id}`, `${base}/objects/${objectIndex}/parts/${partIndex}/temporary`);
+      });
+    }
+    if (object.kind === "svg-artwork") {
+      const availableParts = new Set(parseSvgArtwork(object.svg).value?.parts.map((part) => part.id) ?? []);
+      object.temporaryParts?.forEach((part, partIndex) => {
+        if (!availableParts.has(part)) {
+          errors.push({
+            code: "UNKNOWN_TARGET",
+            path: `${base}/objects/${objectIndex}/temporaryParts/${partIndex}`,
+            message: `Unknown SVG part '${part}' in temporaryParts`,
+            received: part,
+            availableTargets: [...availableParts],
+          });
+          return;
+        }
+        requireTemporaryCleanup(`${object.id}.${part}`, `${base}/objects/${objectIndex}/temporaryParts/${partIndex}`);
+      });
+    }
+  });
   const placementState = new Map<string, "visiting" | "done">();
   const placementStack: string[] = [];
   const visitPlacement = (id: string) => {
@@ -157,6 +205,52 @@ function semanticScene(scene: SceneSpec, sceneIndex: number): { errors: Diagnost
         received: object.asset,
         suggestions: suggestions(object.asset, availableAssets()),
       });
+    }
+    if (object.kind === "group") {
+      const nestedComposite = object.children.findIndex((child) => child.kind === "svg-composite" || child.kind === "svg-artwork");
+      if (nestedComposite >= 0) {
+        errors.push({
+          code: "INVALID_SVG",
+          path: `${base}/objects/${objectIndex}/children/${nestedComposite}`,
+          message: "SVG artwork objects must be top-level scene objects so their parts remain independently targetable",
+          received: object.children[nestedComposite],
+        });
+      }
+    }
+    if (object.kind === "svg-composite") {
+      errors.push(...duplicateDiagnostics(object.parts.map((part) => part.id), `${base}/objects/${objectIndex}/parts`));
+      const [vx, vy, vw, vh] = object.viewBox;
+      object.parts.forEach((part, partIndex) => {
+        const svgError = svgFragmentError(part.svg);
+        if (svgError) {
+          errors.push({
+            code: "INVALID_SVG",
+            path: `${base}/objects/${objectIndex}/parts/${partIndex}/svg`,
+            message: svgError,
+            received: part.svg,
+          });
+        }
+        const [x, y, width, height] = part.bounds;
+        if (x < vx || y < vy || x + width > vx + vw || y + height > vy + vh) {
+          errors.push({
+            code: "INVALID_SVG_BOUNDS",
+            path: `${base}/objects/${objectIndex}/parts/${partIndex}/bounds`,
+            message: `SVG part bounds must stay inside the composite viewBox`,
+            received: part.bounds,
+          });
+        }
+      });
+    }
+    if (object.kind === "svg-artwork") {
+      const svgError = svgArtworkError(object.svg);
+      if (svgError) {
+        errors.push({
+          code: "INVALID_SVG",
+          path: `${base}/objects/${objectIndex}/svg`,
+          message: svgError,
+          received: object.svg,
+        });
+      }
     }
     const references =
       object.kind === "line"

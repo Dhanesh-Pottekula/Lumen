@@ -4,9 +4,8 @@ import type { Film } from "../gcl/schema";
 import { compileResolvedLesson } from "./compile";
 import { validateCanonicalFilm } from "./canonical";
 import type { Diagnostic } from "./diagnostics";
-import { isCinematicRecipeInput, resolveCinematicRecipe } from "./recipes";
 import { resolveLesson, type ResolvedLesson } from "./resolve";
-import type { CinematicLessonSpec, LessonSpec } from "./types";
+import type { LessonSpec } from "./types";
 import { validateLessonSpec } from "./validate";
 
 export interface CompiledLesson {
@@ -23,16 +22,8 @@ export interface LessonFailure {
 }
 
 export type CompileLessonResult = CompiledLesson | LessonFailure;
-export interface RenderedCinematicLesson {
-  valid: true;
-  lesson: CinematicLessonSpec;
-  slide: CanvasSlideDefinition;
-  warnings: Diagnostic[];
-}
-
 export type RenderLessonResult =
   | (CompiledLesson & { slide: CanvasSlideDefinition })
-  | RenderedCinematicLesson
   | LessonFailure;
 
 function decodeInput(input: unknown): { ok: true; value: unknown } | { ok: false; error: Diagnostic } {
@@ -71,19 +62,22 @@ export function compileLessonSpec(input: unknown): CompileLessonResult {
 }
 
 export function renderLessonSpec(input: unknown): RenderLessonResult {
-  const decoded = decodeInput(input);
-  if (!decoded.ok) return { valid: false, errors: [decoded.error] };
-  if (isCinematicRecipeInput(decoded.value)) return resolveCinematicRecipe(decoded.value);
-
-  const compiled = compileLessonSpec(decoded.value);
+  const compiled = compileLessonSpec(input);
   if (!compiled.valid) return compiled;
   return { ...compiled, slide: renderFilm(compiled.gcl) };
 }
 
-export { CINEMATIC_LESSON_SCHEMA, LESSON_INPUT_SCHEMA, LESSON_SPEC_SCHEMA } from "./schema";
+export { LESSON_INPUT_SCHEMA, LESSON_SPEC_SCHEMA } from "./schema";
 export { validateCanonicalFilm } from "./canonical";
-export { NEWTON_CANNON_LESSON } from "./fixtures";
-export { isCinematicRecipeInput, resolveCinematicRecipe } from "./recipes";
+export {
+  availableVisualAssets,
+  resolveVisualAsset,
+  visualAssetAnchorMap,
+  visualAssetAnchors,
+  visualAssetBounds,
+  visualOrientationAngle,
+} from "./visual-catalog";
+export type { VisualAssetDefinition, VisualOrientation } from "./visual-catalog";
 export type * from "./types";
 export type { Diagnostic, ValidationResult } from "./diagnostics";
 export type { ResolvedLesson } from "./resolve";

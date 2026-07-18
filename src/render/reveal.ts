@@ -38,8 +38,8 @@ let scratchBusy = false;
  */
 export function masked(
   ctx: CanvasRenderingContext2D,
-  viewW: number,
-  viewH: number,
+  _viewW: number,
+  _viewH: number,
   drawContent: (c: CanvasRenderingContext2D) => void,
   drawMask: (c: CanvasRenderingContext2D) => void,
   opts: { invert?: boolean } = {},

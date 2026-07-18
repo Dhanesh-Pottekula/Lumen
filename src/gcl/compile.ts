@@ -218,6 +218,11 @@ export function compileScene(scene: ParsedScene, theme: Theme = TEXTBOOK): Canva
   const drawComponents = components.filter(
     (c): c is DrawComponent => c.type !== "camera" && c.type !== "attention",
   );
+  // Start decoding embedded SVGs while the slide is being assembled instead of waiting for paint.
+  // The data URLs are still cached by markup, and seeking never creates a second image instance.
+  drawComponents.forEach((component) => {
+    if (component.type === "svg") primeSvgImage(component.markup);
+  });
   const cameraComponents = components.filter((c): c is Extract<Component, { type: "camera" }> => c.type === "camera");
   const attnComponents = components.filter((c): c is Extract<Component, { type: "attention" }> => c.type === "attention");
 
@@ -526,11 +531,15 @@ function drawComponentInstance(
     }
     const kind = c.emphasis.kind ?? "punch";
     const emAt = c.emphasis.at ?? (c.emphasis.cue != null ? cueTimes[c.emphasis.cue] : undefined) ?? at;
-    const amp = c.emphasis.amp;
-    if (kind === "punch") withPunch(target, cx, cy, t, emAt, drawGhostMagnify, { amp });
-    else if (kind === "shake") withShake(target, t, emAt, drawGhostMagnify, { mag: amp });
-    else if (kind === "pulse") pulseScale(target, cx, cy, t, drawGhostMagnify, { amp });
-    else wiggle(target, cx, cy, t, drawGhostMagnify, { amp });
+    if (t < emAt) {
+      drawGhostMagnify(target);
+      return;
+    }
+    const strength = c.emphasis.amp ?? 1;
+    if (kind === "punch") withPunch(target, cx, cy, t, emAt, drawGhostMagnify, { amp: 0.12 * strength });
+    else if (kind === "shake") withShake(target, t, emAt, drawGhostMagnify, { mag: 5 * strength });
+    else if (kind === "pulse") pulseScale(target, cx, cy, t, drawGhostMagnify, { amp: 0.05 * strength });
+    else wiggle(target, cx, cy, t, drawGhostMagnify, { amp: 0.035 * strength });
   };
 
   drawEmphasized(layer);
@@ -667,14 +676,21 @@ function getImage(src: string): HTMLImageElement | null {
  *  markup directly rather than referencing a `src` URL. */
 const svgMarkupCache = new Map<string, HTMLImageElement>();
 
-function getSvgImage(markup: string): HTMLImageElement | null {
-  if (typeof Image === "undefined") return null; // no DOM (e.g. pure node/vitest) — skip gracefully
+function primeSvgImage(markup: string): HTMLImageElement | null {
+  if (typeof Image === "undefined") return null;
   let img = svgMarkupCache.get(markup);
   if (!img) {
     img = new Image();
     img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(markup);
     svgMarkupCache.set(markup, img);
+    if (typeof img.decode === "function") void img.decode().catch(() => undefined);
   }
+  return img;
+}
+
+function getSvgImage(markup: string): HTMLImageElement | null {
+  const img = primeSvgImage(markup);
+  if (!img) return null; // no DOM (e.g. pure node/vitest) — skip gracefully
   return img.complete && img.naturalWidth > 0 ? img : null;
 }
 
@@ -975,7 +991,10 @@ function paintNative(layer: CanvasRenderingContext2D, c: DrawComponent, rc: Rend
       const leftX = cx - w / 2;
       const mode = c.mode ?? textModeFromEnter(c.enter?.type);
       if (mode === "word") {
-        drawWordReveal(layer, c.text, leftX, cy, tPrime, { font, color, align }, { start: at, mode: "rise" });
+        const wordCount = Math.max(1, c.text.split(/\s+/).filter(Boolean).length);
+        const wordDur = Math.max(0.08, Math.min(0.35, enterDur * 0.35));
+        const wordStep = Math.max(0, (enterDur - wordDur) / Math.max(1, wordCount - 1));
+        drawWordReveal(layer, c.text, leftX, cy, tPrime, { font, color, align }, { start: at, step: wordStep, dur: wordDur, mode: "rise" });
       } else if (mode === "typewriter") {
         drawTypewriter(layer, c.text, leftX, cy, enterP, { font, color, align }, { cursor: true, t: tPrime });
       } else if (mode === "slam") {

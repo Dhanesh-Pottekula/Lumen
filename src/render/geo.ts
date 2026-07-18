@@ -7,7 +7,7 @@
  * Composes with camera (11) for region zooms, reveal (05) for fog-of-war, icons (15) for markers,
  * strokes (04) for draw-on borders/arrows, and morph (14) for borders-over-time.
  */
-import { clamp01, fadeText, lerp } from "../slides/anim";
+import { clamp01, fadeText } from "../slides/anim";
 import { drawIcon, type IconName } from "./icons";
 import { morph } from "./morph";
 import { type Pt, smoothPath, strokeOn } from "./strokes";

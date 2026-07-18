@@ -7,7 +7,6 @@
  */
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 
-import { preloadImages } from "../assets/imageRegistry";
 import { createFrame } from "../render/frame";
 import { type Theme, TEXTBOOK } from "../render/theme";
 import { paintTexture } from "../render/texture";
@@ -18,13 +17,11 @@ interface CanvasSlideProps {
   title: ReactNode;
   tag: ReactNode;
   notes?: string[];
-  /** Optional SVG asset URLs to preload; the paused frame repaints once they decode. */
-  assetUrls?: string[];
   /** Art-direction theme. Defaults to TEXTBOOK (unchanged look). */
   theme?: Theme;
 }
 
-export function CanvasSlide({ slide, title, tag, notes, assetUrls, theme = TEXTBOOK }: CanvasSlideProps) {
+export function CanvasSlide({ slide, title, tag, notes, theme = TEXTBOOK }: CanvasSlideProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const clockRef = useRef({ raf: 0, wallStart: 0, tStart: 0 });
   const tRef = useRef(0); // the currently-displayed time — so resize/preload repaint the right frame
@@ -105,18 +102,6 @@ export function CanvasSlide({ slide, title, tag, notes, assetUrls, theme = TEXTB
     },
     [draw],
   );
-
-  // preload SVG assets, then repaint the current (paused) frame so they appear immediately
-  useEffect(() => {
-    if (!assetUrls || assetUrls.length === 0) return;
-    let cancelled = false;
-    void preloadImages(assetUrls).then(() => {
-      if (!cancelled) draw(tRef.current);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [assetUrls, draw]);
 
   useEffect(() => () => cancelAnimationFrame(clockRef.current.raf), []);
 

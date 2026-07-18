@@ -231,7 +231,7 @@ export const rainEmitter = (viewW: number, viewH: number, seed = 4): EmitterConf
   size: [7, 7], color: "#7fb0d8", alpha: { in: 0.05, out: 0.2, max: 0.5 }, shape: "streak",
 });
 
-export const snowEmitter = (viewW: number, viewH: number, seed = 5): EmitterConfig => ({
+export const snowEmitter = (viewW: number, seed = 5): EmitterConfig => ({
   count: 90, seed, origin: { kind: "rect", x: 0, y: -20, w: viewW, h: 10 }, rate: 40, loop: true,
   life: [5, 8], angle: Math.PI / 2, spread: 0.2, speed: [30, 60], accel: [0, 4], wander: { amp: 26, freq: 0.8 },
   size: [2, 4], color: "#ffffff", alpha: { in: 0.1, out: 0.2, max: 0.8 }, shape: "dot",

@@ -28,7 +28,7 @@ export function resolveEmitter(
     case "rain":
       return rainEmitter(viewW, viewH, seed);
     case "snow":
-      return snowEmitter(viewW, viewH, seed);
+      return snowEmitter(viewW, seed);
     case "fire":
       return fireEmitter(x, y, seed);
     case "smoke":

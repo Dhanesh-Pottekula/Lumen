@@ -161,6 +161,45 @@ const neuronCell: PropFn = (size, color) => {
   return parts;
 };
 
+/** Complete neuron — the reusable soma/dendrite artwork above plus an authored axon, four myelin
+ *  sheaths, and a three-way terminal arbor. Unlike `neuronCell`, this prop is self-contained and
+ *  does not expect the lesson to continue the axon with separate objects. */
+const neuronFull: PropFn = (size, color) => {
+  const s = size;
+  const somaDark = "#2f7d68";
+  const axon = "#cfe0e6";
+  const myelin = "#d6b36a";
+  const myelinDark = "#70542b";
+  const parts = neuronCell(size, color);
+
+  parts.push(
+    // Nucleus, drawn after the soma shading so the complete prop reads clearly at small sizes.
+    { d: `M ${4 * s} ${3 * s} m ${-8 * s} 0 a ${8 * s} ${8 * s} 0 1 0 ${16 * s} 0 a ${8 * s} ${8 * s} 0 1 0 ${-16 * s} 0`, fill: somaDark },
+    // Axon continuing directly from the hillock stub to the terminal arbor.
+    { d: `M ${50 * s} 0 C ${70 * s} ${-2 * s} ${96 * s} ${2 * s} ${118 * s} 0`, stroke: axon, width: 3.4 * s },
+  );
+
+  for (const x of [62, 78, 94, 110]) {
+    parts.push({
+      d: `M ${x * s} 0 m ${-5.5 * s} 0 a ${5.5 * s} ${9.5 * s} 0 1 0 ${11 * s} 0 a ${5.5 * s} ${9.5 * s} 0 1 0 ${-11 * s} 0`,
+      fill: myelin,
+      stroke: myelinDark,
+      width: 1 * s,
+    });
+  }
+
+  parts.push(
+    { d: `M ${118 * s} 0 C ${124 * s} ${-6 * s} ${129 * s} ${-14 * s} ${134 * s} ${-20 * s}`, stroke: axon, width: 2.4 * s },
+    { d: `M ${118 * s} 0 L ${134 * s} 0`, stroke: axon, width: 2.4 * s },
+    { d: `M ${118 * s} 0 C ${124 * s} ${6 * s} ${129 * s} ${14 * s} ${134 * s} ${20 * s}`, stroke: axon, width: 2.4 * s },
+    { d: `M ${134 * s} ${-20 * s} m ${-2.5 * s} 0 a ${2.5 * s} ${2.5 * s} 0 1 0 ${5 * s} 0 a ${2.5 * s} ${2.5 * s} 0 1 0 ${-5 * s} 0`, fill: axon },
+    { d: `M ${134 * s} 0 m ${-2.5 * s} 0 a ${2.5 * s} ${2.5 * s} 0 1 0 ${5 * s} 0 a ${2.5 * s} ${2.5 * s} 0 1 0 ${-5 * s} 0`, fill: axon },
+    { d: `M ${134 * s} ${20 * s} m ${-2.5 * s} 0 a ${2.5 * s} ${2.5 * s} 0 1 0 ${5 * s} 0 a ${2.5 * s} ${2.5 * s} 0 1 0 ${-5 * s} 0`, fill: axon },
+  );
+
+  return parts;
+};
+
 /** Ion channel — membrane ion-channel protein glyph in the closed state: two facing trapezoid
  *  halves (outer/membrane-facing edge wide, inner/pore-facing edge narrow) with a narrow shut pore
  *  gap between them. Origin-centered, ~24px tall at size=1 (top half y:-12..-2, bottom half
@@ -188,7 +227,17 @@ export const PROP_CATALOG: Record<string, PropFn> = {
   arrow,
   star,
   neuronCell,
+  neuronFull,
   ionChannel,
+  "physics.cannon": cannon,
+  "nature.tree": tree,
+  "nature.apple": apple,
+  "physics.planet": planet,
+  "symbols.arrow": arrow,
+  "symbols.star": star,
+  "biology.neuron.cell": neuronCell,
+  "biology.neuron.full": neuronFull,
+  "biology.ion-channel": ionChannel,
 };
 
 /** Named local anchor points per prop, in the SAME local coordinate space each prop's `d` strings use
@@ -212,5 +261,30 @@ export const PROP_ANCHORS: Record<string, Record<string, [number, number]>> = {
     dendriteTip4: [-50.8, 35.6],
     axonRoot: [34, 0],
   },
+  neuronFull: {
+    center: [0, 0],
+    soma: [0, 0],
+    dendriteTip1: [-58.3, -21.2],
+    dendriteTip2: [-59.9, 16.0],
+    dendriteTip3: [-39.9, -47.5],
+    dendriteTip4: [-50.8, 35.6],
+    axonRoot: [34, 0],
+    axonEnd: [118, 0],
+    terminalTop: [134, -20],
+    terminalMiddle: [134, 0],
+    terminalBottom: [134, 20],
+  },
   ionChannel: { center: [0, 0], pore: [0, 0], top: [0, -12], bottom: [0, 12] },
 };
+
+// Namespaced aliases are the stable identifiers exposed by Simple JSON. The short names remain
+// available only for older GCL-authored lessons that use the internal `prop` component directly.
+PROP_ANCHORS["physics.cannon"] = PROP_ANCHORS.cannon;
+PROP_ANCHORS["nature.tree"] = PROP_ANCHORS.tree;
+PROP_ANCHORS["nature.apple"] = PROP_ANCHORS.apple;
+PROP_ANCHORS["physics.planet"] = PROP_ANCHORS.planet;
+PROP_ANCHORS["symbols.arrow"] = PROP_ANCHORS.arrow;
+PROP_ANCHORS["symbols.star"] = PROP_ANCHORS.star;
+PROP_ANCHORS["biology.neuron.cell"] = PROP_ANCHORS.neuronCell;
+PROP_ANCHORS["biology.neuron.full"] = PROP_ANCHORS.neuronFull;
+PROP_ANCHORS["biology.ion-channel"] = PROP_ANCHORS.ionChannel;

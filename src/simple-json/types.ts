@@ -51,6 +51,8 @@ export interface ObjectBase {
   size?: SizeToken;
   initial?: "hidden" | "visible";
   space?: "world" | "screen";
+  /** Teaching aid that must be explicitly hidden before the scene finishes. */
+  temporary?: boolean;
 }
 
 export interface CategoryDatumSpec {
@@ -79,6 +81,17 @@ export interface MapFlowSpec {
   pace?: PaceToken;
 }
 
+export interface SvgCompositePartSpec {
+  id: string;
+  /** SVG element markup only; the compiler supplies the shared root <svg> and viewBox. */
+  svg: string;
+  /** Padded [x, y, width, height] inside the composite viewBox used for rendering and targeting. */
+  bounds: [number, number, number, number];
+  initial?: "hidden" | "visible";
+  /** Teaching aid that must be explicitly hidden before the scene finishes. */
+  temporary?: boolean;
+}
+
 export type ObjectSpec =
   | (ObjectBase & {
       kind: "text";
@@ -96,7 +109,32 @@ export type ObjectSpec =
       commas?: boolean;
       prefix?: string;
     })
-  | (ObjectBase & { kind: "visual"; asset: string; orientation?: "left" | "right" | "up" | "down" })
+  | (ObjectBase & { kind: "visual"; asset: string; color?: string; orientation?: "left" | "right" | "up" | "down" })
+  | (ObjectBase & {
+      kind: "vector";
+      d: string;
+      fill?: string;
+      stroke?: string;
+      strokeWidth?: number;
+      width?: number;
+      height?: number;
+      scale?: number;
+      rotate?: number;
+    })
+  | (ObjectBase & {
+      kind: "svg-composite";
+      viewBox: [number, number, number, number];
+      width: number;
+      height: number;
+      parts: SvgCompositePartSpec[];
+    })
+  | (ObjectBase & {
+      /** LLM-facing conventional SVG. Root-level named <g> elements become addressable parts. */
+      kind: "svg-artwork";
+      svg: string;
+      /** Root-level group ids that are teaching aids and must be hidden before the scene finishes. */
+      temporaryParts?: string[];
+    })
   | (ObjectBase & { kind: "line"; from: string; to: string; form?: "straight" | "elbow" | "curved" | "arrow" | "traced" })
   | (ObjectBase & {
       kind: "shape";
@@ -218,23 +256,3 @@ export interface LessonSpec {
   theme: ThemeToken;
   scenes: SceneSpec[];
 }
-
-export const CINEMATIC_RECIPE_IDS = [
-  "biology.neuron-action-potential.original.v1",
-  "physics.gravity-orbits.original.v1",
-] as const;
-
-export type CinematicRecipeId = (typeof CINEMATIC_RECIPE_IDS)[number];
-
-/**
- * A small, closed LLM-facing request for an audited film. The recipe registry owns every
- * implementation value so JSON cannot smuggle in pixels, timing, paths, or callbacks.
- */
-export interface CinematicLessonSpec {
-  version: "1";
-  mode: "cinematic-recipe";
-  title: string;
-  recipe: CinematicRecipeId;
-}
-
-export type LessonInputSpec = LessonSpec | CinematicLessonSpec;

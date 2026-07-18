@@ -67,6 +67,14 @@ export interface AxesOptions {
   p?: number; // reveal 0..1 (axes wipe in)
 }
 
+function tickDecimals(values: number[]): number {
+  for (let decimals = 0; decimals <= 3; decimals++) {
+    const scale = 10 ** decimals;
+    if (values.every((value) => Math.abs(value * scale - Math.round(value * scale)) < 1e-7)) return decimals;
+  }
+  return 3;
+}
+
 export function axes(ctx: CanvasRenderingContext2D, plot: Plot, o: AxesOptions = {}) {
   const color = o.color ?? "#5b6b78";
   const gridColor = o.gridColor ?? "rgba(255,255,255,0.06)";
@@ -106,9 +114,11 @@ export function axes(ctx: CanvasRenderingContext2D, plot: Plot, o: AxesOptions =
   ctx.fillStyle = ink;
   ctx.font = font;
   ctx.textAlign = "center";
-  for (const v of xTicks) ctx.fillText(formatNumber(v, o.fmt), plot.sx(v), plot.y + plot.h + 16);
+  const xFormat = o.fmt ?? { decimals: tickDecimals(xTicks) };
+  const yFormat = o.fmt ?? { decimals: tickDecimals(yTicks) };
+  for (const v of xTicks) ctx.fillText(formatNumber(v, xFormat), plot.sx(v), plot.y + plot.h + 16);
   ctx.textAlign = "right";
-  for (const v of yTicks) ctx.fillText(formatNumber(v, o.fmt), plot.x - 8, plot.sy(v) + 4);
+  for (const v of yTicks) ctx.fillText(formatNumber(v, yFormat), plot.x - 8, plot.sy(v) + 4);
   // axis titles
   if (o.xLabel) {
     ctx.textAlign = "center";

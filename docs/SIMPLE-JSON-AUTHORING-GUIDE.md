@@ -4,12 +4,7 @@ This is the human reference for Lumen's **Simple JSON** lesson format. It explai
 
 Simple JSON is the high-level authoring layer above GCL. You describe educational intent—objects, relationships, and ordered actions—and the compiler supplies coordinates, colors, timing values, drawing primitives, camera math, and deterministic animation details.
 
-The format has two input modes:
-
-1. **Generative lesson** — build a new lesson from scenes, objects, and beats.
-2. **Cinematic recipe** — select one of the registered, audited films exactly.
-
-Most of this guide covers generative lessons.
+The format directly builds a lesson from scenes, objects, and beats. There is no recipe or predefined-film mode.
 
 ---
 
@@ -365,27 +360,29 @@ For an object named `formula`, use `formula.center`, `formula.top`, and so on.
 
 | Asset | Specific anchors in addition to the generic anchors |
 |---|---|
-| `cannon` | `muzzle`, `breech`, `wheels` |
-| `tree` | `top`, `trunk` |
-| `apple` | `stem` |
-| `planet` | `ring` |
-| `arrow` | `tip`, `tail` |
-| `star` | none beyond `center` |
-| `neuronCell` | `soma`, `dendriteTip1`, `dendriteTip2`, `dendriteTip3`, `dendriteTip4`, `axonRoot` |
-| `ionChannel` | `pore`, `top`, `bottom` |
+| `physics.cannon` | `muzzle`, `breech`, `wheels` |
+| `nature.tree` | `top`, `trunk` |
+| `nature.apple` | `stem` |
+| `physics.planet` | `ring` |
+| `symbols.arrow` | `tip`, `tail` |
+| `symbols.star` | none beyond `center` |
+| `biology.neuron.cell` | `soma`, `dendriteTip1`, `dendriteTip2`, `dendriteTip3`, `dendriteTip4`, `axonRoot` |
+| `biology.neuron.full` | all cell anchors plus `axonEnd`, `terminalTop`, `terminalMiddle`, `terminalBottom` |
+| `biology.ion-channel` | `pore`, `top`, `bottom` |
 
 All currently available asset names are:
 
 ```json
 [
-  "apple",
-  "arrow",
-  "cannon",
-  "ionChannel",
-  "neuronCell",
-  "planet",
-  "star",
-  "tree"
+  "biology.ion-channel",
+  "biology.neuron.cell",
+  "biology.neuron.full",
+  "nature.apple",
+  "nature.tree",
+  "physics.cannon",
+  "physics.planet",
+  "symbols.arrow",
+  "symbols.star"
 ]
 ```
 
@@ -425,12 +422,13 @@ Every object has `id` and `kind`. The following fields are shared and optional.
 {
   "id": "subject",
   "kind": "visual",
-  "asset": "planet",
+  "asset": "physics.planet",
   "role": "hero",
   "placement": { "mode": "zone", "zone": "main" },
   "size": "large",
   "initial": "hidden",
-  "space": "world"
+  "space": "world",
+  "temporary": false
 }
 ```
 
@@ -443,6 +441,7 @@ Every object has `id` and `kind`. The following fields are shared and optional.
 | `size` | no | `tiny`, `small`, `medium`, `large`, `hero`, `fill` | Semantic scale; derived when omitted. |
 | `initial` | no | `hidden`, `visible` | Omitted behaves as hidden unless a `show` action exists. |
 | `space` | no | `world`, `screen` | `world` follows camera; `screen` stays fixed like a HUD. |
+| `temporary` | no | boolean | When `true`, validation requires a later `hide`; use it for projections, guides, arrows, and other teaching marks. |
 
 ### 8.1 Roles
 
@@ -469,7 +468,11 @@ Use semantic sizes to communicate hierarchy. Do not think of them as fixed pixel
 
 ## 9. Object catalogue
 
-There are 13 object kinds.
+There are 16 object kinds. For finished artwork, an LLM should normally use `visual` to select audited
+premade artwork, `vector` for one raw Path2D geometry layer, or `svg-artwork` for one conventional SVG
+whose root-level named groups become independently targetable parts. `svg-composite` remains the
+advanced normalized form. Internal GCL `prop` and direct single-image `svg` components are not Simple
+JSON object kinds.
 
 ### 9.1 `text`
 
@@ -540,7 +543,8 @@ The equation renderer supports the GCL math-text notation used by the project, i
 {
   "id": "cannon",
   "kind": "visual",
-  "asset": "cannon",
+  "asset": "physics.cannon",
+  "color": "#5cc8ae",
   "orientation": "left",
   "role": "hero",
   "placement": { "mode": "zone", "zone": "main-left" }
@@ -550,11 +554,142 @@ The equation renderer supports the GCL math-text notation used by the project, i
 | Field | Required | Options | Meaning |
 |---|---:|---|---|
 | `asset` | yes | one registered asset name | Reusable semantic illustration. |
-| `orientation` | no | `left`, `right`, `up`, `down` | Direction the illustration faces. Defaults to `left`. |
+| `color` | no | non-empty CSS color string | Overrides the asset's primary tint when the asset supports tinting. |
+| `orientation` | no | `left`, `right`, `up`, `down` | Desired facing direction, relative to the artwork's authored facing. Omit it to keep the authored direction. |
 
-Available assets and their anchors are listed in section 7.2.
+One visual may be internally composed from many paths, but it remains one selectable object. Available
+assets and their attachment points are listed in section 7.2.
 
-### 9.5 `line`
+### 9.5 `vector`
+
+```json
+{
+  "id": "custom-neuron",
+  "kind": "vector",
+  "d": "M-60 0 C-83-32-101-43-126-53 M-32 0 C5-4 48 5 98 0",
+  "stroke": "#7fb7c8",
+  "strokeWidth": 3,
+  "width": 200,
+  "height": 129,
+  "scale": 0.65,
+  "rotate": 0,
+  "placement": { "mode": "zone", "zone": "main-left" }
+}
+```
+
+| Field | Required | Options / limits | Meaning |
+|---|---:|---|---|
+| `d` | yes | non-empty Path2D path string | Raw custom geometry. |
+| `fill` | no | non-empty CSS color string | Interior color. |
+| `stroke` | no | non-empty CSS color string | Outline color. |
+| `strokeWidth` | no | number greater than `0`, at most `20` | Outline width. |
+| `width` | no | number greater than `0`, at most `920` | Layout and targeting width. |
+| `height` | no | number greater than `0`, at most `430` | Layout and targeting height. |
+| `scale` | no | number greater than `0`, at most `10` | Drawing scale. |
+| `rotate` | no | radians from `-6.284` to `6.284` | Drawing rotation. |
+
+Use `vector` when the JSON author needs exact custom geometry. Use `visual` when a named premade
+asset already represents the object and its semantic attachment points matter.
+
+### 9.6 `svg-artwork` — recommended for LLM-authored SVG
+
+```json
+{
+  "id": "neuron",
+  "kind": "svg-artwork",
+  "size": "large",
+  "placement": { "mode": "zone", "zone": "main" },
+  "svg": "<svg viewBox='0 0 620 220'><g id='dendrites'><path d='...' /></g><g id='soma'><circle cx='165' cy='110' r='49' /></g><g id='axon'><path d='...' /></g></svg>"
+}
+```
+
+| Field | Required | Options / limits | Meaning |
+|---|---:|---|---|
+| `svg` | yes | one sanitized root `<svg>`, at most 48,000 characters | Complete conventional SVG artwork. |
+| root `viewBox` | yes | four finite numbers with positive width/height | Internal drawing coordinates and aspect ratio. |
+| root-level `<g id="…">` | yes | at least one; valid unique IDs | Paint layers and public target names. |
+| `size` | no | normal semantic size token | Display size; the compiler preserves the viewBox ratio. |
+
+The LLM writes one ordinary SVG. Every root-level named group becomes a part automatically:
+
+```text
+<g id="soma">…</g>  →  neuron.soma
+<g id="axon">…</g>  →  neuron.axon
+```
+
+Shared `<defs>` may stay once at the root; the compiler copies them into each generated layer. Paint
+order follows the order of the named groups. The compiler derives display width and height from
+`size`, infers focused bounds for ordinary circles, ellipses, rectangles, lines, polygons, and common
+absolute `M`/`L`/`C` paths, and falls back safely to the complete viewBox for advanced transformed or
+unsupported geometry. Authors do not provide `parts`, `bounds`, `width`, or `height`.
+
+SVG scripts, handlers, external references, style attributes, nested SVG roots, unnamed root groups,
+and root-level drawing elements outside a named group are rejected. Timing remains controlled by
+beats, not by native SVG animation.
+
+### 9.7 `svg-composite` — advanced normalized form
+
+```json
+{
+  "id": "neuron",
+  "kind": "svg-composite",
+  "viewBox": [0, 0, 620, 220],
+  "width": 620,
+  "height": 220,
+  "placement": { "mode": "zone", "zone": "main" },
+  "parts": [
+    {
+      "id": "soma",
+      "bounds": [111, 56, 108, 108],
+      "svg": "<circle cx='165' cy='110' r='49' fill='#5cc8ae' />"
+    },
+    {
+      "id": "axon",
+      "bounds": [204, 55, 408, 112],
+      "svg": "<path d='M205 110 L607 110' stroke='#cfe0e6' stroke-width='6' />"
+    }
+  ]
+}
+```
+
+| Field | Required | Options / limits | Meaning |
+|---|---:|---|---|
+| `viewBox` | yes | `[x, y, width, height]`; positive width/height | Shared coordinate system for every part. |
+| `width` | yes | number greater than `0`, at most `920` | Final composite layout width. |
+| `height` | yes | number greater than `0`, at most `430` | Final composite layout height. |
+| `parts` | yes | `1`–`32` part objects | Ordered paint layers. Later parts paint above earlier parts. |
+| `parts[].id` | yes | valid ID, unique inside the composite | Creates target `<composite>.<part>`. |
+| `parts[].svg` | yes | sanitized SVG element markup | One or more SVG elements. Do not include a root `<svg>` element. |
+| `parts[].bounds` | yes | `[x, y, width, height]` inside `viewBox` | Padded crop and accurate target box for this part. |
+| `parts[].initial` | no | `hidden`, `visible` | Overrides the composite's initial visibility for this part. |
+
+All parts use the same coordinate system, so they cannot drift when composed. The compiler wraps each
+fragment in its own SVG using the part bounds, places it at the matching location in the parent box,
+and exposes it as a real target. `neuron.soma`, `neuron.axon`, and `neuron.axon.center` are therefore
+valid targets. Showing or hiding `neuron` applies to every part; showing `neuron.soma` affects only the
+soma.
+
+For conventional `svg-artwork`, declare disposable teaching layers once on the artwork:
+
+```json
+{
+  "id": "cannon-art",
+  "kind": "svg-artwork",
+  "temporaryParts": ["shot-slow", "shot-fast"],
+  "svg": "<svg viewBox='0 0 760 270'>...</svg>"
+}
+```
+
+Every named part in `temporaryParts` that becomes visible must later appear in a `hide` action. The
+validator returns `TEMPORARY_VISUAL_PERSISTS` when an LLM forgets the cleanup. For `svg-composite`, set
+`temporary: true` directly on a part. For standalone objects, set `temporary: true` on the object.
+
+SVG scripts, event handlers, external resources, remote `url(...)` values, `foreignObject`, style
+attributes, XML entities, and unsupported SVG elements/attributes are rejected. Timing must come from
+beats, not native SVG animation. Use `vector` when stroke draw-on or runtime recoloring matters; use
+`svg-composite` for multi-color, gradient, clipped, or independently addressable authored artwork.
+
+### 9.8 `line`
 
 ```json
 {
@@ -575,7 +710,7 @@ Available assets and their anchors are listed in section 7.2.
 
 The endpoints are resolved after all objects are placed. `arrow` adds an arrowhead. `elbow` makes an orthogonal connector. `curved` and `traced` use a curved path. A line's default entrance is `draw` when shown.
 
-### 9.6 `shape`
+### 9.9 `shape`
 
 ```json
 {
@@ -596,7 +731,7 @@ The endpoints are resolved after all objects are placed. `arrow` adds an arrowhe
 
 `disc` is shaded and receives a highlight by default.
 
-### 9.7 `curve`
+### 9.10 `curve`
 
 ```json
 {
@@ -619,7 +754,7 @@ The endpoints are resolved after all objects are placed. `arrow` adds an arrowhe
 
 Use `curve` for free parametric geometry. Use a `chart` with `chart: "function"` when axes, domains, or data-point anchors are important.
 
-### 9.8 `chart`
+### 9.11 `chart`
 
 ```json
 {
@@ -680,7 +815,7 @@ The structural schema allows optional chart-specific fields, so use the table ab
 
 Rectangle counts are deterministic: `few` = 4, `several` = 8, `many` = 16, `dense` = 32. A `donut` is rendered as a pie with an automatic inner hole.
 
-### 9.9 `legend`
+### 9.12 `legend`
 
 ```json
 {
@@ -697,7 +832,7 @@ Rectangle counts are deterministic: `few` = 4, `several` = 8, `many` = 16, `dens
 
 Use the same category strings in charts, maps, timelines, and legends for consistent colors.
 
-### 9.10 `map`
+### 9.13 `map`
 
 ```json
 {
@@ -775,7 +910,7 @@ A flow:
 | `bend` | no | `left`, `right`, `direct` | Arc direction. |
 | `pace` | no | pace token | Flow animation speed; defaults to `normal`. |
 
-### 9.11 `timeline`
+### 9.14 `timeline`
 
 ```json
 {
@@ -818,7 +953,7 @@ Playhead forms:
 
 The first is fixed. The second animates from one value to another. Timeline events can be targeted as `history.ev0`, `history.ev1`, and so on.
 
-### 9.12 `table`
+### 9.15 `table`
 
 ```json
 {
@@ -841,7 +976,7 @@ The first is fixed. The second animates from one value to another. Timeline even
 
 Keep row lengths consistent even though the structural schema does not require equal lengths.
 
-### 9.13 `group`
+### 9.16 `group`
 
 ```json
 {
@@ -1482,7 +1617,7 @@ The cannon is one semantic visual asset with useful anchors. Combine it with sha
         {
           "id": "cannon",
           "kind": "visual",
-          "asset": "cannon",
+          "asset": "physics.cannon",
           "orientation": "left",
           "role": "hero",
           "placement": { "mode": "zone", "zone": "main-left" }
@@ -1490,7 +1625,7 @@ The cannon is one semantic visual asset with useful anchors. Combine it with sha
         {
           "id": "earth",
           "kind": "visual",
-          "asset": "planet",
+          "asset": "physics.planet",
           "role": "primary",
           "size": "large",
           "placement": { "mode": "zone", "zone": "main-right" }
@@ -1559,52 +1694,19 @@ The cannon is one semantic visual asset with useful anchors. Combine it with sha
 }
 ```
 
-This uses one `cannon` asset rather than asking for wheel radius, barrel coordinates, line widths, or colors. The compiler preserves the capability through semantic anchors and actions.
+This uses one `physics.cannon` asset rather than asking for wheel radius, barrel coordinates, line widths, or colors. The compiler preserves the capability through semantic anchors and actions.
 
 ---
 
-## 16. Cinematic recipe mode
-
-Recipe mode selects an exact registered film instead of compiling new generative scenes.
-
-```json
-{
-  "version": "1",
-  "mode": "cinematic-recipe",
-  "title": "Why the Moon Doesn't Fall",
-  "recipe": "physics.gravity-orbits.original.v1"
-}
-```
-
-| Field | Required | Rule |
-|---|---:|---|
-| `version` | yes | exactly `"1"` |
-| `mode` | yes | exactly `"cinematic-recipe"` |
-| `title` | yes | non-empty string |
-| `recipe` | yes | registered recipe ID |
-
-Available recipe IDs:
-
-```json
-[
-  "biology.neuron-action-potential.original.v1",
-  "physics.gravity-orbits.original.v1"
-]
-```
-
-Recipe mode has exactly those four fields. It does not accept `theme`, `scenes`, objects, or beats. Use it when exact frame-for-frame parity with an audited original is required. Use generative mode when the lesson content must be newly described in Simple JSON.
-
----
-
-## 17. Validation and repair messages
+## 16. Validation and repair messages
 
 Simple JSON is validated before rendering in several stages.
 
-### 17.1 Structural validation
+### 16.1 Structural validation
 
 Checks required fields, field types, enums, minimum array lengths, numeric limits, ID syntax, and unknown properties.
 
-### 17.2 Semantic validation
+### 16.2 Semantic validation
 
 Checks:
 
@@ -1614,10 +1716,9 @@ Checks:
 - placement cycles;
 - invalid show/hide lifecycle;
 - action targets that are missing or never visible;
-- canonical GCL consistency after compilation;
-- unknown recipe IDs.
+- canonical GCL consistency after compilation.
 
-### 17.3 Diagnostic codes
+### 16.3 Diagnostic codes
 
 | Code | Meaning |
 |---|---|
@@ -1632,13 +1733,14 @@ Checks:
 | `PLACEMENT_CYCLE` | Relative placements depend on each other circularly. |
 | `CANONICAL_ERROR` | Compiled GCL violates the renderer's canonical contract. |
 | `TARGET_NOT_VISIBLE` | A target is used before it has appeared; warning if it becomes visible later. |
+| `TEMPORARY_VISUAL_PERSISTS` | An object or SVG part marked temporary is still visible at the scene's final frame. |
 | `UNKNOWN_RECIPE` | Recipe ID is not registered. |
 
 Diagnostics include a JSON path and, where possible, suggestions and available targets. Fix the earliest structural error first because later reference errors may be consequences of it.
 
 ---
 
-## 18. Practical authoring workflow
+## 17. Practical authoring workflow
 
 1. Choose one lesson theme.
 2. Split the explanation into scenes; each scene should make one conceptual point.
@@ -1655,7 +1757,7 @@ Diagnostics include a JSON path and, where possible, suggestions and available t
 
 ---
 
-## 19. Design guidance that prevents clutter
+## 18. Design guidance that prevents clutter
 
 Simple JSON removes coordinates, but it cannot infer the pedagogical priority of an overcrowded scene. These guidelines produce cleaner results.
 
@@ -1674,7 +1776,7 @@ Simple JSON removes coordinates, but it cannot infer the pedagogical priority of
 
 ---
 
-## 20. Compact option index
+## 19. Compact option index
 
 This is a quick lookup; the earlier sections explain how each option behaves.
 
@@ -1689,7 +1791,7 @@ This is a quick lookup; the earlier sections explain how each option behaves.
 | Sizes | `tiny`, `small`, `medium`, `large`, `hero`, `fill` |
 | Initial state | `hidden`, `visible` |
 | Spaces | `world`, `screen` |
-| Object kinds | `text`, `equation`, `stat`, `visual`, `line`, `shape`, `curve`, `chart`, `legend`, `map`, `timeline`, `table`, `group` |
+| Object kinds | `text`, `equation`, `stat`, `visual`, `vector`, `svg-artwork`, `svg-composite`, `line`, `shape`, `curve`, `chart`, `legend`, `map`, `timeline`, `table`, `group` |
 | Paces | `instant`, `quick`, `normal`, `slow`, `dramatic` |
 | Entrances | `instant`, `fade`, `draw`, `wipe`, `iris`, `slam`, `word-by-word`, `typewriter`, `scramble` |
 | Exits | `instant`, `fade`, `erase`, `wipe`, `iris`, `dissolve`, `slide`, `shrink` |
@@ -1704,7 +1806,7 @@ This is a quick lookup; the earlier sections explain how each option behaves.
 
 ---
 
-## 21. Source of truth
+## 20. Source of truth
 
 This guide describes the implementation in:
 
@@ -1713,6 +1815,6 @@ This guide describes the implementation in:
 - `src/simple-json/validate.ts` and `src/simple-json/lifecycle.ts` — semantic validation;
 - `src/simple-json/resolve.ts` and `src/simple-json/registry.ts` — layout, sizes, themes, paces, shots, and anchors;
 - `src/simple-json/compile.ts` — deterministic compilation into GCL;
-- `src/simple-json/recipes.ts` — registered cinematic recipes.
+- `src/lessons/simple-json/` — the four complete lesson implementations.
 
 When the implementation changes, update this document in the same change so the human contract remains accurate.
