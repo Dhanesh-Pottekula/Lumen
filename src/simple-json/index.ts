@@ -65,13 +65,20 @@ export function compileLessonSpec(input: unknown): CompileLessonResult {
   };
 }
 
+// Cosmetic layout diagnostics the engine already auto-corrects (objects are auto-fit and clamped to the
+// safe frame, overlaps are auto-separated, callouts are auto-flipped/clamped). A few stray pixels of
+// clip or overlap must never blank the whole video — these stay as advisory warnings but do NOT block
+// rendering. Everything else (lifecycle, references, motion geometry, schema) still blocks.
+const NON_BLOCKING_CODES = new Set(["LAYOUT_OVERFLOW", "LAYOUT_COLLISION", "CALLOUT_OVERFLOW"]);
+
 export function renderLessonSpec(input: unknown): RenderLessonResult {
   const compiled = compileLessonSpec(input);
   if (!compiled.valid) return compiled;
-  // Compilation remains diagnostic-friendly so an LLM can inspect and repair
-  // warnings. Rendering is deliberately strict: known geometry, lifecycle, or
-  // safe-frame problems must never be promoted into a user-visible video.
-  if (compiled.warnings.length > 0) return { valid: false, errors: compiled.warnings };
+  // Rendering is strict about anything that would break the lesson — but tolerant of cosmetic layout
+  // issues, which the resolver already adjusts (see resolve.ts). This is what keeps a lesson from
+  // failing entirely over a handful of overflow/overlap pixels.
+  const blocking = compiled.warnings.filter((warning) => !NON_BLOCKING_CODES.has(warning.code));
+  if (blocking.length > 0) return { valid: false, errors: blocking };
   return { ...compiled, slide: renderFilm(compiled.gcl) };
 }
 

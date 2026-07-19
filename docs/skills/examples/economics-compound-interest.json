@@ -1,0 +1,438 @@
+{
+  "version": "1",
+  "title": "The Power of Compound Interest",
+  "theme": "blueprint",
+  "scenes": [
+    {
+      "id": "hook",
+      "composition": "hero",
+      "objects": [
+        {
+          "id": "hook-title",
+          "kind": "text",
+          "text": "The most powerful force in finance",
+          "textRole": "heading",
+          "role": "hero",
+          "placement": {
+            "mode": "zone",
+            "zone": "title"
+          }
+        },
+        {
+          "id": "principal",
+          "kind": "stat",
+          "value": 1000,
+          "prefix": "$",
+          "commas": true,
+          "decimals": 0,
+          "label": "You invest once",
+          "placement": {
+            "mode": "zone",
+            "zone": "main"
+          }
+        },
+        {
+          "id": "hook-q",
+          "kind": "text",
+          "text": "At 8% a year, what is it worth in 30 years?",
+          "textRole": "body",
+          "role": "support",
+          "placement": {
+            "mode": "zone",
+            "zone": "footer"
+          }
+        }
+      ],
+      "beats": [
+        {
+          "id": "hook-b1",
+          "actions": [
+            {
+              "do": "show",
+              "targets": [
+                "hook-title"
+              ],
+              "entrance": "slam"
+            }
+          ]
+        },
+        {
+          "id": "hook-b2",
+          "actions": [
+            {
+              "do": "show",
+              "targets": [
+                "principal"
+              ],
+              "entrance": "iris"
+            }
+          ]
+        },
+        {
+          "id": "hook-b3",
+          "actions": [
+            {
+              "do": "show",
+              "targets": [
+                "hook-q"
+              ],
+              "entrance": "word-by-word"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "growth-curve",
+      "composition": "data",
+      "objects": [
+        {
+          "id": "s2-title",
+          "kind": "text",
+          "text": "It grows on its own growth",
+          "textRole": "title",
+          "role": "annotation",
+          "placement": {
+            "mode": "zone",
+            "zone": "title"
+          }
+        },
+        {
+          "id": "growth",
+          "kind": "chart",
+          "chart": "function",
+          "function": "1000*(1.08^x)",
+          "xDomain": [
+            0,
+            30
+          ],
+          "yDomain": [
+            0,
+            11000
+          ],
+          "axes": true,
+          "xLabel": "Years",
+          "yLabel": "Balance ($)",
+          "size": "large",
+          "placement": {
+            "mode": "zone",
+            "zone": "main"
+          }
+        },
+        {
+          "id": "balance",
+          "kind": "stat",
+          "from": 1000,
+          "value": 10063,
+          "prefix": "$",
+          "commas": true,
+          "decimals": 0,
+          "label": "After 30 years",
+          "role": "hud",
+          "placement": {
+            "mode": "zone",
+            "zone": "hud"
+          }
+        }
+      ],
+      "beats": [
+        {
+          "id": "growth-curve-b1",
+          "actions": [
+            {
+              "do": "show",
+              "targets": [
+                "s2-title"
+              ],
+              "entrance": "fade"
+            }
+          ]
+        },
+        {
+          "id": "growth-curve-b2",
+          "actions": [
+            {
+              "do": "show",
+              "targets": [
+                "growth"
+              ],
+              "entrance": "draw"
+            }
+          ]
+        },
+        {
+          "id": "growth-curve-b3",
+          "actions": [
+            {
+              "do": "show",
+              "targets": [
+                "balance"
+              ],
+              "entrance": "fade"
+            },
+            {
+              "do": "camera",
+              "target": "growth",
+              "shot": "close",
+              "movement": "push"
+            }
+          ]
+        },
+        {
+          "id": "growth-curve-b4",
+          "actions": [
+            {
+              "do": "attention",
+              "target": "growth.last",
+              "verb": "callout",
+              "title": "$10,063",
+              "text": "Growth earning growth",
+              "side": "west",
+              "route": "elbow",
+              "style": "pill"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "compare",
+      "composition": "comparison",
+      "objects": [
+        {
+          "id": "s3-title",
+          "kind": "text",
+          "text": "Simple vs. compound",
+          "textRole": "title",
+          "role": "annotation",
+          "placement": {
+            "mode": "zone",
+            "zone": "title"
+          }
+        },
+        {
+          "id": "simple",
+          "kind": "chart",
+          "chart": "function",
+          "function": "1000+80*x",
+          "xDomain": [
+            0,
+            30
+          ],
+          "yDomain": [
+            0,
+            11000
+          ],
+          "axes": true,
+          "xLabel": "Years",
+          "yLabel": "Balance ($)",
+          "placement": {
+            "mode": "zone",
+            "zone": "main-left"
+          },
+          "size": "medium"
+        },
+        {
+          "id": "compound",
+          "kind": "chart",
+          "chart": "function",
+          "function": "1000*(1.08^x)",
+          "xDomain": [
+            0,
+            30
+          ],
+          "yDomain": [
+            0,
+            11000
+          ],
+          "axes": true,
+          "xLabel": "Years",
+          "yLabel": "Balance ($)",
+          "placement": {
+            "mode": "zone",
+            "zone": "main-right"
+          },
+          "size": "medium"
+        },
+        {
+          "id": "simple-stat",
+          "kind": "stat",
+          "value": 3400,
+          "prefix": "$",
+          "commas": true,
+          "decimals": 0,
+          "label": "Simple interest",
+          "role": "support",
+          "placement": {
+            "mode": "zone",
+            "zone": "main-left"
+          },
+          "size": "small"
+        },
+        {
+          "id": "compound-stat",
+          "kind": "stat",
+          "value": 10063,
+          "prefix": "$",
+          "commas": true,
+          "decimals": 0,
+          "label": "Compound interest",
+          "role": "primary",
+          "placement": {
+            "mode": "zone",
+            "zone": "main-right"
+          },
+          "size": "small"
+        }
+      ],
+      "beats": [
+        {
+          "id": "compare-b1",
+          "actions": [
+            {
+              "do": "show",
+              "targets": [
+                "s3-title"
+              ],
+              "entrance": "fade"
+            }
+          ]
+        },
+        {
+          "id": "compare-b2",
+          "actions": [
+            {
+              "do": "show",
+              "targets": [
+                "simple"
+              ],
+              "entrance": "draw"
+            },
+            {
+              "do": "show",
+              "targets": [
+                "simple-stat"
+              ],
+              "entrance": "fade"
+            }
+          ]
+        },
+        {
+          "id": "compare-b3",
+          "actions": [
+            {
+              "do": "show",
+              "targets": [
+                "compound"
+              ],
+              "entrance": "draw"
+            },
+            {
+              "do": "show",
+              "targets": [
+                "compound-stat"
+              ],
+              "entrance": "fade"
+            }
+          ]
+        },
+        {
+          "id": "compare-b4",
+          "actions": [
+            {
+              "do": "emphasize",
+              "target": "compound",
+              "emphasis": "pulse",
+              "strength": "strong"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "takeaway",
+      "composition": "equation",
+      "objects": [
+        {
+          "id": "formula",
+          "kind": "equation",
+          "value": "A = P(1+r)^t",
+          "role": "hero",
+          "placement": {
+            "mode": "zone",
+            "zone": "main"
+          }
+        },
+        {
+          "id": "early",
+          "kind": "stat",
+          "from": 10063,
+          "value": 21725,
+          "prefix": "$",
+          "commas": true,
+          "decimals": 0,
+          "label": "The same $1,000, invested 10 years earlier",
+          "placement": {
+            "mode": "zone",
+            "zone": "support"
+          }
+        },
+        {
+          "id": "takeaway",
+          "kind": "text",
+          "text": "Start early. Time does the work.",
+          "textRole": "title",
+          "role": "annotation",
+          "placement": {
+            "mode": "zone",
+            "zone": "footer"
+          }
+        }
+      ],
+      "beats": [
+        {
+          "id": "takeaway-b1",
+          "actions": [
+            {
+              "do": "show",
+              "targets": [
+                "formula"
+              ],
+              "entrance": "draw"
+            }
+          ]
+        },
+        {
+          "id": "takeaway-b2",
+          "actions": [
+            {
+              "do": "show",
+              "targets": [
+                "early"
+              ],
+              "entrance": "fade"
+            },
+            {
+              "do": "emphasize",
+              "target": "early",
+              "emphasis": "punch",
+              "strength": "strong"
+            }
+          ]
+        },
+        {
+          "id": "takeaway-b3",
+          "actions": [
+            {
+              "do": "show",
+              "targets": [
+                "takeaway"
+              ],
+              "entrance": "word-by-word"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

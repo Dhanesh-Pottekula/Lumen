@@ -34,6 +34,29 @@ function numbers(value: string | undefined): number[] {
   return value?.match(/[-+]?(?:\d*\.\d+|\d+\.?\d*)(?:e[-+]?\d+)?/gi)?.map(Number) ?? [];
 }
 
+/**
+ * Forgiving sanitizer: strip any attribute outside the whitelist (e.g. `stroke-dasharray`, `style`,
+ * `class`, event handlers, external `href`) from every element, so a single stray presentation
+ * attribute degrades gracefully instead of rejecting the whole SVG (which would also drop all its
+ * anchors). Structural rules — allowed tags, one root `<svg>`, valid viewBox, size limits — still apply.
+ */
+export function sanitizeSvg(svg: string): string {
+  return svg.replace(/<\s*(\/?)([A-Za-z][\w:-]*)([^>]*)>/g, (_full, closing: string, tag: string, rawAttrs: string) => {
+    if (closing) return `</${tag}>`;
+    const selfClose = /\/\s*$/.test(rawAttrs);
+    const attrs = rawAttrs.replace(/\/\s*$/, "");
+    const kept: string[] = [];
+    for (const found of attrs.matchAll(/([A-Za-z_:][\w:.-]*)\s*=\s*("[^"]*"|'[^']*')/g)) {
+      const name = found[1].toLowerCase();
+      if (name.startsWith("on")) continue; // event handlers
+      if (name === "style" || name === "class" || name === "href" || name === "xlink:href") continue;
+      if (!ALLOWED_ATTRIBUTES.has(name)) continue; // e.g. stroke-dasharray — dropped, not fatal
+      kept.push(`${found[1]}=${found[2]}`);
+    }
+    return `<${tag}${kept.length ? " " + kept.join(" ") : ""}${selfClose ? " /" : ""}>`;
+  });
+}
+
 function markupSafetyError(svg: string, allowRootSvg: boolean): string | undefined {
   if (!svg.trim()) return "SVG markup must not be empty";
   if (svg.length > SIMPLE_JSON_SVG_MAX_MARKUP_LENGTH) return `SVG markup exceeds ${SIMPLE_JSON_SVG_MAX_MARKUP_LENGTH} characters`;
@@ -72,7 +95,7 @@ function markupSafetyError(svg: string, allowRootSvg: boolean): string | undefin
 }
 
 export function svgFragmentError(svg: string): string | undefined {
-  return markupSafetyError(svg, false);
+  return markupSafetyError(sanitizeSvg(svg), false);
 }
 
 interface Box { minX: number; minY: number; maxX: number; maxY: number }
@@ -248,7 +271,8 @@ function rootChildren(inner: string): RootChild[] {
   return stack.length === 0 ? children : [];
 }
 
-export function parseSvgArtwork(svg: string): { value?: ParsedSvgArtwork; error?: string } {
+export function parseSvgArtwork(rawSvg: string): { value?: ParsedSvgArtwork; error?: string } {
+  const svg = sanitizeSvg(rawSvg);
   const safeError = markupSafetyError(svg, true);
   if (safeError) return { error: safeError };
   const root = svg.match(/^\s*<svg\b([^>]*)>([\s\S]*)<\/svg>\s*$/i);
@@ -287,5 +311,5 @@ function escapeAttribute(value: string): string {
 
 export function svgPartMarkup(part: SvgCompositePartSpec): string {
   const [x, y, width, height] = part.bounds;
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${x} ${y} ${width} ${height}" width="${width}" height="${height}" preserveAspectRatio="none" role="img" aria-label="${escapeAttribute(part.id)}">${part.svg}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${x} ${y} ${width} ${height}" width="${width}" height="${height}" preserveAspectRatio="none" role="img" aria-label="${escapeAttribute(part.id)}">${sanitizeSvg(part.svg)}</svg>`;
 }

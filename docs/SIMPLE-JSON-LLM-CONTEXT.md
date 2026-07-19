@@ -89,6 +89,13 @@ that temporary guides disappear; that labels sit on the correct visible part wit
 equations/units/chart values/motion are mutually consistent; and that nothing is clipped, inverted,
 mis-scaled, overlapping unrelated content, or off-frame.
 
+> **⚠️ Warnings are hard failures — this is the #1 surprise.** `compileLessonSpec` may report
+> `valid: true` *with warnings*, but the actual render gate the app uses (`renderLessonSpec` /
+> `renderStrict`) treats **any warning as invalid and refuses to render — a single `LAYOUT_OVERFLOW`
+> of even 2 pixels blanks the whole page.** So "zero errors" is not enough; **zero warnings is the bar.**
+> Almost all warnings are layout overflow/overlap — the fix is always sizing/placement (Appendix A), so
+> **budget every object's box before you emit** (see the pre-flight checklist in §I.9).
+
 ---
 
 ## I.3 Plan before you write
@@ -119,7 +126,7 @@ lesson
         └── actions (show, move, label, camera, attention, effect, …)  ← parallel within a beat
 ```
 
-Minimal complete lesson:
+Minimal complete lesson (compiler-verified — valid, zero warnings):
 
 ```json
 {
@@ -128,25 +135,30 @@ Minimal complete lesson:
   "theme": "blueprint",
   "scenes": [
     {
+      "id": "intro",
       "composition": "equation-plot",
       "objects": [
-        { "id": "title", "kind": "text", "text": "Area under a curve", "role": "hero",
+        { "id": "title", "kind": "text", "text": "Area under a curve", "textRole": "heading", "role": "hero",
           "placement": { "mode": "zone", "zone": "title" } },
-        { "id": "curve", "kind": "curve", "function": "x^2", "domain": [0, 3],
-          "placement": { "mode": "zone", "zone": "main" } }
+        { "id": "curve", "kind": "chart", "chart": "function", "function": "x^2", "xDomain": [0, 3],
+          "yDomain": [0, 9], "axes": true, "placement": { "mode": "zone", "zone": "main" } }
       ],
       "beats": [
-        { "actions": [ { "do": "show", "target": "title" } ] },
-        { "actions": [ { "do": "show", "target": "curve", "pace": "slow" } ] }
+        { "id": "show-title", "actions": [ { "do": "show", "targets": ["title"] } ] },
+        { "id": "draw-curve", "pace": "slow", "actions": [ { "do": "show", "targets": ["curve"], "entrance": "draw" } ] }
       ]
     }
   ]
 }
 ```
 
-Top-level fields: `version` (always `"1"`), `title`, `theme` (see cheat-sheet), optional narration
-metadata, and `scenes[]`. Each scene has a `composition` (a layout intent), `objects[]`, and `beats[]`.
-Full field lists are in Part II §4–§5.
+**Structural must-haves (easy to miss — all enforced by the schema):**
+- **`version`, `title`, and `scenes[]`** at the top; `theme` is optional but recommended.
+- **Every scene needs an `id`; every beat needs an `id`** (unique, `^[a-z][a-z0-9-]*$`). Objects need `id` + `kind`.
+- **`show`/`hide` take `targets` (an array)**; all other actions take `target` (a single string).
+- **`pace` is a BEAT field**, not an action field: `{ "id": "...", "pace": "slow", "actions": [...] }`.
+- A scene has `composition` (a layout intent), `objects[]`, and `beats[]`. Full field lists: Part II §4–§5.
+- The exact, authoritative contract is **Appendix B (the raw JSON Schema)** at the end of this file — when prose and schema disagree, the schema wins. **Appendix A (layout budget)** gives the deterministic box math so you can predict and avoid overflow.
 
 ---
 
@@ -195,6 +207,13 @@ targetable part** named `object.groupId`:
   and **must** be hidden before the scene ends.
 - Only the sanitized tag/attribute subset is allowed; only local `url(#id)` references; timing comes
   from beats, never native SVG animation. Limits: ≤ 48,000 chars, ≤ 220 elements. (Subset in §I.7.)
+- **The attribute whitelist is strict — using a disallowed one REJECTS THE WHOLE SVG.** Common traps
+  that are NOT allowed: **`stroke-dasharray`** (no dashed strokes — use solid, or `opacity` to soften),
+  `style`, `class`, `transform` on targeted groups, `filter`, any `on*` handler, `text`/`tspan` (there
+  is **no text element** — put labels in JSON `text`/`label`/`attention`, never inside the SVG).
+- **A single invalid attribute/tag makes the SVG fail to parse, which means it exposes NO parts.** So an
+  error like *"`neuron.soma` does not expose anchor"* is often NOT a naming bug — it's a symptom that
+  something else in that SVG is invalid. Check the SVG against the whitelist first.
 
 **3. `svg-composite` — advanced normalized artwork (only when you need exact per-part bounds).**
 Parts share one `viewBox`; each part declares its own `bounds`, so parts can't drift and each is a
@@ -209,6 +228,11 @@ does not do.
 Quick chooser: named asset exists → **visual**; custom diagram with a few meaningful parts →
 **svg-artwork**; needs exact bounds / gradients / clips / many independently-addressable parts →
 **svg-composite**; one custom stroke that must draw on or recolor → **vector**.
+
+> **⚠️ Size caution (top cause of overflow):** an `svg-artwork` is **~4× the pixel size of a `visual`
+> asset at the same token** — a `medium` svg-artwork is ~437px wide (half the frame), and even `small`
+> is ~304px. Keep the **viewBox landscape** (≈16:9) or the height explodes. Pick sizes from the concrete
+> pixel tables in **Appendix A**, not by intuition. Want a genuinely small object? Use a `visual` asset.
 
 ---
 
@@ -278,6 +302,18 @@ them; e.g. `\frac`, `\sqrt`, `\sum`, `\int`, Greek letters — full list in the 
 ## I.8 Common mistakes to avoid (maps to compiler diagnostics)
 
 - Targeting an object you never `show`ed, or before its show beat → reference / lifecycle error.
+- **`show`ing an object and targeting its SUB-ANCHOR in the SAME beat** → *"target used before it is
+  shown."* You must `show` the object in an **earlier beat** than any beat whose `attention`/`label`/
+  `camera` points at its part (`ramp.net`, `chart.peak`, `neuron.soma`). Whole-object targets are fine
+  same-beat; part/anchor targets need the object shown in a prior beat.
+- **A sentence on a `role: "hero"` (or `primary`/`support`) object** → `role` sets the DEFAULT SIZE
+  (`hero → hero size` = 72px), which **overrides `textRole`** — so a long sentence renders huge and
+  overflows. For any sentence, set an explicit `size` (`"body"`-length → `"small"`), or keep it off
+  hero-role objects. Titles ≤ 8 words; sentences `body`/`small`.
+- **Long text in a half-width zone** (`main-left`/`main-right` in `split`/`comparison`) → overflow: a
+  half-zone has ~360px of width, so a ~40-char sentence at `small` already spills. Keep half-zone text
+  short, or move the sentence to `footer` (full width).
+- Putting anything but a compact readout in the tiny **`hud`** zone (~180×90) → overflow.
 - A temporary object or `temporaryParts`/`temporary` SVG part left visible at scene end →
   `TEMPORARY_VISUAL_PERSISTS`. Add the `hide`.
 - Orbit/along motion whose authored resting position isn't already on the ring/path (frame zero must
@@ -293,6 +329,58 @@ them; e.g. `\frac`, `\sqrt`, `\sum`, `\int`, Greek letters — full list in the 
 When a diagnostic comes back: fix it at its JSON path; never delete an educationally necessary visual
 to silence a reference error, and never shrink the whole scene to solve overflow — repair the specific
 cause.
+
+---
+
+## I.9 Pre-flight checklist — verify EVERY item before you emit (this is how you land first-try, no repair loop)
+
+The gate rejects on the first violation, and warnings block rendering just like errors. Run this list
+against your draft before outputting. Every item here is something that has silently failed a real
+lesson.
+
+**Structure**
+- [ ] `version: "1"`, `title`, `theme`, and `scenes[]` present.
+- [ ] **Every scene has a unique `id`. Every beat has a unique `id`.** Every object has `id` + `kind`.
+- [ ] IDs match `^[a-z][a-z0-9-]*$`.
+- [ ] `show`/`hide` use **`targets`** (array); all other actions use **`target`** (string). `pace` is on
+      the **beat**, not the action.
+
+**Lifecycle / timing**
+- [ ] Every object is shown before it's targeted. **A part/sub-anchor target (`obj.part`) requires the
+      object to be `show`n in an EARLIER beat** — not the same beat.
+- [ ] Every `temporary` object / `temporaryParts` that becomes visible is `hide`n before scene end.
+- [ ] `orbit`/`along` object's authored resting position is already on the ring/path (use `relative`
+      placement to a center, not the center itself).
+
+**Sizing (no warnings = it renders). Compute each box from Appendix A:**
+- [ ] `svg-artwork` sized with a **landscape viewBox** and `tiny`/`small`/`medium` (NOT large/hero/fill);
+      remember it's ~4× a `visual`. A `medium` svg is ~437px wide.
+- [ ] Want a *small* object → use a **`visual`** asset (≈90px base), not svg-artwork.
+- [ ] **No sentence on a `hero`-role object** (role forces size). Sentences → explicit `size:"small"` +
+      `body`/`caption`; titles ≤ 8 words.
+- [ ] Text in a **half-zone** (`main-left`/`main-right`) is short (≤ ~30 chars); long sentences go in
+      `footer`.
+- [ ] Only a compact readout in `hud`. One main object per zone + a short caption; don't stack big boxes.
+- [ ] Every object's box (Appendix A) fits inside the safe frame **`[8, 8, 912, 422]`** after zone
+      placement + 24px stacking.
+
+**SVG (a single bad thing rejects the whole SVG and kills its anchors)**
+- [ ] Every drawn element is inside a **named root `<g id="…">`**; root `viewBox` present; no bare root
+      shapes, no unnamed root groups.
+- [ ] Only whitelisted tags/attributes. **No `stroke-dasharray`, `style`, `class`, `filter`, `text`/
+      `tspan`, `on*`, or `transform` on a targeted group.** Labels live in JSON, never inside the SVG.
+- [ ] Each named group you target has measurable, untransformed geometry (else `IMPRECISE_SVG_BOUNDS`).
+
+**Content correctness**
+- [ ] Chart payload matches kind: `bar`/`pie`/`donut`→`data`; `line`/`area`/`scatter`→`series`;
+      `function`/`riemann`→`function`. Chart anchors: `.first`/`.last`/`.peak`, `.bar0…`, `.pt0…`.
+- [ ] Expressions use the safe language (`sin(x*0.01745)` ok), not JavaScript.
+- [ ] Equations use only supplied math commands — **`\sin`/`\cos` do NOT exist; write plain `sin`/`cos`**
+      with `\theta`/`\mu` etc. Keep equations short (width ≈ chars × sizeScalar × 0.48).
+- [ ] No token/field/asset/anchor/icon invented — if it isn't in §I.7 or Appendix B, it doesn't exist.
+- [ ] No decorative particles/glow/camera moves; effects only when they encode the subject.
+
+If all boxes are checked, the lesson compiles clean **and** renders with zero warnings on the first try.
 
 ---
 
@@ -2200,3 +2288,4355 @@ This guide describes the implementation in:
 - `src/lessons/simple-json/` — the four complete lesson implementations.
 
 When the implementation changes, update this document in the same change so the human contract remains accurate.
+
+---
+
+# Appendix A — Layout budget (deterministic box math)
+
+Layout is a **pure function** of your lesson — no physical-screen measurement. Every object's box is
+computed from its `kind`, semantic `size`, and text length, then placed at a fixed zone center and
+stacked. That means **you can predict overflow before compiling** and avoid it. These are the actual
+constants from the compiler (`resolve.ts` / `registry.ts`).
+
+## Frame
+- View is **920 × 430**. The **safe frame is `[x0=8, y0=8, x1=912, y1=422]`** (an 8px margin). A box
+  whose edges fall outside it triggers `LAYOUT_OVERFLOW` — the gate's zero-warning rule fails.
+
+## ⚠️ Concrete pixel sizes — pick your size token by THESE (read before choosing a size)
+
+Size tokens are a fixed vocabulary, but **the same token means very different pixel sizes for different
+kinds** — the #1 cause of overflow. In particular, **an `svg-artwork` is ~4× larger than a `visual`
+asset at the same token**: an svg-artwork is sized to be a *main diagram* (base 380px), while a `visual`
+is a *prop* (base ≈90px). Don't size by intuition — a "`small`" svg-artwork is ~300px (a third of the
+screen). Use these precomputed boxes against the **920×430 frame (safe area ≈ 904×414):**
+
+### `svg-artwork` — width = `min(760, 380 × scalar)`, height = width ÷ (viewBox width/height)
+| size | width | height @ landscape 16:9 | height @ square 1:1 | height @ tall 3:4 |
+|---|---:|---:|---:|---:|
+| tiny | 209 | 117 | 209 | 279 |
+| small | 304 | 171 | 304 | 405 |
+| medium | 437 | 246 | 437 | 583 |
+| large | 627 | 352 | 627 | 836 |
+| hero / fill | 760 | 427 | 760 | 1013 |
+
+Rules of thumb: a **single centered diagram → `medium`, landscape viewBox** (437×246, fills `main`). **Two
+side by side → `small`, landscape** (304×171 each). **`large`/`hero`/`fill` almost always overflow** unless
+it's the only object and the viewBox is landscape. **A square or tall viewBox at `medium`+ overflows
+vertically** (height ≥ 437 > 414 safe) — so keep viewBoxes landscape, and give small props a small
+viewBox. (My "seasons" lesson failed because a `large`/`small` Earth used a *tall* 160×210 viewBox → 400–823px tall.)
+
+### `visual` — asset prop ≈ 90×90 × scalar (≈4× smaller than svg-artwork)
+| tiny | small | medium | large | hero | fill |
+|---:|---:|---:|---:|---:|---:|
+| 50×50 | 72×72 | 103×103 | 148×148 | 207×207 | 288×288 |
+Want a *small* on-screen object? Use a `visual` asset, not an svg-artwork.
+
+### `stat` · `chart` · `text`
+- **stat** `[max(100, s×3.4) × s×1.8]`: small ≈ 102×54 · medium ≈ 143×76 · large ≈ 190×101 · hero ≈ 245×130.
+- **chart** `[340×min(s,1.65) × 220×min(s,1.65)]`: small ≈ 272×176 · medium ≈ 391×253 · large+ ≈ 561×363 (capped).
+- **text** height = font×1.35; width = `characters × font × 0.55`. Per role: caption(18px)≈char×10 · body(24px)≈char×13 · title(32px)≈char×18 · **heading/hero(72px)≈char×40**. A 40-char sentence is ~396px at caption but **~1,600px at hero** → **never put a full sentence at `title`/`hero`/`heading` size.** Titles ≤ 8 words; sentences use `body`/`caption`.
+
+### Placement budget
+Same-zone objects stack down (24px gap). A `relative` object (above/below/left-of a target) is offset by
+its own half-size, so a tall object placed above/below a center easily leaves the frame — keep anything
+placed *around* a center to `tiny`/`small`. Budget one main object per zone plus a short caption, or two
+half-width objects for a comparison.
+
+## Step 1 — the size scalar `s`
+Each object gets a scalar from its `size` token and `kind` family:
+
+| size | text | equation | stat | visual-family* | line |
+|---|---:|---:|---:|---:|---:|
+| `tiny` | 14 | 20 | 22 | 0.55 | 2 |
+| `small` | 18 | 26 | 30 | 0.80 | 2.5 |
+| `medium` | 24 | 34 | 42 | 1.15 | 3 |
+| `large` | 32 | 46 | 56 | 1.65 | 4 |
+| `hero` | 42 | 60 | 72 | 2.30 | 5 |
+| `fill` | 52 | 72 | 88 | 3.20 | 6 |
+
+*visual-family = `visual, vector, svg-artwork, svg-composite, shape, curve, chart, legend, map,
+timeline, table, group`.
+
+**Default size** (when `size` is omitted): `role:"hero"`→`hero`; `role:"support"`/`"annotation"`→
+`small`; heading/title text→`large`; `line`→`small`; everything else→`medium`.
+
+## Step 2 — the box `[w, h]` from `s`
+| kind | width | height |
+|---|---|---|
+| `text` | `max(s*2, textLength * s * 0.55)` | `s * 1.35` |
+| `equation` | `max(s*3, valueLength * s * 0.48)` | `s * 1.5` |
+| `stat` | `max(100, s * 3.4)` | `s * 1.8` |
+| `chart` | `340 * min(s, 1.65)` | `220 * min(s, 1.65)` |
+| `curve` | `260 * s` | `160 * s` |
+| `shape` | `72 * s` | `72 * s` |
+| `svg-artwork` | `min(760, 380 * s)` | `width / viewBoxRatio` |
+| `svg-composite` | your `width` | your `height` |
+| `vector` | `width` or `220 * s` | `height` or `140 * s` |
+| `visual` | `assetWidth * s` | `assetHeight * s` (swap if rotated 90°) |
+| `line` | resolved from its two anchors | — |
+
+## Step 3 — placement and stacking
+- The **first** object in a zone is centered at the zone's fixed center `ZONES[composition][zone]`.
+- Each **subsequent** object in the **same zone** stacks below it: `cy = previousBottom + 24 + h/2`
+  (a **24px gap**), centered on the zone's x. `previousBottom` is the prior object's bottom edge.
+- `relative` placement (`above`/`below`/`left-of`/`right-of`/`near` a target) offsets from that target
+  instead; `anchor` pins to it exactly.
+
+**Zone centers** (`[x, y]`) — vary slightly per composition; representative rows:
+
+| composition | title | main | main-left | main-right | support | footer | hud |
+|---|---|---|---|---|---|---|---|
+| `hero` | 460,48 | 460,220 | 300,220 | 620,220 | 460,335 | 460,398 | 785,55 |
+| `data` | 460,38 | 460,218 | 270,218 | 665,218 | 460,350 | 460,400 | 790,54 |
+| `comparison` | 460,42 | 460,215 | 245,215 | 675,215 | 460,350 | 460,370 | 790,54 |
+| `equation-plot` | 460,40 | 300,220 | 255,220 | 680,215 | 680,330 | 460,398 | 790,54 |
+| `equation` | 460,48 | 460,205 | 280,205 | 640,205 | 460,315 | 460,398 | 785,55 |
+| `split` | 460,42 | 460,220 | 245,220 | 675,220 | 460,340 | 460,397 | 790,54 |
+| `map` | 460,36 | 455,220 | 250,220 | 680,220 | 760,335 | 460,370 | 790,54 |
+
+(Other compositions — `hero-diagram`, `overview-detail`, `process`, `timeline`, `table`,
+`custom-relational` — follow the same shape; title ≈ y40, main ≈ y215, footer ≈ y398, hud ≈ [790,54].)
+
+## Worked example — predicting (and fixing) an overflow
+In a `comparison` scene, `main-right` center is `[675, 215]`. Put a `medium` chart there, then a stat
+below it in the same zone:
+
+- **chart** (`medium`, chart scalar `1.15`): box `[340*1.15, 220*1.15] = [391, 253]`. First in zone →
+  `cy = 215`, bottom = `215 + 253/2 = 341.5`.
+- **stat** at default `medium` (stat scalar `42`): box `[max(100, 142.8), 75.6] = [142.8, 75.6]`.
+  Stacked → `cy = 341.5 + 24 + 37.8 = 403.3`, **bottom = 441.1 > 422 → overflow by 19.1.** ✗
+- **Fix:** make the stat `small` (scalar `30`): box `[102, 54]` → `cy = 341.5 + 24 + 27 = 392.5`,
+  bottom = `419.5 < 422`. ✓
+
+That is exactly the arithmetic the compiler runs. Budget your zones this way — one large object per zone
+plus at most a small caption — and you'll clear the zero-warning gate on the first try.
+
+
+
+---
+
+# Appendix B — The raw JSON Schema (authoritative)
+
+This is the exact `LESSON_SPEC_SCHEMA` the compiler validates against (via Ajv, `strict: true`,
+`additionalProperties: false`). When this and the prose disagree, THIS wins. It is the ground truth for
+required fields (including scene/beat `id`), enums, numeric limits, and the chart/motion discriminated
+unions.
+
+```json
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://lumen.local/schemas/lesson-spec-v1.json",
+  "type": "object",
+  "$defs": {
+    "object": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "kind",
+            "text"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_-]*$"
+            },
+            "role": {
+              "type": "string",
+              "enum": [
+                "background",
+                "support",
+                "primary",
+                "hero",
+                "annotation",
+                "hud"
+              ]
+            },
+            "placement": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "zone"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "zone"
+                    },
+                    "zone": {
+                      "type": "string",
+                      "enum": [
+                        "title",
+                        "main",
+                        "main-left",
+                        "main-right",
+                        "support",
+                        "footer",
+                        "background",
+                        "overlay",
+                        "hud"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "target",
+                    "relation"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "relative"
+                    },
+                    "target": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "relation": {
+                      "type": "string",
+                      "enum": [
+                        "above",
+                        "below",
+                        "left-of",
+                        "right-of",
+                        "near"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "target"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "anchor"
+                    },
+                    "target": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              ]
+            },
+            "size": {
+              "type": "string",
+              "enum": [
+                "tiny",
+                "small",
+                "medium",
+                "large",
+                "hero",
+                "fill"
+              ]
+            },
+            "initial": {
+              "type": "string",
+              "enum": [
+                "hidden",
+                "visible"
+              ]
+            },
+            "space": {
+              "type": "string",
+              "enum": [
+                "world",
+                "screen"
+              ]
+            },
+            "temporary": {
+              "type": "boolean"
+            },
+            "kind": {
+              "const": "text"
+            },
+            "text": {
+              "type": "string",
+              "minLength": 1
+            },
+            "textRole": {
+              "type": "string",
+              "enum": [
+                "heading",
+                "title",
+                "body",
+                "bullet",
+                "caption"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_-]*$"
+            },
+            "role": {
+              "type": "string",
+              "enum": [
+                "background",
+                "support",
+                "primary",
+                "hero",
+                "annotation",
+                "hud"
+              ]
+            },
+            "placement": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "zone"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "zone"
+                    },
+                    "zone": {
+                      "type": "string",
+                      "enum": [
+                        "title",
+                        "main",
+                        "main-left",
+                        "main-right",
+                        "support",
+                        "footer",
+                        "background",
+                        "overlay",
+                        "hud"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "target",
+                    "relation"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "relative"
+                    },
+                    "target": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "relation": {
+                      "type": "string",
+                      "enum": [
+                        "above",
+                        "below",
+                        "left-of",
+                        "right-of",
+                        "near"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "target"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "anchor"
+                    },
+                    "target": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              ]
+            },
+            "size": {
+              "type": "string",
+              "enum": [
+                "tiny",
+                "small",
+                "medium",
+                "large",
+                "hero",
+                "fill"
+              ]
+            },
+            "initial": {
+              "type": "string",
+              "enum": [
+                "hidden",
+                "visible"
+              ]
+            },
+            "space": {
+              "type": "string",
+              "enum": [
+                "world",
+                "screen"
+              ]
+            },
+            "temporary": {
+              "type": "boolean"
+            },
+            "kind": {
+              "const": "equation"
+            },
+            "value": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "kind",
+            "value"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_-]*$"
+            },
+            "role": {
+              "type": "string",
+              "enum": [
+                "background",
+                "support",
+                "primary",
+                "hero",
+                "annotation",
+                "hud"
+              ]
+            },
+            "placement": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "zone"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "zone"
+                    },
+                    "zone": {
+                      "type": "string",
+                      "enum": [
+                        "title",
+                        "main",
+                        "main-left",
+                        "main-right",
+                        "support",
+                        "footer",
+                        "background",
+                        "overlay",
+                        "hud"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "target",
+                    "relation"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "relative"
+                    },
+                    "target": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "relation": {
+                      "type": "string",
+                      "enum": [
+                        "above",
+                        "below",
+                        "left-of",
+                        "right-of",
+                        "near"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "target"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "anchor"
+                    },
+                    "target": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              ]
+            },
+            "size": {
+              "type": "string",
+              "enum": [
+                "tiny",
+                "small",
+                "medium",
+                "large",
+                "hero",
+                "fill"
+              ]
+            },
+            "initial": {
+              "type": "string",
+              "enum": [
+                "hidden",
+                "visible"
+              ]
+            },
+            "space": {
+              "type": "string",
+              "enum": [
+                "world",
+                "screen"
+              ]
+            },
+            "temporary": {
+              "type": "boolean"
+            },
+            "kind": {
+              "const": "stat"
+            },
+            "value": {
+              "type": "number"
+            },
+            "from": {
+              "type": "number"
+            },
+            "unit": {
+              "type": "string"
+            },
+            "label": {
+              "type": "string"
+            },
+            "decimals": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 8
+            },
+            "commas": {
+              "type": "boolean"
+            },
+            "prefix": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "kind",
+            "asset"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_-]*$"
+            },
+            "role": {
+              "type": "string",
+              "enum": [
+                "background",
+                "support",
+                "primary",
+                "hero",
+                "annotation",
+                "hud"
+              ]
+            },
+            "placement": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "zone"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "zone"
+                    },
+                    "zone": {
+                      "type": "string",
+                      "enum": [
+                        "title",
+                        "main",
+                        "main-left",
+                        "main-right",
+                        "support",
+                        "footer",
+                        "background",
+                        "overlay",
+                        "hud"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "target",
+                    "relation"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "relative"
+                    },
+                    "target": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "relation": {
+                      "type": "string",
+                      "enum": [
+                        "above",
+                        "below",
+                        "left-of",
+                        "right-of",
+                        "near"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "target"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "anchor"
+                    },
+                    "target": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              ]
+            },
+            "size": {
+              "type": "string",
+              "enum": [
+                "tiny",
+                "small",
+                "medium",
+                "large",
+                "hero",
+                "fill"
+              ]
+            },
+            "initial": {
+              "type": "string",
+              "enum": [
+                "hidden",
+                "visible"
+              ]
+            },
+            "space": {
+              "type": "string",
+              "enum": [
+                "world",
+                "screen"
+              ]
+            },
+            "temporary": {
+              "type": "boolean"
+            },
+            "kind": {
+              "const": "visual"
+            },
+            "asset": {
+              "type": "string",
+              "minLength": 1
+            },
+            "color": {
+              "type": "string",
+              "minLength": 1
+            },
+            "orientation": {
+              "type": "string",
+              "enum": [
+                "left",
+                "right",
+                "up",
+                "down"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "kind",
+            "d"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_-]*$"
+            },
+            "role": {
+              "type": "string",
+              "enum": [
+                "background",
+                "support",
+                "primary",
+                "hero",
+                "annotation",
+                "hud"
+              ]
+            },
+            "placement": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "zone"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "zone"
+                    },
+                    "zone": {
+                      "type": "string",
+                      "enum": [
+                        "title",
+                        "main",
+                        "main-left",
+                        "main-right",
+                        "support",
+                        "footer",
+                        "background",
+                        "overlay",
+                        "hud"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "target",
+                    "relation"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "relative"
+                    },
+                    "target": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "relation": {
+                      "type": "string",
+                      "enum": [
+                        "above",
+                        "below",
+                        "left-of",
+                        "right-of",
+                        "near"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "target"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "anchor"
+                    },
+                    "target": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              ]
+            },
+            "size": {
+              "type": "string",
+              "enum": [
+                "tiny",
+                "small",
+                "medium",
+                "large",
+                "hero",
+                "fill"
+              ]
+            },
+            "initial": {
+              "type": "string",
+              "enum": [
+                "hidden",
+                "visible"
+              ]
+            },
+            "space": {
+              "type": "string",
+              "enum": [
+                "world",
+                "screen"
+              ]
+            },
+            "temporary": {
+              "type": "boolean"
+            },
+            "kind": {
+              "const": "vector"
+            },
+            "d": {
+              "type": "string",
+              "minLength": 1,
+              "pattern": "\\S"
+            },
+            "fill": {
+              "type": "string",
+              "minLength": 1
+            },
+            "stroke": {
+              "type": "string",
+              "minLength": 1
+            },
+            "strokeWidth": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 20
+            },
+            "width": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 920
+            },
+            "height": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 430
+            },
+            "scale": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 10
+            },
+            "rotate": {
+              "type": "number",
+              "minimum": -6.284,
+              "maximum": 6.284
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "kind",
+            "viewBox",
+            "width",
+            "height",
+            "parts"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_-]*$"
+            },
+            "role": {
+              "type": "string",
+              "enum": [
+                "background",
+                "support",
+                "primary",
+                "hero",
+                "annotation",
+                "hud"
+              ]
+            },
+            "placement": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "zone"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "zone"
+                    },
+                    "zone": {
+                      "type": "string",
+                      "enum": [
+                        "title",
+                        "main",
+                        "main-left",
+                        "main-right",
+                        "support",
+                        "footer",
+                        "background",
+                        "overlay",
+                        "hud"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "target",
+                    "relation"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "relative"
+                    },
+                    "target": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "relation": {
+                      "type": "string",
+                      "enum": [
+                        "above",
+                        "below",
+                        "left-of",
+                        "right-of",
+                        "near"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "target"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "anchor"
+                    },
+                    "target": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              ]
+            },
+            "size": {
+              "type": "string",
+              "enum": [
+                "tiny",
+                "small",
+                "medium",
+                "large",
+                "hero",
+                "fill"
+              ]
+            },
+            "initial": {
+              "type": "string",
+              "enum": [
+                "hidden",
+                "visible"
+              ]
+            },
+            "space": {
+              "type": "string",
+              "enum": [
+                "world",
+                "screen"
+              ]
+            },
+            "temporary": {
+              "type": "boolean"
+            },
+            "kind": {
+              "const": "svg-composite"
+            },
+            "viewBox": {
+              "type": "array",
+              "minItems": 4,
+              "maxItems": 4,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                }
+              ]
+            },
+            "width": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 920
+            },
+            "height": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 430
+            },
+            "parts": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 32,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "svg",
+                  "bounds"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z][A-Za-z0-9_-]*$"
+                  },
+                  "svg": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 24000,
+                    "pattern": "\\S"
+                  },
+                  "bounds": {
+                    "type": "array",
+                    "minItems": 4,
+                    "maxItems": 4,
+                    "prefixItems": [
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "number"
+                      },
+                      {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      },
+                      {
+                        "type": "number",
+                        "exclusiveMinimum": 0
+                      }
+                    ]
+                  },
+                  "initial": {
+                    "type": "string",
+                    "enum": [
+                      "hidden",
+                      "visible"
+                    ]
+                  },
+                  "temporary": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "kind",
+            "svg"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_-]*$"
+            },
+            "role": {
+              "type": "string",
+              "enum": [
+                "background",
+                "support",
+                "primary",
+                "hero",
+                "annotation",
+                "hud"
+              ]
+            },
+            "placement": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "zone"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "zone"
+                    },
+                    "zone": {
+                      "type": "string",
+                      "enum": [
+                        "title",
+                        "main",
+                        "main-left",
+                        "main-right",
+                        "support",
+                        "footer",
+                        "background",
+                        "overlay",
+                        "hud"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "target",
+                    "relation"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "relative"
+                    },
+                    "target": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "relation": {
+                      "type": "string",
+                      "enum": [
+                        "above",
+                        "below",
+                        "left-of",
+                        "right-of",
+                        "near"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "target"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "anchor"
+                    },
+                    "target": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              ]
+            },
+            "size": {
+              "type": "string",
+              "enum": [
+                "tiny",
+                "small",
+                "medium",
+                "large",
+                "hero",
+                "fill"
+              ]
+            },
+            "initial": {
+              "type": "string",
+              "enum": [
+                "hidden",
+                "visible"
+              ]
+            },
+            "space": {
+              "type": "string",
+              "enum": [
+                "world",
+                "screen"
+              ]
+            },
+            "temporary": {
+              "type": "boolean"
+            },
+            "kind": {
+              "const": "svg-artwork"
+            },
+            "svg": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 48000,
+              "pattern": "\\S"
+            },
+            "temporaryParts": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 32,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9_-]*$"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "kind",
+            "from",
+            "to"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_-]*$"
+            },
+            "role": {
+              "type": "string",
+              "enum": [
+                "background",
+                "support",
+                "primary",
+                "hero",
+                "annotation",
+                "hud"
+              ]
+            },
+            "placement": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "zone"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "zone"
+                    },
+                    "zone": {
+                      "type": "string",
+                      "enum": [
+                        "title",
+                        "main",
+                        "main-left",
+                        "main-right",
+                        "support",
+                        "footer",
+                        "background",
+                        "overlay",
+                        "hud"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "target",
+                    "relation"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "relative"
+                    },
+                    "target": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "relation": {
+                      "type": "string",
+                      "enum": [
+                        "above",
+                        "below",
+                        "left-of",
+                        "right-of",
+                        "near"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "target"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "anchor"
+                    },
+                    "target": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              ]
+            },
+            "size": {
+              "type": "string",
+              "enum": [
+                "tiny",
+                "small",
+                "medium",
+                "large",
+                "hero",
+                "fill"
+              ]
+            },
+            "initial": {
+              "type": "string",
+              "enum": [
+                "hidden",
+                "visible"
+              ]
+            },
+            "space": {
+              "type": "string",
+              "enum": [
+                "world",
+                "screen"
+              ]
+            },
+            "temporary": {
+              "type": "boolean"
+            },
+            "kind": {
+              "const": "line"
+            },
+            "from": {
+              "type": "string",
+              "minLength": 1
+            },
+            "to": {
+              "type": "string",
+              "minLength": 1
+            },
+            "form": {
+              "type": "string",
+              "enum": [
+                "straight",
+                "elbow",
+                "curved",
+                "arrow",
+                "traced"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "kind",
+            "shape"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_-]*$"
+            },
+            "role": {
+              "type": "string",
+              "enum": [
+                "background",
+                "support",
+                "primary",
+                "hero",
+                "annotation",
+                "hud"
+              ]
+            },
+            "placement": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "zone"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "zone"
+                    },
+                    "zone": {
+                      "type": "string",
+                      "enum": [
+                        "title",
+                        "main",
+                        "main-left",
+                        "main-right",
+                        "support",
+                        "footer",
+                        "background",
+                        "overlay",
+                        "hud"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "target",
+                    "relation"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "relative"
+                    },
+                    "target": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "relation": {
+                      "type": "string",
+                      "enum": [
+                        "above",
+                        "below",
+                        "left-of",
+                        "right-of",
+                        "near"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "target"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "anchor"
+                    },
+                    "target": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              ]
+            },
+            "size": {
+              "type": "string",
+              "enum": [
+                "tiny",
+                "small",
+                "medium",
+                "large",
+                "hero",
+                "fill"
+              ]
+            },
+            "initial": {
+              "type": "string",
+              "enum": [
+                "hidden",
+                "visible"
+              ]
+            },
+            "space": {
+              "type": "string",
+              "enum": [
+                "world",
+                "screen"
+              ]
+            },
+            "temporary": {
+              "type": "boolean"
+            },
+            "kind": {
+              "const": "shape"
+            },
+            "shape": {
+              "type": "string",
+              "enum": [
+                "circle",
+                "polygon",
+                "star",
+                "heart",
+                "disc"
+              ]
+            },
+            "sides": {
+              "type": "integer",
+              "minimum": 3,
+              "maximum": 12
+            },
+            "appearance": {
+              "type": "string",
+              "enum": [
+                "solid",
+                "outline",
+                "shaded"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "kind",
+            "x",
+            "y"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_-]*$"
+            },
+            "role": {
+              "type": "string",
+              "enum": [
+                "background",
+                "support",
+                "primary",
+                "hero",
+                "annotation",
+                "hud"
+              ]
+            },
+            "placement": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "zone"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "zone"
+                    },
+                    "zone": {
+                      "type": "string",
+                      "enum": [
+                        "title",
+                        "main",
+                        "main-left",
+                        "main-right",
+                        "support",
+                        "footer",
+                        "background",
+                        "overlay",
+                        "hud"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "target",
+                    "relation"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "relative"
+                    },
+                    "target": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "relation": {
+                      "type": "string",
+                      "enum": [
+                        "above",
+                        "below",
+                        "left-of",
+                        "right-of",
+                        "near"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "target"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "anchor"
+                    },
+                    "target": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              ]
+            },
+            "size": {
+              "type": "string",
+              "enum": [
+                "tiny",
+                "small",
+                "medium",
+                "large",
+                "hero",
+                "fill"
+              ]
+            },
+            "initial": {
+              "type": "string",
+              "enum": [
+                "hidden",
+                "visible"
+              ]
+            },
+            "space": {
+              "type": "string",
+              "enum": [
+                "world",
+                "screen"
+              ]
+            },
+            "temporary": {
+              "type": "boolean"
+            },
+            "kind": {
+              "const": "curve"
+            },
+            "x": {
+              "type": "string",
+              "minLength": 1
+            },
+            "y": {
+              "type": "string",
+              "minLength": 1
+            },
+            "domain": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ]
+            },
+            "appearance": {
+              "type": "string",
+              "enum": [
+                "solid",
+                "dashed"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "kind",
+            "chart",
+            "data"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_-]*$"
+            },
+            "role": {
+              "type": "string",
+              "enum": [
+                "background",
+                "support",
+                "primary",
+                "hero",
+                "annotation",
+                "hud"
+              ]
+            },
+            "placement": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "zone"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "zone"
+                    },
+                    "zone": {
+                      "type": "string",
+                      "enum": [
+                        "title",
+                        "main",
+                        "main-left",
+                        "main-right",
+                        "support",
+                        "footer",
+                        "background",
+                        "overlay",
+                        "hud"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "target",
+                    "relation"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "relative"
+                    },
+                    "target": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "relation": {
+                      "type": "string",
+                      "enum": [
+                        "above",
+                        "below",
+                        "left-of",
+                        "right-of",
+                        "near"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "target"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "anchor"
+                    },
+                    "target": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              ]
+            },
+            "size": {
+              "type": "string",
+              "enum": [
+                "tiny",
+                "small",
+                "medium",
+                "large",
+                "hero",
+                "fill"
+              ]
+            },
+            "initial": {
+              "type": "string",
+              "enum": [
+                "hidden",
+                "visible"
+              ]
+            },
+            "space": {
+              "type": "string",
+              "enum": [
+                "world",
+                "screen"
+              ]
+            },
+            "temporary": {
+              "type": "boolean"
+            },
+            "kind": {
+              "const": "chart"
+            },
+            "chart": {
+              "type": "string",
+              "enum": [
+                "bar",
+                "pie",
+                "donut"
+              ]
+            },
+            "data": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "label",
+                  "value"
+                ],
+                "properties": {
+                  "label": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "value": {
+                    "type": "number"
+                  },
+                  "category": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            },
+            "xDomain": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ]
+            },
+            "yDomain": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ]
+            },
+            "axes": {
+              "type": "boolean"
+            },
+            "xLabel": {
+              "type": "string"
+            },
+            "yLabel": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "kind",
+            "chart",
+            "series"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_-]*$"
+            },
+            "role": {
+              "type": "string",
+              "enum": [
+                "background",
+                "support",
+                "primary",
+                "hero",
+                "annotation",
+                "hud"
+              ]
+            },
+            "placement": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "zone"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "zone"
+                    },
+                    "zone": {
+                      "type": "string",
+                      "enum": [
+                        "title",
+                        "main",
+                        "main-left",
+                        "main-right",
+                        "support",
+                        "footer",
+                        "background",
+                        "overlay",
+                        "hud"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "target",
+                    "relation"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "relative"
+                    },
+                    "target": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "relation": {
+                      "type": "string",
+                      "enum": [
+                        "above",
+                        "below",
+                        "left-of",
+                        "right-of",
+                        "near"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "target"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "anchor"
+                    },
+                    "target": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              ]
+            },
+            "size": {
+              "type": "string",
+              "enum": [
+                "tiny",
+                "small",
+                "medium",
+                "large",
+                "hero",
+                "fill"
+              ]
+            },
+            "initial": {
+              "type": "string",
+              "enum": [
+                "hidden",
+                "visible"
+              ]
+            },
+            "space": {
+              "type": "string",
+              "enum": [
+                "world",
+                "screen"
+              ]
+            },
+            "temporary": {
+              "type": "boolean"
+            },
+            "kind": {
+              "const": "chart"
+            },
+            "chart": {
+              "type": "string",
+              "enum": [
+                "line",
+                "area",
+                "scatter"
+              ]
+            },
+            "series": {
+              "type": "array",
+              "minItems": 2,
+              "items": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 2,
+                "prefixItems": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ]
+              }
+            },
+            "xDomain": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ]
+            },
+            "yDomain": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ]
+            },
+            "axes": {
+              "type": "boolean"
+            },
+            "xLabel": {
+              "type": "string"
+            },
+            "yLabel": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "kind",
+            "chart",
+            "function"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_-]*$"
+            },
+            "role": {
+              "type": "string",
+              "enum": [
+                "background",
+                "support",
+                "primary",
+                "hero",
+                "annotation",
+                "hud"
+              ]
+            },
+            "placement": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "zone"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "zone"
+                    },
+                    "zone": {
+                      "type": "string",
+                      "enum": [
+                        "title",
+                        "main",
+                        "main-left",
+                        "main-right",
+                        "support",
+                        "footer",
+                        "background",
+                        "overlay",
+                        "hud"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "target",
+                    "relation"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "relative"
+                    },
+                    "target": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "relation": {
+                      "type": "string",
+                      "enum": [
+                        "above",
+                        "below",
+                        "left-of",
+                        "right-of",
+                        "near"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "target"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "anchor"
+                    },
+                    "target": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              ]
+            },
+            "size": {
+              "type": "string",
+              "enum": [
+                "tiny",
+                "small",
+                "medium",
+                "large",
+                "hero",
+                "fill"
+              ]
+            },
+            "initial": {
+              "type": "string",
+              "enum": [
+                "hidden",
+                "visible"
+              ]
+            },
+            "space": {
+              "type": "string",
+              "enum": [
+                "world",
+                "screen"
+              ]
+            },
+            "temporary": {
+              "type": "boolean"
+            },
+            "kind": {
+              "const": "chart"
+            },
+            "chart": {
+              "const": "function"
+            },
+            "function": {
+              "type": "string",
+              "minLength": 1
+            },
+            "xDomain": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ]
+            },
+            "yDomain": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ]
+            },
+            "axes": {
+              "type": "boolean"
+            },
+            "xLabel": {
+              "type": "string"
+            },
+            "yLabel": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "kind",
+            "chart",
+            "function"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_-]*$"
+            },
+            "role": {
+              "type": "string",
+              "enum": [
+                "background",
+                "support",
+                "primary",
+                "hero",
+                "annotation",
+                "hud"
+              ]
+            },
+            "placement": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "zone"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "zone"
+                    },
+                    "zone": {
+                      "type": "string",
+                      "enum": [
+                        "title",
+                        "main",
+                        "main-left",
+                        "main-right",
+                        "support",
+                        "footer",
+                        "background",
+                        "overlay",
+                        "hud"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "target",
+                    "relation"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "relative"
+                    },
+                    "target": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "relation": {
+                      "type": "string",
+                      "enum": [
+                        "above",
+                        "below",
+                        "left-of",
+                        "right-of",
+                        "near"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "target"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "anchor"
+                    },
+                    "target": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              ]
+            },
+            "size": {
+              "type": "string",
+              "enum": [
+                "tiny",
+                "small",
+                "medium",
+                "large",
+                "hero",
+                "fill"
+              ]
+            },
+            "initial": {
+              "type": "string",
+              "enum": [
+                "hidden",
+                "visible"
+              ]
+            },
+            "space": {
+              "type": "string",
+              "enum": [
+                "world",
+                "screen"
+              ]
+            },
+            "temporary": {
+              "type": "boolean"
+            },
+            "kind": {
+              "const": "chart"
+            },
+            "chart": {
+              "const": "riemann"
+            },
+            "function": {
+              "type": "string",
+              "minLength": 1
+            },
+            "rectangles": {
+              "type": "string",
+              "enum": [
+                "few",
+                "several",
+                "many",
+                "dense"
+              ]
+            },
+            "xDomain": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ]
+            },
+            "yDomain": {
+              "type": "array",
+              "minItems": 2,
+              "maxItems": 2,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ]
+            },
+            "axes": {
+              "type": "boolean"
+            },
+            "xLabel": {
+              "type": "string"
+            },
+            "yLabel": {
+              "type": "string"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "kind",
+            "categories"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_-]*$"
+            },
+            "role": {
+              "type": "string",
+              "enum": [
+                "background",
+                "support",
+                "primary",
+                "hero",
+                "annotation",
+                "hud"
+              ]
+            },
+            "placement": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "zone"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "zone"
+                    },
+                    "zone": {
+                      "type": "string",
+                      "enum": [
+                        "title",
+                        "main",
+                        "main-left",
+                        "main-right",
+                        "support",
+                        "footer",
+                        "background",
+                        "overlay",
+                        "hud"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "target",
+                    "relation"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "relative"
+                    },
+                    "target": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "relation": {
+                      "type": "string",
+                      "enum": [
+                        "above",
+                        "below",
+                        "left-of",
+                        "right-of",
+                        "near"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "target"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "anchor"
+                    },
+                    "target": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              ]
+            },
+            "size": {
+              "type": "string",
+              "enum": [
+                "tiny",
+                "small",
+                "medium",
+                "large",
+                "hero",
+                "fill"
+              ]
+            },
+            "initial": {
+              "type": "string",
+              "enum": [
+                "hidden",
+                "visible"
+              ]
+            },
+            "space": {
+              "type": "string",
+              "enum": [
+                "world",
+                "screen"
+              ]
+            },
+            "temporary": {
+              "type": "boolean"
+            },
+            "kind": {
+              "const": "legend"
+            },
+            "categories": {
+              "type": "array",
+              "minItems": 1,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "kind",
+            "features"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_-]*$"
+            },
+            "role": {
+              "type": "string",
+              "enum": [
+                "background",
+                "support",
+                "primary",
+                "hero",
+                "annotation",
+                "hud"
+              ]
+            },
+            "placement": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "zone"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "zone"
+                    },
+                    "zone": {
+                      "type": "string",
+                      "enum": [
+                        "title",
+                        "main",
+                        "main-left",
+                        "main-right",
+                        "support",
+                        "footer",
+                        "background",
+                        "overlay",
+                        "hud"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "target",
+                    "relation"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "relative"
+                    },
+                    "target": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "relation": {
+                      "type": "string",
+                      "enum": [
+                        "above",
+                        "below",
+                        "left-of",
+                        "right-of",
+                        "near"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "target"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "anchor"
+                    },
+                    "target": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              ]
+            },
+            "size": {
+              "type": "string",
+              "enum": [
+                "tiny",
+                "small",
+                "medium",
+                "large",
+                "hero",
+                "fill"
+              ]
+            },
+            "initial": {
+              "type": "string",
+              "enum": [
+                "hidden",
+                "visible"
+              ]
+            },
+            "space": {
+              "type": "string",
+              "enum": [
+                "world",
+                "screen"
+              ]
+            },
+            "temporary": {
+              "type": "boolean"
+            },
+            "kind": {
+              "const": "map"
+            },
+            "features": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "id",
+                  "rings"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z][A-Za-z0-9_-]*$"
+                  },
+                  "rings": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "array",
+                      "minItems": 3,
+                      "items": {
+                        "type": "array",
+                        "minItems": 2,
+                        "maxItems": 2,
+                        "prefixItems": [
+                          {
+                            "type": "number",
+                            "minimum": -180,
+                            "maximum": 180
+                          },
+                          {
+                            "type": "number",
+                            "minimum": -90,
+                            "maximum": 90
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "category": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              }
+            },
+            "markers": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "lon",
+                  "lat"
+                ],
+                "properties": {
+                  "lon": {
+                    "type": "number",
+                    "minimum": -180,
+                    "maximum": 180
+                  },
+                  "lat": {
+                    "type": "number",
+                    "minimum": -90,
+                    "maximum": 90
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "icon": {
+                    "type": "string",
+                    "enum": [
+                      "arrow",
+                      "check",
+                      "cross",
+                      "plus",
+                      "minus",
+                      "star",
+                      "heart",
+                      "circle",
+                      "square",
+                      "triangle",
+                      "gear",
+                      "bolt",
+                      "drop",
+                      "sun",
+                      "leaf",
+                      "flame",
+                      "factory",
+                      "home",
+                      "person",
+                      "book",
+                      "flask",
+                      "atom",
+                      "clock",
+                      "pin",
+                      "warning",
+                      "info",
+                      "search",
+                      "cloud",
+                      "mountain",
+                      "seed"
+                    ]
+                  },
+                  "category": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "places": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "name",
+                  "lon",
+                  "lat"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "lon": {
+                    "type": "number",
+                    "minimum": -180,
+                    "maximum": 180
+                  },
+                  "lat": {
+                    "type": "number",
+                    "minimum": -90,
+                    "maximum": 90
+                  }
+                }
+              }
+            },
+            "flows": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "from",
+                  "to"
+                ],
+                "properties": {
+                  "from": {
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      {
+                        "type": "array",
+                        "minItems": 2,
+                        "maxItems": 2,
+                        "prefixItems": [
+                          {
+                            "type": "number",
+                            "minimum": -180,
+                            "maximum": 180
+                          },
+                          {
+                            "type": "number",
+                            "minimum": -90,
+                            "maximum": 90
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "to": {
+                    "oneOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      {
+                        "type": "array",
+                        "minItems": 2,
+                        "maxItems": 2,
+                        "prefixItems": [
+                          {
+                            "type": "number",
+                            "minimum": -180,
+                            "maximum": 180
+                          },
+                          {
+                            "type": "number",
+                            "minimum": -90,
+                            "maximum": 90
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  "category": {
+                    "type": "string"
+                  },
+                  "bend": {
+                    "type": "string",
+                    "enum": [
+                      "left",
+                      "right",
+                      "direct"
+                    ]
+                  },
+                  "pace": {
+                    "type": "string",
+                    "enum": [
+                      "instant",
+                      "quick",
+                      "normal",
+                      "slow",
+                      "dramatic"
+                    ]
+                  }
+                }
+              }
+            },
+            "outline": {
+              "type": "array",
+              "minItems": 3,
+              "items": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 2,
+                "prefixItems": [
+                  {
+                    "type": "number",
+                    "minimum": -180,
+                    "maximum": 180
+                  },
+                  {
+                    "type": "number",
+                    "minimum": -90,
+                    "maximum": 90
+                  }
+                ]
+              }
+            },
+            "growth": {
+              "type": "array",
+              "minItems": 2,
+              "items": {
+                "type": "array",
+                "minItems": 3,
+                "items": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "prefixItems": [
+                    {
+                      "type": "number",
+                      "minimum": -180,
+                      "maximum": 180
+                    },
+                    {
+                      "type": "number",
+                      "minimum": -90,
+                      "maximum": 90
+                    }
+                  ]
+                }
+              }
+            },
+            "growthPace": {
+              "type": "string",
+              "enum": [
+                "instant",
+                "quick",
+                "normal",
+                "slow",
+                "dramatic"
+              ]
+            },
+            "stagger": {
+              "type": "string",
+              "enum": [
+                "instant",
+                "quick",
+                "normal",
+                "slow",
+                "dramatic"
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "kind",
+            "from",
+            "to"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_-]*$"
+            },
+            "role": {
+              "type": "string",
+              "enum": [
+                "background",
+                "support",
+                "primary",
+                "hero",
+                "annotation",
+                "hud"
+              ]
+            },
+            "placement": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "zone"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "zone"
+                    },
+                    "zone": {
+                      "type": "string",
+                      "enum": [
+                        "title",
+                        "main",
+                        "main-left",
+                        "main-right",
+                        "support",
+                        "footer",
+                        "background",
+                        "overlay",
+                        "hud"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "target",
+                    "relation"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "relative"
+                    },
+                    "target": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "relation": {
+                      "type": "string",
+                      "enum": [
+                        "above",
+                        "below",
+                        "left-of",
+                        "right-of",
+                        "near"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "target"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "anchor"
+                    },
+                    "target": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              ]
+            },
+            "size": {
+              "type": "string",
+              "enum": [
+                "tiny",
+                "small",
+                "medium",
+                "large",
+                "hero",
+                "fill"
+              ]
+            },
+            "initial": {
+              "type": "string",
+              "enum": [
+                "hidden",
+                "visible"
+              ]
+            },
+            "space": {
+              "type": "string",
+              "enum": [
+                "world",
+                "screen"
+              ]
+            },
+            "temporary": {
+              "type": "boolean"
+            },
+            "kind": {
+              "const": "timeline"
+            },
+            "from": {
+              "type": "number"
+            },
+            "to": {
+              "type": "number"
+            },
+            "events": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "at",
+                  "label"
+                ],
+                "properties": {
+                  "at": {
+                    "type": "number"
+                  },
+                  "label": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "side": {
+                    "type": "string",
+                    "enum": [
+                      "above",
+                      "below"
+                    ]
+                  }
+                }
+              }
+            },
+            "eras": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "from",
+                  "to",
+                  "label"
+                ],
+                "properties": {
+                  "from": {
+                    "type": "number"
+                  },
+                  "to": {
+                    "type": "number"
+                  },
+                  "label": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "category": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "playhead": {
+              "oneOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "from",
+                    "to"
+                  ],
+                  "properties": {
+                    "from": {
+                      "type": "number"
+                    },
+                    "to": {
+                      "type": "number"
+                    },
+                    "pace": {
+                      "type": "string",
+                      "enum": [
+                        "instant",
+                        "quick",
+                        "normal",
+                        "slow",
+                        "dramatic"
+                      ]
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "kind",
+            "rows"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_-]*$"
+            },
+            "role": {
+              "type": "string",
+              "enum": [
+                "background",
+                "support",
+                "primary",
+                "hero",
+                "annotation",
+                "hud"
+              ]
+            },
+            "placement": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "zone"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "zone"
+                    },
+                    "zone": {
+                      "type": "string",
+                      "enum": [
+                        "title",
+                        "main",
+                        "main-left",
+                        "main-right",
+                        "support",
+                        "footer",
+                        "background",
+                        "overlay",
+                        "hud"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "target",
+                    "relation"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "relative"
+                    },
+                    "target": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "relation": {
+                      "type": "string",
+                      "enum": [
+                        "above",
+                        "below",
+                        "left-of",
+                        "right-of",
+                        "near"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "target"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "anchor"
+                    },
+                    "target": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              ]
+            },
+            "size": {
+              "type": "string",
+              "enum": [
+                "tiny",
+                "small",
+                "medium",
+                "large",
+                "hero",
+                "fill"
+              ]
+            },
+            "initial": {
+              "type": "string",
+              "enum": [
+                "hidden",
+                "visible"
+              ]
+            },
+            "space": {
+              "type": "string",
+              "enum": [
+                "world",
+                "screen"
+              ]
+            },
+            "temporary": {
+              "type": "boolean"
+            },
+            "kind": {
+              "const": "table"
+            },
+            "rows": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "header": {
+              "type": "boolean"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "kind",
+            "children"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "pattern": "^[A-Za-z][A-Za-z0-9_-]*$"
+            },
+            "role": {
+              "type": "string",
+              "enum": [
+                "background",
+                "support",
+                "primary",
+                "hero",
+                "annotation",
+                "hud"
+              ]
+            },
+            "placement": {
+              "oneOf": [
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "zone"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "zone"
+                    },
+                    "zone": {
+                      "type": "string",
+                      "enum": [
+                        "title",
+                        "main",
+                        "main-left",
+                        "main-right",
+                        "support",
+                        "footer",
+                        "background",
+                        "overlay",
+                        "hud"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "target",
+                    "relation"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "relative"
+                    },
+                    "target": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "relation": {
+                      "type": "string",
+                      "enum": [
+                        "above",
+                        "below",
+                        "left-of",
+                        "right-of",
+                        "near"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "mode",
+                    "target"
+                  ],
+                  "properties": {
+                    "mode": {
+                      "const": "anchor"
+                    },
+                    "target": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              ]
+            },
+            "size": {
+              "type": "string",
+              "enum": [
+                "tiny",
+                "small",
+                "medium",
+                "large",
+                "hero",
+                "fill"
+              ]
+            },
+            "initial": {
+              "type": "string",
+              "enum": [
+                "hidden",
+                "visible"
+              ]
+            },
+            "space": {
+              "type": "string",
+              "enum": [
+                "world",
+                "screen"
+              ]
+            },
+            "temporary": {
+              "type": "boolean"
+            },
+            "kind": {
+              "const": "group"
+            },
+            "children": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/object"
+              }
+            },
+            "layout": {
+              "type": "string",
+              "enum": [
+                "row",
+                "stack",
+                "grid"
+              ]
+            },
+            "columns": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 6
+            },
+            "build": {
+              "type": "string",
+              "enum": [
+                "instant",
+                "quick",
+                "normal",
+                "slow",
+                "dramatic"
+              ]
+            },
+            "clip": {
+              "type": "boolean"
+            }
+          }
+        }
+      ]
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "title",
+    "theme",
+    "scenes"
+  ],
+  "properties": {
+    "version": {
+      "const": "1"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "theme": {
+      "type": "string",
+      "enum": [
+        "textbook",
+        "parchment",
+        "blueprint",
+        "chalkboard"
+      ]
+    },
+    "scenes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "composition",
+          "objects",
+          "beats"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9_-]*$"
+          },
+          "composition": {
+            "type": "string",
+            "enum": [
+              "hero",
+              "hero-diagram",
+              "equation",
+              "overview-detail",
+              "split",
+              "comparison",
+              "process",
+              "equation-plot",
+              "data",
+              "map",
+              "timeline",
+              "table",
+              "custom-relational"
+            ]
+          },
+          "objects": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "$ref": "#/$defs/object"
+            }
+          },
+          "beats": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "id",
+                "actions"
+              ],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z][A-Za-z0-9_-]*$"
+                },
+                "pace": {
+                  "type": "string",
+                  "enum": [
+                    "instant",
+                    "quick",
+                    "normal",
+                    "slow",
+                    "dramatic"
+                  ]
+                },
+                "actions": {
+                  "type": "array",
+                  "minItems": 1,
+                  "items": {
+                    "oneOf": [
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "do",
+                          "targets"
+                        ],
+                        "properties": {
+                          "do": {
+                            "const": "show"
+                          },
+                          "targets": {
+                            "type": "array",
+                            "minItems": 1,
+                            "uniqueItems": true,
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "entrance": {
+                            "type": "string",
+                            "enum": [
+                              "instant",
+                              "fade",
+                              "draw",
+                              "wipe",
+                              "iris",
+                              "slam",
+                              "word-by-word",
+                              "typewriter",
+                              "scramble"
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "do",
+                          "targets"
+                        ],
+                        "properties": {
+                          "do": {
+                            "const": "hide"
+                          },
+                          "targets": {
+                            "type": "array",
+                            "minItems": 1,
+                            "uniqueItems": true,
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "exit": {
+                            "type": "string",
+                            "enum": [
+                              "instant",
+                              "fade",
+                              "erase",
+                              "wipe",
+                              "iris",
+                              "dissolve",
+                              "slide",
+                              "shrink"
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "do",
+                          "target"
+                        ],
+                        "properties": {
+                          "do": {
+                            "const": "camera"
+                          },
+                          "target": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "shot": {
+                            "type": "string",
+                            "enum": [
+                              "overview",
+                              "wide",
+                              "medium",
+                              "close",
+                              "detail"
+                            ]
+                          },
+                          "movement": {
+                            "type": "string",
+                            "enum": [
+                              "cut",
+                              "move",
+                              "push"
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "do",
+                          "target",
+                          "text"
+                        ],
+                        "properties": {
+                          "do": {
+                            "const": "label"
+                          },
+                          "target": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "text": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "title": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "style": {
+                            "type": "string",
+                            "enum": [
+                              "text",
+                              "pill",
+                              "rect",
+                              "tag",
+                              "bubble",
+                              "badge"
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "do",
+                          "stops"
+                        ],
+                        "properties": {
+                          "do": {
+                            "const": "tour"
+                          },
+                          "labelMode": {
+                            "const": "one-at-a-time"
+                          },
+                          "returnTo": {
+                            "const": "overview"
+                          },
+                          "stops": {
+                            "type": "array",
+                            "minItems": 1,
+                            "items": {
+                              "type": "object",
+                              "additionalProperties": false,
+                              "required": [
+                                "target",
+                                "label"
+                              ],
+                              "properties": {
+                                "target": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "label": {
+                                  "type": "string",
+                                  "minLength": 1
+                                },
+                                "shot": {
+                                  "type": "string",
+                                  "enum": [
+                                    "overview",
+                                    "wide",
+                                    "medium",
+                                    "close",
+                                    "detail"
+                                  ]
+                                }
+                              }
+                            }
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "do",
+                          "target",
+                          "motion",
+                          "to"
+                        ],
+                        "properties": {
+                          "do": {
+                            "const": "motion"
+                          },
+                          "target": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "motion": {
+                            "const": "move"
+                          },
+                          "to": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "do",
+                          "target",
+                          "motion",
+                          "to"
+                        ],
+                        "properties": {
+                          "do": {
+                            "const": "motion"
+                          },
+                          "target": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "motion": {
+                            "const": "fall"
+                          },
+                          "to": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "bounce": {
+                            "type": "string",
+                            "enum": [
+                              "none",
+                              "soft",
+                              "strong"
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "do",
+                          "target",
+                          "motion",
+                          "around"
+                        ],
+                        "properties": {
+                          "do": {
+                            "const": "motion"
+                          },
+                          "target": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "motion": {
+                            "const": "orbit"
+                          },
+                          "around": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "orbit": {
+                            "type": "string",
+                            "enum": [
+                              "small",
+                              "medium",
+                              "large"
+                            ]
+                          },
+                          "turns": {
+                            "type": "string",
+                            "enum": [
+                              "half",
+                              "one",
+                              "two",
+                              "many"
+                            ]
+                          },
+                          "direction": {
+                            "type": "string",
+                            "enum": [
+                              "clockwise",
+                              "counterclockwise"
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "do",
+                          "target",
+                          "motion",
+                          "along"
+                        ],
+                        "properties": {
+                          "do": {
+                            "const": "motion"
+                          },
+                          "target": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "motion": {
+                            "const": "along"
+                          },
+                          "along": {
+                            "type": "string",
+                            "minLength": 1
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "do",
+                          "target",
+                          "motion"
+                        ],
+                        "properties": {
+                          "do": {
+                            "const": "motion"
+                          },
+                          "target": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "motion": {
+                            "const": "spin"
+                          },
+                          "direction": {
+                            "type": "string",
+                            "enum": [
+                              "clockwise",
+                              "counterclockwise"
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "do",
+                          "target",
+                          "emphasis"
+                        ],
+                        "properties": {
+                          "do": {
+                            "const": "emphasize"
+                          },
+                          "target": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "emphasis": {
+                            "type": "string",
+                            "enum": [
+                              "punch",
+                              "shake",
+                              "pulse",
+                              "wiggle"
+                            ]
+                          },
+                          "strength": {
+                            "type": "string",
+                            "enum": [
+                              "subtle",
+                              "normal",
+                              "strong"
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "do",
+                          "target",
+                          "verb"
+                        ],
+                        "properties": {
+                          "do": {
+                            "const": "attention"
+                          },
+                          "target": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "verb": {
+                            "type": "string",
+                            "enum": [
+                              "callout",
+                              "highlight",
+                              "spotlight",
+                              "dim",
+                              "box",
+                              "brackets",
+                              "encircle",
+                              "converge",
+                              "spark",
+                              "vignette",
+                              "rings"
+                            ]
+                          },
+                          "from": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "text": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "side": {
+                            "type": "string",
+                            "enum": [
+                              "auto",
+                              "north",
+                              "south",
+                              "east",
+                              "west"
+                            ]
+                          },
+                          "route": {
+                            "type": "string",
+                            "enum": [
+                              "auto",
+                              "straight",
+                              "elbow",
+                              "curve"
+                            ]
+                          },
+                          "style": {
+                            "type": "string",
+                            "enum": [
+                              "text",
+                              "pill",
+                              "rect",
+                              "tag",
+                              "bubble",
+                              "badge"
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "do",
+                          "target",
+                          "verb",
+                          "from"
+                        ],
+                        "properties": {
+                          "do": {
+                            "const": "attention"
+                          },
+                          "target": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "verb": {
+                            "const": "pointer"
+                          },
+                          "from": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "text": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "side": {
+                            "type": "string",
+                            "enum": [
+                              "auto",
+                              "north",
+                              "south",
+                              "east",
+                              "west"
+                            ]
+                          },
+                          "route": {
+                            "type": "string",
+                            "enum": [
+                              "auto",
+                              "straight",
+                              "elbow",
+                              "curve"
+                            ]
+                          },
+                          "style": {
+                            "type": "string",
+                            "enum": [
+                              "text",
+                              "pill",
+                              "rect",
+                              "tag",
+                              "bubble",
+                              "badge"
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "do",
+                          "effect",
+                          "target"
+                        ],
+                        "properties": {
+                          "do": {
+                            "const": "effect"
+                          },
+                          "effect": {
+                            "const": "particles"
+                          },
+                          "target": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "preset": {
+                            "type": "string",
+                            "enum": [
+                              "fire",
+                              "smoke",
+                              "sparks",
+                              "rain",
+                              "snow",
+                              "dust",
+                              "confetti",
+                              "energy"
+                            ]
+                          },
+                          "intensity": {
+                            "type": "string",
+                            "enum": [
+                              "subtle",
+                              "normal",
+                              "strong"
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "do",
+                          "effect",
+                          "target"
+                        ],
+                        "properties": {
+                          "do": {
+                            "const": "effect"
+                          },
+                          "effect": {
+                            "const": "glow"
+                          },
+                          "target": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "intensity": {
+                            "type": "string",
+                            "enum": [
+                              "subtle",
+                              "normal",
+                              "strong"
+                            ]
+                          }
+                        }
+                      },
+                      {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "required": [
+                          "do",
+                          "effect",
+                          "from",
+                          "to"
+                        ],
+                        "properties": {
+                          "do": {
+                            "const": "effect"
+                          },
+                          "effect": {
+                            "const": "flow"
+                          },
+                          "from": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "to": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "intensity": {
+                            "type": "string",
+                            "enum": [
+                              "subtle",
+                              "normal",
+                              "strong"
+                            ]
+                          }
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+```

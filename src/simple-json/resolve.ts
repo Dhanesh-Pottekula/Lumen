@@ -312,6 +312,14 @@ function resolveReferenceBox(target: string, objects: Map<string, ResolvedObject
   return split > 0 ? objects.get(target.slice(0, split))?.box : undefined;
 }
 
+// Safe frame the compiler keeps every object inside (view 920×430, 8px inset). Used to auto-fit and
+// clamp object boxes so a mis-sized or mis-placed object degrades gracefully instead of overflowing.
+const FIT_MAX_W = 920 - 16;
+const FIT_MAX_H = 430 - 16;
+const FRAME_MIN = 8;
+const FRAME_MAX_X = 912;
+const FRAME_MAX_Y = 422;
+
 function resolveObjects(scene: SceneSpec): ResolvedObject[] {
   const counts = new Map<ZoneToken, number>();
   const zoneBottom = new Map<ZoneToken, number>();
@@ -320,8 +328,13 @@ function resolveObjects(scene: SceneSpec): ResolvedObject[] {
     const count = counts.get(zone) ?? 0;
     counts.set(zone, count + 1);
     const base = ZONES[scene.composition][zone];
-    const size = resolveSize(defaultSize(source), source.kind) ?? 1;
-    const measured = dimensions(source, size);
+    const size0 = resolveSize(defaultSize(source), source.kind) ?? 1;
+    const measured0 = dimensions(source, size0);
+    // Auto-fit: if the object is bigger than the usable frame (920×430 minus an 8px inset), scale its
+    // size and box down so it always fits — overflow degrades to a smaller object instead of failing.
+    const fit = source.kind === "line" ? 1 : Math.min(1, FIT_MAX_W / measured0[0], FIT_MAX_H / measured0[1]);
+    const size = fit < 1 ? size0 * fit : size0;
+    const measured: [number, number] = fit < 1 ? [measured0[0] * fit, measured0[1] * fit] : measured0;
     const previousBottom = zoneBottom.get(zone);
     const cy = previousBottom === undefined ? base[1] : previousBottom + 24 + measured[1] / 2;
     const position: Point = [base[0], cy];
@@ -373,6 +386,72 @@ function resolveObjects(scene: SceneSpec): ResolvedObject[] {
     placed.add(object.id);
   };
   objects.forEach(place);
+
+  // Final clamp: nudge any box that still pokes outside the safe frame back inside (each already fits
+  // after the per-object auto-fit, so a shift is always enough). Overflow can no longer occur.
+  for (const object of objects) {
+    if (object.source.kind === "line") continue;
+    const { x, y, w, h } = object.box;
+    let nx = x;
+    let ny = y;
+    if (nx < FRAME_MIN) nx = FRAME_MIN;
+    if (ny < FRAME_MIN) ny = FRAME_MIN;
+    if (nx + w > FRAME_MAX_X) nx = Math.max(FRAME_MIN, FRAME_MAX_X - w);
+    if (ny + h > FRAME_MAX_Y) ny = Math.max(FRAME_MIN, FRAME_MAX_Y - h);
+    if (nx !== x || ny !== y) {
+      object.position = [nx + w / 2, ny + h / 2];
+      object.box = makeBox(object.position, [w, h]);
+    }
+  }
+
+  // Auto-separate overlapping content objects: nudge each significantly-overlapping pair apart along
+  // the vertical axis, then re-clamp. The engine arranges the layout itself instead of erroring; any
+  // residual overlap after this is cosmetic and tolerated by the render gate. Skips lightweight overlays
+  // (background/annotation/hud/screen), lines, and intentionally-attached pairs (relative/anchor).
+  const skipSeparation = (o: ResolvedObject) =>
+    o.source.kind === "line" || o.source.role === "background" || o.source.role === "annotation"
+    || o.source.role === "hud" || o.source.space === "screen";
+  const attached = (a: ResolvedObject, b: ResolvedObject) => {
+    const p = a.source.placement;
+    return (p?.mode === "anchor" || p?.mode === "relative") && (p.target === b.id || p.target.startsWith(`${b.id}.`));
+  };
+  for (let iteration = 0; iteration < 6; iteration++) {
+    let adjusted = false;
+    for (let i = 0; i < objects.length; i++) {
+      for (let j = i + 1; j < objects.length; j++) {
+        const a = objects[i];
+        const b = objects[j];
+        if (skipSeparation(a) || skipSeparation(b) || attached(a, b) || attached(b, a)) continue;
+        const overlapX = Math.min(a.box.x + a.box.w, b.box.x + b.box.w) - Math.max(a.box.x, b.box.x);
+        const overlapY = Math.min(a.box.y + a.box.h, b.box.y + b.box.h) - Math.max(a.box.y, b.box.y);
+        if (overlapX <= 1 || overlapY <= 1) continue;
+        if (overlapX * overlapY < Math.min(a.box.w * a.box.h, b.box.w * b.box.h) * 0.12) continue; // ignore slivers
+        const shift = overlapY / 2 + 3;
+        const upper = a.box.y <= b.box.y ? a : b;
+        const lower = upper === a ? b : a;
+        upper.position = [upper.position[0], upper.position[1] - shift];
+        lower.position = [lower.position[0], lower.position[1] + shift];
+        upper.box = makeBox(upper.position, [upper.box.w, upper.box.h]);
+        lower.box = makeBox(lower.position, [lower.box.w, lower.box.h]);
+        adjusted = true;
+      }
+    }
+    for (const object of objects) {
+      if (object.source.kind === "line") continue;
+      const { x, y, w, h } = object.box;
+      let nx = x;
+      let ny = y;
+      if (nx < FRAME_MIN) nx = FRAME_MIN;
+      if (ny < FRAME_MIN) ny = FRAME_MIN;
+      if (nx + w > FRAME_MAX_X) nx = Math.max(FRAME_MIN, FRAME_MAX_X - w);
+      if (ny + h > FRAME_MAX_Y) ny = Math.max(FRAME_MIN, FRAME_MAX_Y - h);
+      if (nx !== x || ny !== y) {
+        object.position = [nx + w / 2, ny + h / 2];
+        object.box = makeBox(object.position, [w, h]);
+      }
+    }
+    if (!adjusted) break;
+  }
 
   for (const parent of [...objects]) {
     const definition = svgDefinition(parent.source);
