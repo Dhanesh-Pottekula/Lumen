@@ -597,10 +597,24 @@ The theme supplies semantic colors. Authors choose roles and categories, not hex
 |---|---:|---|---|---|
 | `id` | yes | string | valid ID | Unique scene name. |
 | `composition` | yes | string | one composition token | Layout strategy for the scene. |
+| `narration` | no | string | the teacher's spoken words for this scene | Voice-over that explains THIS scene's visuals. All scenes' narration, in order, becomes one synthesized audio; each scene's spoken span sets its minimum on-screen time (scene ≥ its narration, a little longer, never shorter). See §5.2. |
 | `objects` | yes | array | at least one object | Content available in this scene. |
 | `beats` | yes | array | at least one beat | Ordered animation and explanation steps. |
 
-Scenes play in the order listed. A scene's duration is calculated from its beats; authors do not enter seconds.
+Scenes play in the order listed. A scene's duration is calculated from its beats; authors do not enter seconds. When a scene has `narration`, its duration is raised to at least the time that narration takes to speak — a little longer, never shorter — with any extra time held on the final composed frame while the voice-over finishes.
+
+### 5.2 Narration — teach with the picture, not over it
+
+`narration` is the voice you'd use standing beside the student, pointing at the screen. It is optional, but a lesson that has it *feels* like a lesson; one that doesn't is a silent slideshow. Write it as prose (full sentences, spoken aloud), not labels.
+
+The narration and the visuals are one performance — write them together so the words land on the moment they describe:
+
+- **Say what is appearing, as it appears.** Order the sentences to match the beats. When a beat draws the airfoil, the narration for that moment is about the airfoil. "Look at the top of the wing — it's curved and longer" while the curve draws reads as one thing; the same line over a finished static frame reads as filler.
+- **Point, don't recite.** Use the second person and deictic language that ties ear to eye: *"notice…", "watch what happens when…", "follow this arrow…", "here's the key."* You are directing attention to something visible.
+- **One idea, building.** Each scene's narration proves that scene's single claim and hands off to the next. Curiosity → reveal → payoff. Open a scene with the question the visual is about to answer; close it having answered it.
+- **Warm and plain.** Short sentences next to longer ones for rhythm. No jargon dumped without a picture behind it. Contractions are fine. A beat of anticipation before a reveal ("So how does 400 tonnes stay up? …The answer is the shape of the wing.") is worth more than another fact.
+- **Length is timing.** Because the scene lasts at least as long as its narration, the amount you write *is* how long the scene stays on screen. Give a rich scene more words; a quick beat, fewer. Roughly 2.5–3 words per second of screen time. Don't pad to fill, and don't cram — write what the moment deserves, and the scene sizes itself.
+- **Continuity across scenes.** The narration is read as one continuous take, so end and begin scenes so they flow ("…and that push is lift." → "But there's a second way a wing makes lift…"). Callbacks to the anchor object tie the whole lesson together.
 
 ### 5.1 Compositions
 

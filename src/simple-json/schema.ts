@@ -376,6 +376,7 @@ export const LESSON_SPEC_SCHEMA = {
         properties: {
           id,
           composition: enumOf("hero", "hero-diagram", "equation", "overview-detail", "split", "comparison", "process", "equation-plot", "data", "map", "timeline", "table", "custom-relational"),
+          narration: { type: "string", minLength: 1 },
           objects: {
             type: "array",
             minItems: 1,

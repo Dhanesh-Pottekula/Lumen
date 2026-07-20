@@ -40,6 +40,10 @@ Don't jump to scene 1. First design the *visual argument*:
    then *quantify* it as a *chart*, then *apply* it to a real object. Three angles on one truth beats one.
 5. **Sequence as a build-up:** hook/question → reveal the mechanism → quantify it → apply it → show a
    consequence or contrast → recap the whole chain. Each scene proves one claim and sets up the next.
+6. **Voice the whole thing as you sequence it.** Don't design the pictures and bolt words on afterward —
+   hear the teacher talking through each beat as you place it. The narration (see the dedicated section
+   below) is timed to the animation in the final video, so it must be written *with* the visuals, not over
+   them.
 
 ## Director's playbook (the moves that create depth)
 
@@ -97,6 +101,37 @@ Brief it like an animator:
 
 End each script with a single **object-lifecycle table** (every object · IN · OUT).
 
+## Write the narration WITH the picture (this is what makes it feel amazing)
+
+Every scene has a `VO:` line — the teacher's spoken words. It is not a caption or an afterthought; it is
+**half the lesson**, and in the final video it is a real voice that plays *locked to the animation*. The
+whole experience lives or dies here. Write the words and the visuals as **one performance**, so the voice
+lands on the exact moment it describes.
+
+- **Narrate the reveal as it happens.** The sentence and the thing it describes appear together. When the
+  beat draws the airfoil, the VO for that moment is *about* the airfoil — "look at the top of the wing, it's
+  curved and longer" *as the curve draws on*. The same words over an already-finished frame are dead air.
+- **Point with your voice.** Second person and "look / notice / watch what happens / follow this arrow /
+  here's the key." You are standing beside the student pointing at the screen — the words send the eye to
+  the right place at the right time.
+- **Curiosity → reveal → payoff, every scene.** Open on the question the visual is about to answer; hold a
+  beat of anticipation before the reveal; close having paid it off. *"So how does 400 tonnes stay up? …The
+  secret is the shape of the wing."* Anticipation beats another fact.
+- **Warm, plain, spoken.** Contractions, short sentences beside longer ones for rhythm, no jargon without a
+  picture behind it. Read it aloud in your head — if it sounds like a textbook, rewrite it as a person
+  talking.
+- **Length is the scene's clock.** The scene stays on screen at least as long as its narration takes to
+  speak (a little longer, never shorter). So the amount of VO you write *is* how long the scene lasts —
+  ~2.5–3 words per second. Give a rich reveal more words; a quick beat fewer. Don't pad, don't cram.
+- **One continuous take.** All scenes' VO is spoken as one flow, so end and begin scenes so they hand off
+  ("…and that push is lift." → "But there's a second way a wing makes lift…"). Callbacks to the anchor
+  object stitch the lesson together.
+
+Brief each scene's VO to ride its beats, e.g.:
+> *VO (rides the beats): [wing draws] "Look closely at a wing — it isn't a flat plank. The top is curved and
+> longer." [air splits] "As it cuts through the air, the flow splits…" [top flow speeds up] "…and the air up
+> top has farther to go, so it races ahead."*
+
 ## Format
 
 ```
@@ -107,7 +142,8 @@ End each script with a single **object-lifecycle table** (every object · IN · 
 Goal: <the one claim this scene proves>.
 Sees: <2–4 sentences of concrete visual prose>.
 Elements: <each object — IN / position / behavior / OUT>.
-VO: "<the teacher's narration>".
+VO: "<the teacher's spoken narration for this scene — sentences that ride the beats above, pointing the
+     student at each thing as it appears; sized to how long the scene should last>".
 
 ... more scenes ...
 

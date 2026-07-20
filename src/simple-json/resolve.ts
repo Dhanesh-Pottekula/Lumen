@@ -516,7 +516,7 @@ function resolveAction(action: ActionSpec, start: number, paceToken: PaceToken):
   return { kind: action.do, source: action, start, end: start + duration, duration };
 }
 
-function resolveScene(scene: SceneSpec, theme: ResolvedScene["theme"]): ResolvedScene {
+function resolveScene(scene: SceneSpec, theme: ResolvedScene["theme"], floor?: number): ResolvedScene {
   let cursor = 0;
   const beats = scene.beats.map((beat): ResolvedBeat => {
     const paceToken = beat.pace ?? "normal";
@@ -527,10 +527,18 @@ function resolveScene(scene: SceneSpec, theme: ResolvedScene["theme"]): Resolved
     cursor = end;
     return resolved;
   });
-  return { id: scene.id, composition: scene.composition, theme, objects: resolveObjects(scene), beats, duration: cursor };
+  // Narration floor: a narrated scene lasts at least as long as its spoken lines (a little longer, never
+  // shorter). Any time beyond the paced beats is a trailing hold on the final composed frame while the
+  // narrator finishes — authored motion keeps its speed rather than being stretched.
+  const duration = floor !== undefined ? Math.max(cursor, floor) : cursor;
+  return { id: scene.id, composition: scene.composition, theme, objects: resolveObjects(scene), beats, duration };
 }
 
-export function resolveLesson(spec: LessonSpec): ResolvedLesson {
+export function resolveLesson(spec: LessonSpec, sceneFloors?: Map<string, number>): ResolvedLesson {
   const theme = resolveTheme(spec.theme)!;
-  return { version: spec.version, title: spec.title, scenes: spec.scenes.map((scene) => resolveScene(scene, theme)) };
+  return {
+    version: spec.version,
+    title: spec.title,
+    scenes: spec.scenes.map((scene) => resolveScene(scene, theme, sceneFloors?.get(scene.id))),
+  };
 }

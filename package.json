@@ -10,7 +10,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@cartesia/cartesia-js": "^3.3.0",
     "ajv": "^8.20.0",
+    "mp4-muxer": "^5.2.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },

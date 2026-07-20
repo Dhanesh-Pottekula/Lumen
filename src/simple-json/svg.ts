@@ -123,6 +123,8 @@ function pathBox(d: string): InferredBox | undefined {
   let command = "";
   let x = 0; let y = 0; let sx = 0; let sy = 0;
   let conservative = false;
+  let lastQCtrl: [number, number] | null = null; // previous quadratic control point, for smooth 't'
+  let lastCCtrl: [number, number] | null = null; // previous cubic second control point, for smooth 's'
   const isCommand = (value: string) => /^[A-Za-z]$/.test(value);
   const read = () => {
     const value = Number(tokens[index++]);
@@ -138,31 +140,50 @@ function pathBox(d: string): InferredBox | undefined {
       const lower = command.toLowerCase();
       const relative = command === lower;
       if (lower === "z") {
-        x = sx; y = sy; point(x, y); command = ""; continue;
+        x = sx; y = sy; point(x, y); command = ""; lastQCtrl = null; lastCCtrl = null; continue;
       }
       if (lower === "h") {
-        x = relative ? x + read() : read(); point(x, y); continue;
+        x = relative ? x + read() : read(); point(x, y); lastQCtrl = null; lastCCtrl = null; continue;
       }
       if (lower === "v") {
-        y = relative ? y + read() : read(); point(x, y); continue;
+        y = relative ? y + read() : read(); point(x, y); lastQCtrl = null; lastCCtrl = null; continue;
       }
-      if (lower === "m" || lower === "l" || lower === "t") {
+      if (lower === "m" || lower === "l") {
         const [nx, ny] = endpoint(read(), read(), relative);
         x = nx; y = ny; point(x, y);
         if (lower === "m") { sx = x; sy = y; command = relative ? "l" : "L"; }
-        if (lower === "t") conservative = true;
+        lastQCtrl = null; lastCCtrl = null;
         continue;
+      }
+      if (lower === "t") {
+        // Smooth quadratic: the control point is the reflection of the previous quadratic control about
+        // the current point (or the current point itself if the previous command was not a q/t). Capturing
+        // it is what keeps a wave's troughs inside the computed bounds instead of being cropped.
+        const ctrl: [number, number] = lastQCtrl ? [2 * x - lastQCtrl[0], 2 * y - lastQCtrl[1]] : [x, y];
+        const end = endpoint(read(), read(), relative);
+        point(...ctrl); point(...end);
+        lastQCtrl = ctrl; lastCCtrl = null; [x, y] = end; conservative = true; continue;
+      }
+      if (lower === "q") {
+        const control = endpoint(read(), read(), relative);
+        const end = endpoint(read(), read(), relative);
+        point(...control); point(...end);
+        lastQCtrl = control; lastCCtrl = null; [x, y] = end; conservative = true; continue;
       }
       if (lower === "c") {
         const c1 = endpoint(read(), read(), relative);
         const c2 = endpoint(read(), read(), relative);
         const end = endpoint(read(), read(), relative);
-        point(...c1); point(...c2); point(...end); [x, y] = end; conservative = true; continue;
+        point(...c1); point(...c2); point(...end);
+        lastCCtrl = c2; lastQCtrl = null; [x, y] = end; conservative = true; continue;
       }
-      if (lower === "s" || lower === "q") {
-        const control = endpoint(read(), read(), relative);
+      if (lower === "s") {
+        // Smooth cubic: the first control is the reflection of the previous cubic second control.
+        const c1: [number, number] = lastCCtrl ? [2 * x - lastCCtrl[0], 2 * y - lastCCtrl[1]] : [x, y];
+        const c2 = endpoint(read(), read(), relative);
         const end = endpoint(read(), read(), relative);
-        point(...control); point(...end); [x, y] = end; conservative = true; continue;
+        point(...c1); point(...c2); point(...end);
+        lastCCtrl = c2; lastQCtrl = null; [x, y] = end; conservative = true; continue;
       }
       if (lower === "a") {
         const rx = Math.abs(read()); const ry = Math.abs(read());
@@ -170,7 +191,7 @@ function pathBox(d: string): InferredBox | undefined {
         const end = endpoint(read(), read(), relative);
         point(x - rx, y - ry); point(x + rx, y + ry);
         point(end[0] - rx, end[1] - ry); point(end[0] + rx, end[1] + ry);
-        point(...end); [x, y] = end; conservative = true; continue;
+        point(...end); [x, y] = end; conservative = true; lastQCtrl = null; lastCCtrl = null; continue;
       }
       return undefined;
     }

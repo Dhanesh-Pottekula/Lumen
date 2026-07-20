@@ -30,6 +30,8 @@ export interface VisualLessonPlan {
     visualEvidence: string[];
     changeOverTime: string;
     labels: string[];
+    /** The teacher's spoken voice-over for the scene: sentences that explain this scene's visuals in sync. */
+    narration: string;
     facts: string[];
     sourceUrls: string[];
     units: string[];
@@ -49,7 +51,8 @@ Rules:
 7. State factual quantities with units and keep equations, charts, labels, and motion mutually consistent.
 8. Do not invent facts or citations. Associate factual claims with URLs supplied in the request; leave sourceUrls empty when the request provides none.
 9. Obey the supplied complexityBudget. Count simultaneously visible focal/supporting visuals, not decorative background layers.
-10. Return only a JSON VisualLessonPlan with title, audience, objective, and scenes. Each scene needs claim, visualEvidence, changeOverTime, labels, facts, sourceUrls, and units.`;
+10. Plan each scene's narration: the teacher's spoken voice-over that explains that scene's visuals as they appear. It proves the scene's claim in the second person ("notice", "watch"), opens on the question the visual answers, and pays it off. Its length sets the scene's on-screen time, so size it to the moment (about 2.5 to 3 words per second); scenes flow as one continuous take.
+11. Return only a JSON VisualLessonPlan with title, audience, objective, and scenes. Each scene needs claim, visualEvidence, changeOverTime, labels, narration, facts, sourceUrls, and units.`;
 
 export const SIMPLE_JSON_AUTHOR_SYSTEM_PROMPT = `You author deterministic animated lessons using Lumen Simple JSON version 1.
 Return one complete JSON object and no Markdown, comments, imports, JavaScript, or prose.
@@ -69,8 +72,14 @@ Correctness contract:
 12. Mathematical curves use the supplied safe expression language, not JavaScript. Equations use only supplied math-text commands.
 13. Use attention and effects only when they communicate a teaching relationship. Never add decorative particles or repeated glow.
 14. One scene teaches one claim. Show the evidence first, then label or summarize it. Prefer visual change over sentences describing change.
-15. Keep text concise: headings under 8 words, labels under 12 words, callout bodies under 18 words.
-16. The result is not ready until compilation returns zero errors and zero warnings.`;
+15. Keep on-screen text concise: headings under 8 words, labels under 12 words, callout bodies under 18 words.
+16. The result is not ready until compilation returns zero errors and zero warnings.
+
+Narration (the spoken voice-over, distinct from on-screen text):
+17. Put each scene's spoken narration in its scene-level narration field: full sentences a teacher says aloud that explain THAT scene's visuals. This is prose, not labels, and is separate from on-screen text.
+18. Write the narration to ride the beats: order the sentences so each lands as the object it describes appears. Point the ear at the eye with the second person ("notice", "watch what happens", "here is the key"). Open on the question the scene answers; pay it off before it ends.
+19. Narration length sets the scene's minimum on-screen time (the scene lasts at least as long as its narration, a little longer, never shorter), so size it to the moment at about 2.5 to 3 words per second. Do not pad to fill or cram to save time.
+20. All scenes' narration is spoken as one continuous take: end and begin adjacent scenes so they flow, and call back to the anchor subject. Keep it warm, plain, and spoken, never a textbook read.`;
 
 export const SIMPLE_JSON_REPAIR_SYSTEM_PROMPT = `You repair an existing Lumen Simple JSON lesson from compiler diagnostics.
 Return the complete corrected JSON object only.

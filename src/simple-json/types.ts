@@ -270,6 +270,12 @@ export interface BeatSpec {
 export interface SceneSpec {
   id: string;
   composition: CompositionToken;
+  /**
+   * The spoken narration for this scene (its voice-over lines). All scenes' narration, concatenated
+   * in order, is the full text sent to TTS. The per-scene word-timestamp span is used as the REFERENCE
+   * that sets this scene's minimum on-screen duration (scene ≥ its audio, a little longer, never shorter).
+   */
+  narration?: string;
   objects: ObjectSpec[];
   beats: BeatSpec[];
 }

@@ -23,4 +23,10 @@ export interface CanvasSlideDefinition {
   render: (ctx: CanvasRenderingContext2D, t: number, frame?: FrameCtx) => void;
   /** Optional on-screen captions (subtitles) keyed to the timeline. */
   captions?: CaptionSegment[];
+  /**
+   * Optional narration audio (an object URL for a synthesized WAV). When present, the player slaves this
+   * audio to its clock — play/pause/seek move both together. The film's duration is ≥ the audio's, so the
+   * narration never outruns the picture.
+   */
+  audioUrl?: string;
 }

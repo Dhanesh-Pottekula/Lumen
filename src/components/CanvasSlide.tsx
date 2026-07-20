@@ -23,6 +23,7 @@ interface CanvasSlideProps {
 
 export function CanvasSlide({ slide, title, tag, notes, theme = TEXTBOOK }: CanvasSlideProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
   const clockRef = useRef({ raf: 0, wallStart: 0, tStart: 0 });
   const tRef = useRef(0); // the currently-displayed time — so resize/preload repaint the right frame
   const scrubbing = useRef(false);
@@ -68,39 +69,55 @@ export function CanvasSlide({ slide, title, tag, notes, theme = TEXTBOOK }: Canv
   const pause = useCallback(() => {
     setPlaying(false);
     cancelAnimationFrame(clockRef.current.raf);
+    audioRef.current?.pause();
   }, []);
 
+  // When the slide has narration audio, the AUDIO is the master clock: each frame we draw whatever time the
+  // audio is currently at, so the picture can never drift from the voice — they are the same clock. Without
+  // audio we fall back to a wall clock. Playback ends when the audio ends (or the film's length is reached).
   const tick = useCallback(
     (now: number) => {
       const clock = clockRef.current;
-      let next = clock.tStart + (now - clock.wallStart) / 1000;
-      if (next >= slide.duration) {
-        next = slide.duration;
+      const audio = audioRef.current;
+      const audioMaster = !!(audio && slide.audioUrl);
+      let next = audioMaster ? audio!.currentTime : clock.tStart + (now - clock.wallStart) / 1000;
+      const ended = audioMaster ? audio!.ended || next >= slide.duration : next >= slide.duration;
+      if (ended) {
+        next = Math.min(next, slide.duration);
         setPlaying(false);
+        if (audioMaster) audio!.pause();
       } else {
         clock.raf = requestAnimationFrame(tick);
       }
       draw(next);
       if (!scrubbing.current) setT(next);
     },
-    [slide.duration, draw],
+    [slide.duration, slide.audioUrl, draw],
   );
 
   const play = useCallback(() => {
+    cancelAnimationFrame(clockRef.current.raf); // kill any prior loop so two Plays can't run two clocks
     const startAt = t >= slide.duration ? 0 : t;
     setT(startAt);
     setPlaying(true);
+    const audio = audioRef.current;
+    if (audio && slide.audioUrl) {
+      audio.currentTime = startAt;
+      void audio.play().catch(() => {}); // autoplay can reject; the picture still runs
+    }
     clockRef.current = { raf: 0, wallStart: performance.now(), tStart: startAt };
     clockRef.current.raf = requestAnimationFrame(tick);
-  }, [t, slide.duration, tick]);
+  }, [t, slide.duration, slide.audioUrl, tick]);
 
   const seek = useCallback(
     (value: number) => {
       setT(value);
       clockRef.current = { ...clockRef.current, wallStart: performance.now(), tStart: value };
+      const audio = audioRef.current;
+      if (audio && slide.audioUrl) audio.currentTime = value;
       draw(value);
     },
-    [draw],
+    [slide.audioUrl, draw],
   );
 
   useEffect(() => () => cancelAnimationFrame(clockRef.current.raf), []);
@@ -115,6 +132,8 @@ export function CanvasSlide({ slide, title, tag, notes, theme = TEXTBOOK }: Canv
       <div className="stage">
         <canvas ref={canvasRef} style={{ aspectRatio: `${slide.viewW} / ${slide.viewH}` }} />
       </div>
+
+      {slide.audioUrl && <audio ref={audioRef} src={slide.audioUrl} preload="auto" hidden />}
 
       <div className="player">
         <button onClick={playing ? pause : play}>{playing ? "Pause" : "Play"}</button>

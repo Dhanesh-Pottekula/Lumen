@@ -21,6 +21,8 @@ export const howPlanesFlyLessonSpec: LessonSpec = {
     {
       id: "hook",
       composition: "hero",
+      narration:
+        "A fully loaded jumbo jet weighs around four hundred tonnes. That is heavier than a hundred cars stacked together. So how on earth does something that heavy climb into the sky and stay there? The answer is not magic, and it is not just the engines. It is the shape of the wing.",
       objects: [
         { id: "plane", kind: "svg-artwork", svg: PLANE, size: "medium", placement: { mode: "zone", zone: "main" } },
         { id: "hook-title", kind: "text", text: "How does 400 tonnes stay up?", textRole: "heading", role: "hero", placement: { mode: "zone", zone: "title" } },
@@ -33,6 +35,8 @@ export const howPlanesFlyLessonSpec: LessonSpec = {
     {
       id: "forces",
       composition: "hero-diagram",
+      narration:
+        "Every airplane, in every moment of flight, is caught in a tug of war between four forces. Lift pulls it up. Weight, which is gravity, pulls it down. Thrust from the engines pushes it forward. And drag, the resistance of the air, holds it back. To fly level, lift must balance weight. To climb, lift has to win.",
       objects: [
         { id: "f-title", kind: "text", text: "Four forces on every plane", textRole: "title", role: "annotation", placement: { mode: "zone", zone: "title" } },
         { id: "forces", kind: "svg-artwork", svg: FORCES, size: "medium", placement: { mode: "zone", zone: "main" } },
@@ -48,6 +52,8 @@ export const howPlanesFlyLessonSpec: LessonSpec = {
     {
       id: "wing",
       composition: "hero-diagram",
+      narration:
+        "So where does lift actually come from? Look closely at the cross-section of a wing. It is not a flat plank. The top surface is curved and longer, while the bottom is flatter and shorter. That subtle shape is the whole secret. Everything about flight comes from what the air does as it flows around this curve.",
       objects: [
         { id: "w-title", kind: "text", text: "The secret is the wing's shape", textRole: "title", role: "annotation", placement: { mode: "zone", zone: "title" } },
         { id: "airfoil", kind: "svg-artwork", svg: AIRFOIL, size: "medium", placement: { mode: "zone", zone: "main" } },
@@ -62,6 +68,8 @@ export const howPlanesFlyLessonSpec: LessonSpec = {
     {
       id: "airflow",
       composition: "hero-diagram",
+      narration:
+        "As the wing slices through the air, the flow splits at the leading edge. Some air travels underneath, and some travels over the top. Because the top of the wing is curved and longer, the air going over it has farther to travel in the same amount of time. So it speeds up, and races across the top of the wing.",
       objects: [
         { id: "af-title", kind: "text", text: "Air races over the top", textRole: "title", role: "annotation", placement: { mode: "zone", zone: "title" } },
         { id: "airflow", kind: "svg-artwork", svg: AIRFLOW, size: "medium", placement: { mode: "zone", zone: "main" } },
@@ -77,6 +85,8 @@ export const howPlanesFlyLessonSpec: LessonSpec = {
     {
       id: "pressure",
       composition: "hero-diagram",
+      narration:
+        "And here is the key idea of the whole lesson. Faster moving air has lower pressure. So above the wing, where the air is racing, the pressure drops. Below the wing, the slower air keeps a higher pressure. Higher pressure pushing up from below, lower pressure above — and the wing gets squeezed upward. That upward push is lift.",
       objects: [
         { id: "p-title", kind: "text", text: "Faster air, lower pressure", textRole: "title", role: "annotation", placement: { mode: "zone", zone: "title" } },
         { id: "pressure", kind: "svg-artwork", svg: PRESSURE, size: "medium", placement: { mode: "zone", zone: "main" } },
@@ -92,6 +102,8 @@ export const howPlanesFlyLessonSpec: LessonSpec = {
     {
       id: "angle",
       composition: "hero-diagram",
+      narration:
+        "There is a second way a wing makes lift, and it is just as important. Tilt the wing slightly into the oncoming air. Now the underside deflects the air downward. And Newton's third law tells us that every action has an equal and opposite reaction. The wing pushes the air down, so the air pushes the wing up.",
       objects: [
         { id: "a-title", kind: "text", text: "Tilt the wing, push air down", textRole: "title", role: "annotation", placement: { mode: "zone", zone: "title" } },
         { id: "angle", kind: "svg-artwork", svg: ANGLE, size: "medium", placement: { mode: "zone", zone: "main" } },
@@ -107,6 +119,8 @@ export const howPlanesFlyLessonSpec: LessonSpec = {
     {
       id: "speed",
       composition: "data",
+      narration:
+        "Now, how much lift you get depends dramatically on speed. And lift does not grow evenly. It grows with the square of the speed. Double your speed, and you get four times the lift. That is exactly why a plane has to accelerate down a long runway before its wings can finally carry the weight of the aircraft.",
       objects: [
         { id: "s-title", kind: "text", text: "More speed, much more lift", textRole: "title", role: "annotation", placement: { mode: "zone", zone: "title" } },
         { id: "speed-chart", kind: "chart", chart: "function", function: "x^2", xDomain: [0, 10], yDomain: [0, 105], axes: true, xLabel: "Speed", yLabel: "Lift", size: "medium", placement: { mode: "zone", zone: "main" } },
@@ -122,6 +136,8 @@ export const howPlanesFlyLessonSpec: LessonSpec = {
     {
       id: "stall",
       composition: "data",
+      narration:
+        "But you cannot simply keep tilting the wing to get more and more lift. Increase the angle too far, and the smooth airflow over the top suddenly breaks away and becomes turbulent. Lift does not just stop growing — it collapses. This is called a stall, and it is one of the most important limits every pilot learns to respect.",
       objects: [
         { id: "st-title", kind: "text", text: "Too much angle: the stall", textRole: "title", role: "annotation", placement: { mode: "zone", zone: "title" } },
         { id: "stall-chart", kind: "chart", chart: "line", series: [[0, 0], [4, 22], [8, 42], [12, 58], [15, 66], [17, 52], [20, 28]], xDomain: [0, 20], yDomain: [0, 72], axes: true, xLabel: "Angle (°)", yLabel: "Lift", size: "medium", placement: { mode: "zone", zone: "main" } },
@@ -137,6 +153,8 @@ export const howPlanesFlyLessonSpec: LessonSpec = {
     {
       id: "recap",
       composition: "hero",
+      narration:
+        "So there it is. Four forces held in balance. A curved wing that speeds air over the top and lowers the pressure above it. A gentle tilt that flings air downward. Put it all together, and a wing quietly turns forward speed into upward lift. And that, is how four hundred tonnes stays in the sky.",
       objects: [
         { id: "recap-wing", kind: "svg-artwork", svg: PRESSURE, size: "medium", placement: { mode: "zone", zone: "main" } },
         { id: "recap-take", kind: "text", text: "A wing turns speed into lift — and that is flight.", textRole: "body", role: "primary", size: "small", placement: { mode: "zone", zone: "footer" } },
