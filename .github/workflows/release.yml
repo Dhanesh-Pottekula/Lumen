@@ -1,0 +1,45 @@
+name: Release packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      npm_tag:
+        description: npm distribution tag
+        required: true
+        default: beta
+        type: choice
+        options:
+          - beta
+          - latest
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: npm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm run api:check
+      - run: npm run pack:audit
+      - run: npm run smoke:install
+      - run: npm run security:audit
+      - name: Publish core
+        run: npm publish --workspace @aira/lumen --access public --provenance --tag "${{ inputs.npm_tag }}"
+      - name: Publish React adapter
+        run: npm publish --workspace @aira/lumen-react --access public --provenance --tag "${{ inputs.npm_tag }}"
+      - name: Publish Cartesia adapter
+        run: npm publish --workspace @aira/lumen-cartesia --access public --provenance --tag "${{ inputs.npm_tag }}"
+      - name: Publish MP4 adapter
+        run: npm publish --workspace @aira/lumen-mp4 --access public --provenance --tag "${{ inputs.npm_tag }}"

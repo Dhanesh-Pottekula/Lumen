@@ -1,0 +1,43 @@
+{
+  "name": "@aira/lumen-mp4",
+  "version": "0.1.0-beta.1",
+  "description": "Optional browser MP4 exporter for @aira/lumen.",
+  "keywords": ["mp4", "webcodecs", "canvas", "education", "video"],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Dhanesh-Pottekula/Lumen.git",
+    "directory": "packages/mp4"
+  },
+  "bugs": {
+    "url": "https://github.com/Dhanesh-Pottekula/Lumen/issues"
+  },
+  "homepage": "https://github.com/Dhanesh-Pottekula/Lumen#readme",
+  "type": "module",
+  "license": "Apache-2.0",
+  "files": ["dist", "README.md", "LICENSE"],
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "sideEffects": false,
+  "scripts": {
+    "build": "vite build && tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@aira/lumen": "0.1.0-beta.1",
+    "mp4-muxer": "^5.2.2"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

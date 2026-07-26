@@ -1,20 +1,36 @@
 {
-  "name": "lumen",
+  "name": "aira-lumen-workspace",
   "private": true,
-  "version": "1.0.0",
-  "description": "Lumen turns language models into animators: a small JSON grammar an LLM writes, compiled into a deterministic, seekable explainer film rendered live on an HTML5 canvas.",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "tsc --noEmit && vite build",
-    "preview": "vite preview"
+  "version": "0.1.0-beta.1",
+  "description": "Public workspace for the Lumen deterministic educational-video renderer.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Dhanesh-Pottekula/Lumen.git"
   },
-  "dependencies": {
-    "@cartesia/cartesia-js": "^3.3.0",
-    "ajv": "^8.20.0",
-    "mp4-muxer": "^5.2.2",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+  "bugs": {
+    "url": "https://github.com/Dhanesh-Pottekula/Lumen/issues"
+  },
+  "homepage": "https://github.com/Dhanesh-Pottekula/Lumen#readme",
+  "engines": {
+    "node": ">=20",
+    "npm": ">=10"
+  },
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run build:packages && npm run dev --workspace @aira/lumen-playground",
+    "build": "npm run build:packages && npm run build --workspace @aira/lumen-playground",
+    "build:packages": "npm run build --workspace @aira/lumen && npm run build --workspace @aira/lumen-react && npm run build --workspace @aira/lumen-cartesia && npm run build --workspace @aira/lumen-mp4",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "api:check": "node scripts/check-public-api.mjs",
+    "pack:audit": "node scripts/audit-package-contents.mjs",
+    "smoke:install": "node scripts/smoke-local-install.mjs",
+    "security:audit": "npm audit --omit=dev",
+    "preview": "npm run preview --workspace @aira/lumen-playground"
   },
   "devDependencies": {
     "@types/react": "^19.2.0",

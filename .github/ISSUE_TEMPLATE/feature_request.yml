@@ -1,0 +1,20 @@
+name: Feature request
+description: Propose a generally useful capability
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Teaching or library problem
+      description: Explain the missing capability, not only one desired visual.
+    validations:
+      required: true
+  - type: textarea
+    id: api
+    attributes:
+      label: Proposed Simple JSON or public API
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: Compatibility, accessibility, and security considerations

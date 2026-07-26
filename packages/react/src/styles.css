@@ -1,0 +1,93 @@
+.lumen-card {
+  background: #181f26;
+  border: 1px solid #2b3640;
+  border-radius: 14px;
+  color: #e8eef2;
+  padding: 24px;
+}
+
+.lumen-card h2 {
+  font-size: 1.1rem;
+  margin: 0 0 4px;
+}
+
+.lumen-tag {
+  color: #93a4b0;
+  font-size: 0.8rem;
+  margin: 0 0 16px;
+}
+
+.lumen-stage {
+  background: #1f2830;
+  border: 1px solid #2b3640;
+  border-radius: 10px;
+  overflow: hidden;
+  position: relative;
+}
+
+.lumen-stage canvas {
+  display: block;
+  width: 100%;
+}
+
+.lumen-player {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.lumen-player button {
+  background: #e8a13c;
+  border: 0;
+  border-radius: 8px;
+  color: #14181c;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  min-width: 84px;
+  padding: 8px 18px;
+}
+
+.lumen-player input[type="range"] {
+  accent-color: #e8a13c;
+  flex: 1;
+}
+
+.lumen-player .lumen-clock {
+  color: #93a4b0;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+  min-width: 96px;
+  text-align: right;
+}
+
+.lumen-caption {
+  background: #1f2830;
+  border-left: 3px solid #e8a13c;
+  border-radius: 0 8px 8px 0;
+  color: #e8eef2;
+  font-size: 0.95rem;
+  margin-top: 14px;
+  min-height: 48px;
+  padding: 12px 16px;
+}
+
+.lumen-caption .lumen-speaker {
+  color: #e8a13c;
+  display: block;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  margin-bottom: 2px;
+}
+
+.lumen-notes {
+  color: #93a4b0;
+  font-size: 0.85rem;
+  margin-top: 16px;
+}
+
+.lumen-notes li {
+  margin-bottom: 4px;
+  margin-left: 18px;
+}

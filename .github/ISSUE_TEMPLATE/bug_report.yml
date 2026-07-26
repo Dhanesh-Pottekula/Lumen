@@ -1,0 +1,34 @@
+name: Bug report
+description: Report a reproducible Lumen problem
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Do not include credentials or private lesson content.
+  - type: input
+    id: package
+    attributes:
+      label: Package and version
+      placeholder: "@aira/lumen 0.1.0-beta.1"
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Browser or runtime
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Include sanitized Simple JSON and diagnostic output.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true

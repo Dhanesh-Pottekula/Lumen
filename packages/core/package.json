@@ -1,0 +1,42 @@
+{
+  "name": "@aira/lumen",
+  "version": "0.1.0-beta.1",
+  "description": "Deterministic Simple JSON compiler and HTML Canvas renderer for educational videos.",
+  "keywords": ["canvas", "education", "animation", "video", "json"],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Dhanesh-Pottekula/Lumen.git",
+    "directory": "packages/core"
+  },
+  "bugs": {
+    "url": "https://github.com/Dhanesh-Pottekula/Lumen/issues"
+  },
+  "homepage": "https://github.com/Dhanesh-Pottekula/Lumen#readme",
+  "type": "module",
+  "license": "Apache-2.0",
+  "files": ["dist", "README.md", "LICENSE"],
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "sideEffects": false,
+  "scripts": {
+    "build": "vite build && tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "ajv": "^8.20.0"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "name": "@aira/lumen-react",
+  "version": "0.1.0-beta.1",
+  "description": "React canvas player for @aira/lumen lessons.",
+  "keywords": ["react", "canvas", "education", "animation", "video"],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Dhanesh-Pottekula/Lumen.git",
+    "directory": "packages/react"
+  },
+  "bugs": {
+    "url": "https://github.com/Dhanesh-Pottekula/Lumen/issues"
+  },
+  "homepage": "https://github.com/Dhanesh-Pottekula/Lumen#readme",
+  "type": "module",
+  "license": "Apache-2.0",
+  "files": ["dist", "README.md", "LICENSE"],
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./style.css": "./dist/style.css"
+  },
+  "sideEffects": ["**/*.css"],
+  "scripts": {
+    "build": "vite build && tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@aira/lumen": "0.1.0-beta.1"
+  },
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
