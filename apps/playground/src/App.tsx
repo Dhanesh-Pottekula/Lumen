@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent } from "react";
 
 import { renderLessonSpec } from "@aira/lumen";
+import { canExportMp4, exportLessonMp4 } from "@aira/lumen-mp4";
 import { CanvasSlide } from "@aira/lumen-react";
 import { NarratedLesson } from "./components/NarratedLesson";
 import { waterCycleLessonSpec } from "./lessons";
@@ -20,7 +21,31 @@ export default function App() {
   const [draft, setDraft] = useState("");
   const [visible, setVisible] = useState(false);
   const [silentPreview, setSilentPreview] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
   const silentResult = useMemo(() => renderLessonSpec(waterCycleLessonSpec), []);
+
+  async function downloadSilentPreview() {
+    if (!silentResult.valid) return;
+    setExporting(true);
+    setExportError(null);
+    try {
+      const blob = await exportLessonMp4(silentResult.slide, null, {
+        fps: 30,
+        scale: 1,
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "lumen-water-cycle-demo.mp4";
+      link.click();
+      window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setExporting(false);
+    }
+  }
 
   function saveKey(event: FormEvent) {
     event.preventDefault();
@@ -107,15 +132,29 @@ export default function App() {
       {apiKey ? (
         <NarratedLesson spec={waterCycleLessonSpec} apiKey={apiKey} />
       ) : silentResult.valid ? (
-        <CanvasSlide
-          slide={silentResult.slide}
-          title={<>💧 {waterCycleLessonSpec.title}</>}
-          tag="Silent preview — add your Cartesia key only if you want narration."
-          notes={[
-            "A fresh four-scene lesson authored entirely with public Simple JSON.",
-            "No provider key or network request is required for this preview.",
-          ]}
-        />
+        <>
+          <CanvasSlide
+            slide={silentResult.slide}
+            title={<>💧 {waterCycleLessonSpec.title}</>}
+            tag="Silent preview — add your Cartesia key only if you want narration."
+            notes={[
+              "A fresh four-scene lesson authored entirely with public Simple JSON.",
+              "No provider key or network request is required for this preview.",
+            ]}
+          />
+          {canExportMp4() && (
+            <div className="silent-export">
+              {exportError && <span>{exportError}</span>}
+              <button
+                type="button"
+                onClick={() => void downloadSilentPreview()}
+                disabled={exporting}
+              >
+                {exporting ? "Encoding MP4…" : "Download silent MP4"}
+              </button>
+            </div>
+          )}
+        </>
       ) : (
         <pre>{JSON.stringify(silentResult.errors, null, 2)}</pre>
       )}

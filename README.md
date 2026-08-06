@@ -8,6 +8,16 @@ validates, compiles, renders, narrates, and optionally exports it.
 > **Release status:** `0.1.0-beta.1` is prepared locally but has not been
 > published to npm yet.
 
+## Demo
+
+[![Watch the Lumen Water Cycle demo](docs/assets/lumen-water-cycle-demo.jpg)](docs/assets/lumen-water-cycle-demo.mp4)
+
+**[Watch or download the 22-second Water Cycle MP4](docs/assets/lumen-water-cycle-demo.mp4).**
+
+This silent demo was authored as Simple JSON, validated by Lumen, rendered on
+HTML Canvas, and exported in the browser as a deterministic H.264 MP4. Optional
+narration can be added with the separate Cartesia adapter using your own key.
+
 ## Packages
 
 | Package | Purpose |

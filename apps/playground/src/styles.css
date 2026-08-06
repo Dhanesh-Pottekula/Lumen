@@ -131,6 +131,19 @@ button.secondary {
   margin-bottom: 24px;
 }
 
+.silent-export {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: -10px;
+}
+
+.silent-export span {
+  color: #ffb4b4;
+  font-size: 0.82rem;
+}
+
 @media (max-width: 680px) {
   .key-row {
     grid-template-columns: 1fr 1fr;
