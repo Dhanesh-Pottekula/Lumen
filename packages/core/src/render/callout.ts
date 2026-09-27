@@ -210,6 +210,69 @@ function drawSubject(ctx: CanvasRenderingContext2D, target: [number, number], su
 }
 
 /** Draw an animated callout on the annotation layer. */
+
+type Rect = { x: number; y: number; w: number; h: number };
+
+const SIDES: Exclude<Side, "auto">[] = ["e", "w", "n", "s", "ne", "nw", "se", "sw"];
+
+function overlaps(a: Rect, b: Rect): boolean {
+  return (
+    a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
+  );
+}
+
+/**
+ * A box for this label that no label already placed this frame is sitting in.
+ *
+ * `resolveSide` is a pure function of where the target sits in the frame, so two targets in the
+ * same region resolve to the same side and the same offset and their boxes land on top of each
+ * other — two labels printed as one unreadable block. Callouts are directives rather than objects,
+ * so the layout collision pass never sees them and nothing else was going to separate them.
+ *
+ * The preferred side is tried first and kept whenever it is free, so a scene that never collides
+ * draws exactly as it did. Only a label with nowhere else to go returns to its first choice and
+ * overlaps.
+ */
+function freeBox(
+  taken: Rect[],
+  side: Exclude<Side, "auto">,
+  target: [number, number],
+  offset: number,
+  w: number,
+  h: number,
+  viewW: number,
+  viewH: number,
+): [number, number] {
+  const order = [side, ...SIDES.filter((one) => one !== side)];
+  const rings = [offset, offset + 46, offset + 92];
+  let offFrame: [number, number] | undefined;
+
+  for (const ring of rings) {
+    for (const candidate of order) {
+      const [cx, cy] = boxCenter(candidate, target, ring, w, h);
+      const box = { x: cx - w / 2, y: cy - h / 2, w, h };
+      if (taken.some((one) => overlaps(one, box))) continue;
+      const inside =
+        box.x >= 0 && box.y >= 0 && box.x + w <= viewW && box.y + h <= viewH;
+      if (inside) return [cx, cy];
+      offFrame = offFrame ?? [cx, cy];
+    }
+  }
+  return offFrame ?? boxCenter(side, target, offset, w, h);
+}
+
+
+/** Label boxes already placed in this frame. Keyed on the frame, so it empties when the frame does. */
+const PLACED = new WeakMap<FrameCtx, Rect[]>();
+
+function calloutBoxes(frame: FrameCtx): Rect[] {
+  const existing = PLACED.get(frame);
+  if (existing) return existing;
+  const fresh: Rect[] = [];
+  PLACED.set(frame, fresh);
+  return fresh;
+}
+
 export function callout(frame: FrameCtx, o: CalloutOptions) {
   const ctx = frame.layer.ctx("annotation");
   const th = frame.theme;
@@ -245,8 +308,10 @@ export function callout(frame: FrameCtx, o: CalloutOptions) {
   const lineH = fontPx * 1.32;
   const w = container === "badge" ? Math.max(fontPx + PAD * 2, textW + PAD * 2) : textW + PAD * 2;
   const h = container === "badge" ? Math.max(fontPx + PAD * 2, lineH + PAD) : lines.length * lineH + PAD * 2 - (lineH - fontPx);
-  const [bcx, bcy] = boxCenter(side, o.target, o.offset ?? 90, w, h);
+  const placed = calloutBoxes(frame);
+  const [bcx, bcy] = freeBox(placed, side, o.target, o.offset ?? 90, w, h, frame.viewW, frame.viewH);
   const box = { x: bcx - w / 2, y: bcy - h / 2, w, h };
+  placed.push(box);
 
   // subject marker around the target (draws on with the leader)
   drawSubject(ctx, o.target, o.subject ?? "none", o.subjectR ?? 22, leaderP, accent);

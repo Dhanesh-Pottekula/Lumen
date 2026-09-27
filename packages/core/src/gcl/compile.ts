@@ -12,13 +12,42 @@ import {
 import { drawMath } from "../render/mathtext";
 import { drawIcon, iconNames, colorSemantics } from "../render/icons";
 import type { IconName } from "../render/icons";
-import { axes, barChart, lineChart, makePlot, pie, plotFunction, scatter, type Datum } from "../render/charts";
-import { circleShape, heartShape, polygonShape, starShape } from "../render/morph";
+import {
+  axes,
+  barChart,
+  lineChart,
+  makePlot,
+  pie,
+  plotFunction,
+  scatter,
+  type Datum,
+} from "../render/charts";
+import {
+  circleShape,
+  heartShape,
+  polygonShape,
+  starShape,
+} from "../render/morph";
 import { smoothPath, strokeOn, type Pt } from "../render/strokes";
 import { drawBorderThenFill, erase, circumscribe } from "../render/strokeVerbs";
 import { pointAt } from "../render/strokes";
-import { borderAt, drawFeature, drawMap, featureCenter, fitProjection, flowArrow, geoMarker, type GeoFeature, type LonLat, type Projection } from "../render/geo";
-import { events as timelineEvents, eras as timelineEras, makeTimeline, playhead as timelinePlayhead, timelineAxis } from "../render/timeline";
+import {
+  borderAt,
+  drawFeature,
+  drawMap,
+  featureCenter,
+  flowArrow,
+  geoMarker,
+  type GeoFeature,
+  type Projection,
+} from "../render/geo";
+import {
+  events as timelineEvents,
+  eras as timelineEras,
+  makeTimeline,
+  playhead as timelinePlayhead,
+  timelineAxis,
+} from "../render/timeline";
 import { drawMorph } from "../render/morph";
 import { tracerDot } from "../render/strokeVerbs";
 import { callout, type CalloutOptions } from "../render/callout";
@@ -29,55 +58,139 @@ import {
   focusBox,
   focusRings,
   ghost as ghostVerb,
-  highlightRing,
+  highlightHalo,
   magnify as magnifyVerb,
   pointerArrow,
-  pulseScale,
   sparkFlash,
   spotlightFocus,
   vignetteTo,
-  wiggle,
 } from "../render/focus";
-import { predictReveal, withPunch, withShake } from "../render/sequence";
+import { predictReveal, withPunch } from "../render/sequence";
 import type { CanvasSlideDefinition } from "../slides/types";
 import type { ParsedScene } from "./parse";
-import type { Component, DrawComponent, EnterKind, GeoPoint, Position, Vec2 } from "./schema";
+import type {
+  Component,
+  DrawComponent,
+  EnterKind,
+  FillStep,
+  GeoPoint,
+  Position,
+  Vec2,
+} from "./schema";
 import { compileExpr } from "./expr";
 import { PROP_CATALOG } from "./props";
 import { drawTable } from "./table";
-import { layoutGroup, layoutScene, type LayoutResult, type Placement } from "./layout";
+import {
+  layoutGroup,
+  layoutScene,
+  type LayoutResult,
+  type Placement,
+} from "./layout";
 import { narrationTiming, resolveExit, resolveTiming } from "./timing";
 import { applyEnterExit } from "./enterexit";
 import { resolvePosition } from "./anchors";
 import { attentionOpacity, attnGeom } from "./attention";
 import { cameraAt, type CamDirective } from "./camera";
-import { linearPhase, motionTransform, oscillateOffset } from "./motion";
-import { phase, smooth } from "../render/motion";
+import { linearPhase, motionsTransform, oscillateOffset } from "./motion";
+import { mapProjection } from "./subanchors";
+import type { AttnGeom } from "./attention";
+import { easeInOutCubic, phase, smooth } from "../render/motion";
+import { masked } from "../render/reveal";
+import { paintMask, type MaskOpts } from "./mask";
 import type { MotionSpec } from "./schema";
 import { emit, type EmitterConfig } from "../render/particles";
 import { resolveEmitter } from "./particles";
 import type { FrameCtx } from "../render/frame";
 import { TEXTBOOK, type Theme } from "../render/theme";
+import { VIEW_HEIGHT, VIEW_WIDTH } from "./viewport";
 
-const W = 920;
-const H = 430;
+const W = VIEW_WIDTH;
+const H = VIEW_HEIGHT;
 
-const ROLE_FONT: Record<NonNullable<Extract<Component, { type: "text" }>["role"]>, { weight: number; size: number }> = {
+const ROLE_FONT: Record<
+  NonNullable<Extract<Component, { type: "text" }>["role"]>,
+  { weight: number; size: number }
+> = {
   title: { weight: 700, size: 30 },
   body: { weight: 500, size: 20 },
   bullet: { weight: 500, size: 18 },
   caption: { weight: 500, size: 14 },
 };
 
-function textFont(c: Extract<Component, { type: "text" }>, fontFamily: string): string {
+function textFont(
+  c: Extract<Component, { type: "text" }>,
+  fontFamily: string,
+): string {
   const role = ROLE_FONT[c.role ?? "body"];
   const size = c.size ?? role.size;
   return `${role.weight} ${size}px ${fontFamily}`;
 }
 
-/** Build a stat's unit suffix: symbol units (`%`, `+`, `°`, `‰`) attach directly (`16%`), word units
+/** Build a measure's unit suffix: symbol units (`%`, `+`, `°`, `‰`) attach directly (`16%`), word units
  *  get a leading space (`24,000,000 km²`, `1260 CE`) — matching the original counters. */
-function statSuffix(unit: string | undefined): string {
+/**
+ * Draw the meter that turns a figure into a quantity you can see.
+ *
+ * `filled` is where the value sits between the scale's bounds, already eased in step with the
+ * digits, so the length and the number are one fact told twice. Painted UNDER the figure — a meter
+ * across its own reading is a meter nobody can read.
+ */
+function drawMeter(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  size: number,
+  filled: number,
+  meter: "bar" | "ring",
+  color: string,
+  track: string,
+) {
+  const p = Math.max(0, Math.min(1, filled));
+  ctx.save();
+  ctx.lineCap = "round";
+  if (meter === "ring") {
+    const r = size * 1.32;
+    ctx.lineWidth = size * 0.26;
+    ctx.strokeStyle = track;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.stroke();
+    if (p > 0) {
+      const start = -Math.PI / 2;
+      ctx.strokeStyle = color;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, start, start + Math.PI * 2 * p);
+      ctx.stroke();
+    }
+    ctx.restore();
+    return;
+  }
+
+  const width = size * 4.5;
+  const y = cy + size * 0.72;
+  ctx.lineWidth = size * 0.28;
+  ctx.strokeStyle = track;
+  ctx.beginPath();
+  ctx.moveTo(cx - width / 2, y);
+  ctx.lineTo(cx + width / 2, y);
+  ctx.stroke();
+  if (p > 0) {
+    ctx.strokeStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(cx - width / 2, y);
+    ctx.lineTo(cx - width / 2 + width * p, y);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+const meterFill = (c: { value: number; scale?: [number, number] }, reading: number): number | undefined => {
+  if (!c.scale) return undefined;
+  const span = c.scale[1] - c.scale[0];
+  return span === 0 ? 0 : (reading - c.scale[0]) / span;
+};
+
+function measureSuffix(unit: string | undefined): string {
   if (!unit) return "";
   return /^[%+°‰]/.test(unit) ? unit : ` ${unit}`;
 }
@@ -89,7 +202,10 @@ type TextMode = "fade" | "word" | "typewriter" | "slam" | "scramble";
 /** Resolve a text component's kinetic style when `mode` is absent: fall back to `enter.type` when
  *  it names one of the kinetic kinds, else plain fade. `mode` (when set) always wins in the caller. */
 function textModeFromEnter(enterType: EnterKind | undefined): TextMode {
-  if (enterType && (KINETIC_ENTER_KINDS as readonly string[]).includes(enterType)) {
+  if (
+    enterType &&
+    (KINETIC_ENTER_KINDS as readonly string[]).includes(enterType)
+  ) {
     return enterType as TextMode;
   }
   return "fade";
@@ -102,7 +218,11 @@ function textModeFromEnter(enterType: EnterKind | undefined): TextMode {
  *  component's own resolved start time (`componentAt`), so an un-timed motion begins when its
  *  component does. Only `move` currently declares `cue`/`start` in the schema, but this resolves any
  *  motion kind uniformly (future kinds gain the same wiring for free). */
-export function resolveMotionAt(spec: MotionSpec, cueTimes: number[], componentAt: number): number {
+export function resolveMotionAt(
+  spec: MotionSpec,
+  cueTimes: number[],
+  componentAt: number,
+): number {
   if (spec.at !== undefined) return spec.at;
   const cue = "cue" in spec ? spec.cue : undefined;
   if (cue != null && cueTimes[cue] !== undefined) return cueTimes[cue];
@@ -119,7 +239,7 @@ function defaultLayerFor(type: Component["type"]): LayerName {
     case "text":
     case "heading":
     case "equation":
-    case "stat":
+    case "measure":
     case "legend":
     case "icon":
       return "annotation";
@@ -144,26 +264,43 @@ function defaultLayerFor(type: Component["type"]): LayerName {
 /** Named lon/lat points a `map` exposes for targeting: explicit `places`, plus every feature `id`
  *  (→ its centroid) and every marker `label`. Keys are lowercased. Used to resolve a place NAME to a
  *  lon/lat both for scene-wide targets (`buildSceneGeo`) and for a map's own `flows`. */
-function mapPlaceNames(m: Extract<Component, { type: "map" }>): Map<string, [number, number]> {
+function mapPlaceNames(
+  m: Extract<Component, { type: "map" }>,
+): Map<string, [number, number]> {
   const names = new Map<string, [number, number]>();
-  for (const p of m.places ?? []) names.set(p.name.toLowerCase(), [p.lon, p.lat]);
-  for (const mk of m.markers ?? []) if (mk.label) names.set(mk.label.toLowerCase(), [mk.lon, mk.lat]);
-  for (const f of m.features) names.set(f.id.toLowerCase(), featureCenter(f as GeoFeature) as [number, number]);
+  for (const p of m.places ?? [])
+    names.set(p.name.toLowerCase(), [p.lon, p.lat]);
+  for (const mk of m.markers ?? [])
+    if (mk.label) names.set(mk.label.toLowerCase(), [mk.lon, mk.lat]);
+  for (const f of m.features)
+    names.set(
+      f.id.toLowerCase(),
+      featureCenter(f as GeoFeature) as [number, number],
+    );
   return names;
 }
 
 /** Strip an optional `place:`/`region:`/`khanate:`/`city:`/`geo:` prefix and look a name up. */
-function lookupPlace(names: Map<string, [number, number]>, key: string): [number, number] | undefined {
-  return names.get(key.replace(/^(place|region|khanate|city|geo):/i, "").toLowerCase());
+function lookupPlace(
+  names: Map<string, [number, number]>,
+  key: string,
+): [number, number] | undefined {
+  return names.get(
+    key.replace(/^(place|region|khanate|city|geo):/i, "").toLowerCase(),
+  );
 }
 
 /** Build the scene's geographic resolver from its `map`(s): a function that projects a `{lon,lat}`
  *  point or a named place/region/feature to a screen point (returns null for anything non-geographic,
  *  so plain strings still fall through to id-anchor resolution). The projection comes from the first
- *  map with an explicit pixel box + geometry — mirroring `paintMapComponent`'s own `fitProjection`, so
+ *  map with an explicit pixel box + geometry, through the same `mapProjection` the painter uses, so
  *  a targeted place lands exactly where the map draws it. Undefined when the scene has no such map. */
-function buildSceneGeo(components: DrawComponent[]): ((pos: Position) => Vec2 | null) | undefined {
-  const maps = components.filter((c): c is Extract<Component, { type: "map" }> => c.type === "map");
+function buildSceneGeo(
+  components: DrawComponent[],
+): ((pos: Position) => Vec2 | null) | undefined {
+  const maps = components.filter(
+    (c): c is Extract<Component, { type: "map" }> => c.type === "map",
+  );
   let proj: Projection | null = null;
   const names = new Map<string, [number, number]>();
   for (const m of maps) {
@@ -171,18 +308,18 @@ function buildSceneGeo(components: DrawComponent[]): ((pos: Position) => Vec2 | 
     const [cx, cy] = m.at as [number, number];
     const w = m.w ?? W - 80;
     const h = m.h ?? H - 120;
-    const area = { x: cx - w / 2, y: cy - h / 2, w, h };
-    const markerRings: GeoFeature[] = (m.markers ?? []).map((mk, i) => ({ id: `__m${i}`, rings: [[[mk.lon, mk.lat]]] }));
-    const outlineFeature: GeoFeature[] = m.outline ? [{ id: "__o", rings: [m.outline] }] : [];
-    const growFeatures: GeoFeature[] = (m.grow ?? []).map((r, i) => ({ id: `__g${i}`, rings: [r as LonLat[]] }));
-    const mp = fitProjection([...(m.features as GeoFeature[]), ...outlineFeature, ...growFeatures, ...markerRings], area, 20);
+    const mp = mapProjection(m, { x: cx - w / 2, y: cy - h / 2, w, h });
     if (!proj) proj = mp;
     for (const [k, v] of mapPlaceNames(m)) if (!names.has(k)) names.set(k, v);
   }
   if (!proj) return undefined;
   const P = proj;
   return (pos: Position): Vec2 | null => {
-    if (typeof pos === "object" && !Array.isArray(pos) && typeof (pos as GeoPoint).lon === "number") {
+    if (
+      typeof pos === "object" &&
+      !Array.isArray(pos) &&
+      typeof (pos as GeoPoint).lon === "number"
+    ) {
       const gp = pos as GeoPoint;
       return P.project([gp.lon, gp.lat]);
     }
@@ -209,7 +346,16 @@ function buildSceneGeo(components: DrawComponent[]): ((pos: Position) => Vec2 | 
  *  Subject modifiers (`emphasis`/`ghost`/`magnify`/`predict`, Base props on any drawn component) wrap
  *  that component's own content paint in the (A)-class verbs — composed just inside the motion
  *  transform, around `applyEnterExit`. */
-export function compileScene(scene: ParsedScene, theme: Theme = TEXTBOOK): CanvasSlideDefinition {
+export interface CompileSceneOptions {
+  /** Solid host-supplied backdrop used instead of the scene's theme gradient. */
+  backgroundColor?: string;
+}
+
+export function compileScene(
+  scene: ParsedScene,
+  theme: Theme = TEXTBOOK,
+  options: CompileSceneOptions = {},
+): CanvasSlideDefinition {
   const { marker, components } = scene;
   const cueTimes = narrationTiming(marker.narration ?? []);
 
@@ -223,8 +369,13 @@ export function compileScene(scene: ParsedScene, theme: Theme = TEXTBOOK): Canva
   drawComponents.forEach((component) => {
     if (component.type === "svg") primeSvgImage(component.markup);
   });
-  const cameraComponents = components.filter((c): c is Extract<Component, { type: "camera" }> => c.type === "camera");
-  const attnComponents = components.filter((c): c is Extract<Component, { type: "attention" }> => c.type === "attention");
+  const cameraComponents = components.filter(
+    (c): c is Extract<Component, { type: "camera" }> => c.type === "camera",
+  );
+  const attnComponents = components.filter(
+    (c): c is Extract<Component, { type: "attention" }> =>
+      c.type === "attention",
+  );
 
   // Scene-wide geographic resolver (pure, from the scene's map geometry) — lets camera `to`, attention
   // `target`, and any component `at` reference a `{lon,lat}` point or a place/region/feature name.
@@ -238,11 +389,14 @@ export function compileScene(scene: ParsedScene, theme: Theme = TEXTBOOK): Canva
   // entrance window and would otherwise get cut off mid-flight. Fold each such motion's own end
   // time (resolved start + its `dur`) into the same max used for the entrance-only `lastEnd`.
   // Continuous motions (`spin`/`orbit` with no `dur`) have no natural end, so they don't extend it.
-  const motionEnd = drawComponents.reduce((m, c, i) => {
-    if (!c.motion || c.motion.dur === undefined) return m;
-    const motionStart = resolveMotionAt(c.motion, cueTimes, timings[i].at);
-    return Math.max(m, motionStart + c.motion.dur);
-  }, 0);
+  const motionEnd = drawComponents.reduce(
+    (m, c, i) =>
+      (c.motions ?? []).reduce(
+        (end, spec) => (spec.dur === undefined ? end : Math.max(end, resolveMotionAt(spec, cueTimes, timings[i].at) + spec.dur)),
+        m,
+      ),
+    0,
+  );
   const lastEnd = Math.max(
     timings.reduce((m, t) => Math.max(m, t.at + t.dur), 0),
     camTimings.reduce((m, t) => Math.max(m, t.at + t.dur), 0),
@@ -261,7 +415,10 @@ export function compileScene(scene: ParsedScene, theme: Theme = TEXTBOOK): Canva
     viewW: W,
     viewH: H,
     render(ctx, t, frame) {
-      if (!frame) { ctx.clearRect(0, 0, W, H); return; }
+      if (!frame) {
+        ctx.clearRect(0, 0, W, H);
+        return;
+      }
       if (!laid) laid = layoutScene(drawComponents, W, H, geo);
       const placements = laid.placements;
       const boxes = laid.boxes;
@@ -269,8 +426,20 @@ export function compileScene(scene: ParsedScene, theme: Theme = TEXTBOOK): Canva
       if (!camDirectives) {
         camDirectives = cameraComponents.map((c, i) => {
           const { at, dur } = camTimings[i];
-          const [fx, fy] = resolvePosition(c.to, { viewW: W, viewH: H, boxes, geo });
-          return { at, dur, focal: [fx, fy] as [number, number], zoom: c.zoom ?? 1, rot: c.rot ?? 0, kind: c.kind ?? "move" };
+          const [fx, fy] = resolvePosition(c.to, {
+            viewW: W,
+            viewH: H,
+            boxes,
+            geo,
+          });
+          return {
+            at,
+            dur,
+            focal: [fx, fy] as [number, number],
+            zoom: c.zoom ?? 1,
+            rot: c.rot ?? 0,
+            kind: c.kind ?? "move",
+          };
         });
       }
       frame.setCamera(cameraAt(camDirectives, t, W, H));
@@ -278,23 +447,144 @@ export function compileScene(scene: ParsedScene, theme: Theme = TEXTBOOK): Canva
       // Screen-fixed HUD: any `fixed` component renders on `fg`, which we pin to screen space so it
       // ignores the camera (mirrors the original's `frame.layer.set("annotation",{screenspace:true})`).
       // Set only when this scene actually has a fixed component, so no other scene/lesson is affected.
-      if (drawComponents.some((c) => c.fixed)) frame.layer.set("fg", { screenspace: true });
+      if (drawComponents.some((c) => c.fixed))
+        frame.layer.set("fg", { screenspace: true });
 
       const bg = frame.layer.ctx("bg");
-      const [c0, c1] = marker.bg ?? [theme.palette.bg, theme.palette.surface];
-      const g = bg.createLinearGradient(0, 0, 0, H);
-      g.addColorStop(0, c0);
-      g.addColorStop(1, c1);
-      bg.fillStyle = g;
+      if (options.backgroundColor) {
+        bg.fillStyle = options.backgroundColor;
+      } else {
+        const [c0, c1] = marker.bg ?? [theme.palette.bg, theme.palette.surface];
+        const g = bg.createLinearGradient(0, 0, 0, H);
+        g.addColorStop(0, c0);
+        g.addColorStop(1, c1);
+        bg.fillStyle = g;
+      }
       bg.fillRect(0, 0, W, H);
 
-      const resolveFocal = (pos: unknown): [number, number] => resolvePosition(pos as Component["at"], { viewW: W, viewH: H, boxes, geo });
+      const resolveFocal = (pos: unknown): [number, number] =>
+        resolvePosition(pos as Component["at"], {
+          viewW: W,
+          viewH: H,
+          boxes,
+          geo,
+        });
 
-      drawComponents.forEach((c, i) => {
+      // Every anchor in the layout is a RESTING box, so anything aimed at a thing that has travelled
+      // points where it started — labels at empty space, a string left hanging beside its bob. A
+      // component's motion is a pure function of `t`, so the same displacement is applied to both.
+      const motionShift = (target: unknown, now: number): [number, number] => {
+        if (typeof target !== "string") return [0, 0];
+        // A part that travels on its own carries its own motion; one that only rides along with its
+        // artwork has none of its own and takes the artwork's.
+        const own = drawComponents.findIndex((d) => d.id === target && d.motions?.length);
+        const index = own >= 0 ? own : drawComponents.findIndex((d) => d.id === target.split(".")[0]);
+        const moving = index < 0 ? undefined : drawComponents[index].motions;
+        if (!moving?.length) return [0, 0];
+        const specs = moving.map((spec) => ({ ...spec, at: resolveMotionAt(spec, cueTimes, timings[index].at) }) as MotionSpec);
+        const place = placements[index];
+        const box = { x: place.cx - place.w / 2, y: place.cy - place.h / 2, w: place.w, h: place.h };
+        const { dx, dy } = motionsTransform(specs, box, now, resolveFocal);
+        return [dx, dy];
+      };
+
+      const livePoint = (target: Position, now: number): [number, number] => {
+        const [x, y] = resolveFocal(target);
+        const [dx, dy] = motionShift(target, now);
+        return [x + dx, y + dy];
+      };
+
+      const followTarget = (g: AttnGeom, target: unknown, now: number): AttnGeom => {
+        const [dx, dy] = motionShift(target, now);
+        if (dx === 0 && dy === 0) return g;
+        return { ...g, cx: g.cx + dx, cy: g.cy + dy, box: { ...g.box, x: g.box.x + dx, y: g.box.y + dy } };
+      };
+
+      /** Rigidly carry a pinned connector onto its live endpoints: turn and stretch about the end
+       *  that has not moved, so shaft, arrowhead and caps travel together. */
+      // Where a connector meets a thing that has moved: the point on that thing's live box facing the
+      // other end, the same walk that laid the resting `ends0` — pinning a box-edge rest to a live
+      // CENTRE would stretch the connector by the two insets and overshoot its target.
+      const liveEdge = (end: Position, other: Position, now: number): [number, number] => {
+        const centre = livePoint(end, now);
+        const box = typeof end === "string" ? boxes.get(end) : undefined;
+        if (!box) return centre;
+        const toward = livePoint(other, now);
+        const dx = toward[0] - centre[0];
+        const dy = toward[1] - centre[1];
+        const length = Math.hypot(dx, dy);
+        if (length < 0.001) return centre;
+        const ux = dx / length;
+        const uy = dy / length;
+        const reach = Math.min(
+          Math.abs(ux) < 1e-6 ? Infinity : box.w / 2 / Math.abs(ux),
+          Math.abs(uy) < 1e-6 ? Infinity : box.h / 2 / Math.abs(uy),
+        );
+        if (!Number.isFinite(reach) || reach >= length) return centre;
+        return [centre[0] + ux * reach, centre[1] + uy * reach];
+      };
+
+      const pinTransform = (c: DrawComponent, now: number) => {
+        if (!c.ends || !c.ends0) return undefined;
+        const [a0, b0] = c.ends0;
+        const [a1, b1] = [liveEdge(c.ends[0], c.ends[1], now), liveEdge(c.ends[1], c.ends[0], now)];
+        const was = Math.hypot(b0[0] - a0[0], b0[1] - a0[1]);
+        const now2 = Math.hypot(b1[0] - a1[0], b1[1] - a1[1]);
+        // An arrow pinned to one thing only — a magnitude and a direction — has no second end to
+        // aim at, so it simply travels with the thing it reads from.
+        if (was < 0.001) return a1[0] === a0[0] && a1[1] === a0[1] ? undefined : { a0, a1, rot: 0, scale: 1 };
+        const rot = Math.atan2(b1[1] - a1[1], b1[0] - a1[0]) - Math.atan2(b0[1] - a0[1], b0[0] - a0[0]);
+        const scale = now2 / was;
+        if (Math.abs(rot) < 1e-4 && Math.abs(scale - 1) < 1e-4 && a1[0] === a0[0] && a1[1] === a0[1])
+          return undefined;
+
+        return { a0, a1, rot, scale };
+      };
+
+
+      /** A connector redrawn onto its live endpoints, or the component unchanged when it has none. */
+      const pinned = (c: DrawComponent, now: number): DrawComponent => {
+        const pin = pinTransform(c, now);
+        if (!pin) return c;
+        const { a0, a1, rot, scale } = pin;
+        const cos = Math.cos(rot) * scale;
+        const sin = Math.sin(rot) * scale;
+        const carry = (point: Vec2): Vec2 => {
+          const x = point[0] - a0[0];
+          const y = point[1] - a0[1];
+          return [a1[0] + x * cos - y * sin, a1[1] + x * sin + y * cos];
+        };
+        const map = (node: DrawComponent): DrawComponent => ({
+          ...node,
+          ...("points" in node && Array.isArray(node.points) ? { points: node.points.map(carry) } : {}),
+          ...("children" in node && Array.isArray(node.children)
+            ? { children: (node.children as DrawComponent[]).map(map) }
+            : {}),
+        });
+        return map(c);
+      };
+
+      // Within a layer the biggest thing paints first, so whatever sits on it — a molecule on a cell,
+      // a caravan on a map — is never buried under it.
+      const drawOrder = drawComponents
+        .map((_c, i) => i)
+        .sort((a, b) => placements[b].w * placements[b].h - placements[a].w * placements[a].h);
+      for (const i of drawOrder) {
+        const c = drawComponents[i];
         const timing = timings[i];
-        if (t < timing.at) return;
-        drawComponentInstance(frame, c, placements[i], timing, duration, t, cueTimes, resolveFocal, theme);
-      });
+        if (t < timing.at) continue;
+        drawComponentInstance(
+          frame,
+          pinned(c, t),
+          placements[i],
+          timing,
+          duration,
+          t,
+          cueTimes,
+          resolveFocal,
+          theme,
+        );
+      }
 
       // Attention overlays (Phase 4): timed like any component but not part of the draw-loop's
       // placement/index alignment above — each resolves its own anchor geometry independently.
@@ -302,71 +592,89 @@ export function compileScene(scene: ParsedScene, theme: Theme = TEXTBOOK): Canva
         const { at, dur } = attnTimings[i];
         const opacity = attentionOpacity(t, at, dur, c.exit, duration);
         if (opacity <= 0) return;
-        const g = attnGeom(c.target, boxes, W, H, geo);
+        const g = followTarget(attnGeom(c.target, boxes, W, H, geo), c.target, t);
         const p = phase(t, at, at + dur);
         const color = c.color;
-        const defaultLayer = c.verb === "spotlight" || c.verb === "dim" || c.verb === "vignette" ? "fx" : "annotation";
+        const defaultLayer =
+          c.verb === "spotlight" || c.verb === "dim" || c.verb === "vignette"
+            ? "fx"
+            : "annotation";
         const layer = frame.layer.ctx(c.layer ?? defaultLayer);
 
         layer.save();
         layer.globalAlpha *= opacity;
 
-        try { switch (c.verb) {
-          case "callout": {
-            callout(frame, {
-              target: [g.cx, g.cy],
-              text: c.text,
-              title: c.title,
-              side: c.side as CalloutOptions["side"],
-              route: c.route as CalloutOptions["route"],
-              container: c.container as CalloutOptions["container"],
-              color,
-              leaderP: p,
-              labelP: phase(t, at + dur * 0.3, at + dur),
-            });
-            return;
+        try {
+          switch (c.verb) {
+            case "callout": {
+              callout(frame, {
+                target: [g.cx, g.cy],
+                text: c.text,
+                title: c.title,
+                side: c.side as CalloutOptions["side"],
+                route: c.route as CalloutOptions["route"],
+                container: c.container as CalloutOptions["container"],
+                color,
+                leaderP: p,
+                labelP: phase(t, at + dur * 0.3, at + dur),
+              });
+              return;
+            }
+            case "highlight":
+              highlightHalo(layer, g.cx, g.cy, c.radius ?? g.r, { color });
+              return;
+            case "spotlight":
+              spotlightFocus(layer, g.cx, g.cy, c.radius ?? g.r);
+              return;
+            case "dim":
+              dimExcept(layer, [{ cx: g.cx, cy: g.cy, r: c.radius ?? g.r }]);
+              return;
+            case "pointer": {
+              const from =
+                c.from !== undefined
+                  ? resolvePosition(c.from, { viewW: W, viewH: H, boxes, geo })
+                  : ([g.cx, g.cy - (c.radius ?? g.r) - 60] as [number, number]);
+              pointerArrow(layer, from[0], from[1], g.cx, g.cy, p, { color });
+              return;
+            }
+            case "box":
+              focusBox(layer, g.box.x, g.box.y, g.box.w, g.box.h, t, { color });
+              return;
+            case "brackets":
+              cornerBrackets(layer, g.box.x, g.box.y, g.box.w, g.box.h, {
+                color,
+                p,
+              });
+              return;
+            case "encircle":
+              circumscribe(
+                layer,
+                { x: g.box.x, y: g.box.y, w: g.box.w, h: g.box.h },
+                p,
+                { style: { color } },
+              );
+              return;
+            case "converge":
+              convergingArrows(layer, g.cx, g.cy, p, { color });
+              return;
+            case "spark":
+              sparkFlash(layer, g.cx, g.cy, p, { color });
+              return;
+            case "vignette":
+              vignetteTo(layer, g.cx, g.cy, {});
+              return;
+            case "rings":
+              focusRings(layer, g.cx, g.cy, p, { color });
+              return;
+            default: {
+              const _exhaustive: never = c.verb;
+              console.warn(
+                `gcl: no attention handler for verb "${_exhaustive as string}"`,
+              );
+              return;
+            }
           }
-          case "highlight":
-            highlightRing(layer, g.cx, g.cy, c.radius ?? g.r, t, { color });
-            return;
-          case "spotlight":
-            spotlightFocus(layer, g.cx, g.cy, c.radius ?? g.r);
-            return;
-          case "dim":
-            dimExcept(layer, [{ cx: g.cx, cy: g.cy, r: c.radius ?? g.r }]);
-            return;
-          case "pointer": {
-            const from = c.from !== undefined ? resolvePosition(c.from, { viewW: W, viewH: H, boxes, geo }) : ([g.cx, g.cy - (c.radius ?? g.r) - 60] as [number, number]);
-            pointerArrow(layer, from[0], from[1], g.cx, g.cy, p, { color });
-            return;
-          }
-          case "box":
-            focusBox(layer, g.box.x, g.box.y, g.box.w, g.box.h, t, { color });
-            return;
-          case "brackets":
-            cornerBrackets(layer, g.box.x, g.box.y, g.box.w, g.box.h, { color, p });
-            return;
-          case "encircle":
-            circumscribe(layer, { x: g.box.x, y: g.box.y, w: g.box.w, h: g.box.h }, p, { style: { color } });
-            return;
-          case "converge":
-            convergingArrows(layer, g.cx, g.cy, p, { color });
-            return;
-          case "spark":
-            sparkFlash(layer, g.cx, g.cy, p, { color });
-            return;
-          case "vignette":
-            vignetteTo(layer, g.cx, g.cy, {});
-            return;
-          case "rings":
-            focusRings(layer, g.cx, g.cy, p, { color });
-            return;
-          default: {
-            const _exhaustive: never = c.verb;
-            console.warn(`gcl: no attention handler for verb "${_exhaustive as string}"`);
-            return;
-          }
-        } } finally {
+        } finally {
           layer.restore();
         }
       });
@@ -380,7 +688,13 @@ export function compileScene(scene: ParsedScene, theme: Theme = TEXTBOOK): Canva
  * just to reach the one `group` case — everything else ignores these fields.
  */
 interface RenderCtx {
-  t: number; at: number; dur: number; cx: number; cy: number; w: number; h: number;
+  t: number;
+  at: number;
+  dur: number;
+  cx: number;
+  cy: number;
+  w: number;
+  h: number;
   frame?: FrameCtx;
   cueTimes?: number[];
   resolveFocal?: (pos: unknown) => [number, number];
@@ -423,7 +737,10 @@ function drawComponentInstance(
     const layer = frame.layer.ctx(c.layer ?? "fx");
     const { cx, cy } = placement;
     if (c.type === "particles") {
-      const cfg: EmitterConfig = { ...resolveEmitter(c.preset, cx, cy, W, H, c.seed ?? 1), ...(c.config as Partial<EmitterConfig> | undefined) };
+      const cfg: EmitterConfig = {
+        ...resolveEmitter(c.preset, cx, cy, W, H, c.seed ?? 1),
+        ...(c.config as Partial<EmitterConfig> | undefined),
+      };
       emit(layer, cfg, t - at);
     } else if (c.type === "flow") {
       const [fx, fy] = resolveFocal(c.from);
@@ -447,22 +764,44 @@ function drawComponentInstance(
       };
       emit(layer, cfg, t - at);
     } else {
-      radialGlow(layer, cx, cy, c.r ?? 60, c.color ?? "#ffd24a", phase(t, at, at + dur));
+      radialGlow(
+        layer,
+        cx,
+        cy,
+        c.r ?? 60,
+        c.color ?? "#ffd24a",
+        phase(t, at, at + dur),
+      );
     }
     return;
   }
 
   // `fixed` components render on the `fg` layer, which the scene marks screenspace (below) so they stay
   // put through camera moves — a HUD/legend overlay. Otherwise use the explicit or default layer.
-  const layer = frame.layer.ctx(c.fixed ? "fg" : c.layer ?? defaultLayerFor(c.type));
+  const layer = frame.layer.ctx(
+    c.fixed ? "fg" : (c.layer ?? defaultLayerFor(c.type)),
+  );
   const { cx, cy, w, h } = placement;
   const box = { x: cx - w / 2, y: cy - h / 2, w, h };
   const enterDur = c.enter?.dur ?? dur;
   const exitInfo = resolveExit(c.exit, sceneDuration);
-  const rc: RenderCtx = { t, at, dur, cx, cy, w, h, frame, cueTimes, resolveFocal, sceneDuration, theme };
+  const rc: RenderCtx = {
+    t,
+    at,
+    dur,
+    cx,
+    cy,
+    w,
+    h,
+    frame,
+    cueTimes,
+    resolveFocal,
+    sceneDuration,
+    theme,
+  };
 
-  const motionSpec: typeof c.motion = c.motion ? { ...c.motion, at: resolveMotionAt(c.motion, cueTimes, at) } : undefined;
-  const mt = motionTransform(motionSpec, box, t, resolveFocal);
+  const motionSpecs = (c.motions ?? []).map((spec) => ({ ...spec, at: resolveMotionAt(spec, cueTimes, at) }) as MotionSpec);
+  const mt = motionsTransform(motionSpecs, box, t, resolveFocal);
   const osc = oscillateOffset(c.oscillate, t);
   const dx = mt.dx + osc.dx;
   const dy = mt.dy + osc.dy;
@@ -483,7 +822,13 @@ function drawComponentInstance(
   // Subject modifiers (Phase 4): `predict` gates WHICH content draws (placeholder vs real);
   // `ghost`/`magnify`/`emphasis` wrap the (possibly gated) content draw itself. Composed here so
   // they apply uniformly whether the component's own enter is native, masked, or fade.
-  const predictAt = c.predict ? (c.predict.revealAt ?? (c.predict.revealCue != null ? cueTimes[c.predict.revealCue] : undefined) ?? at) : undefined;
+  const predictAt = c.predict
+    ? (c.predict.revealAt ??
+      (c.predict.revealCue != null
+        ? cueTimes[c.predict.revealCue]
+        : undefined) ??
+      at)
+    : undefined;
   const drawSubject = (target: CanvasRenderingContext2D) => {
     const runEnterExit = (paintTarget: CanvasRenderingContext2D) =>
       applyEnterExit(
@@ -498,12 +843,24 @@ function drawComponentInstance(
       );
 
     if (predictAt !== undefined) {
-      const pr = predictReveal(t, { poseAt: c.predict!.poseAt, revealAt: predictAt });
+      const pr = predictReveal(t, {
+        poseAt: c.predict!.poseAt,
+        revealAt: predictAt,
+      });
       if (!pr.revealed) {
         const pulse = 0.55 + 0.25 * Math.sin(pr.thinking * Math.PI * 3);
         target.save();
         target.globalAlpha *= pulse;
-        fadeText(target, "?", cx, cy, 1, `700 ${Math.round(Math.min(w, h) * 0.6)}px ${theme.type.display}`, theme.palette.muted, "center");
+        fadeText(
+          target,
+          "?",
+          cx,
+          cy,
+          1,
+          `700 ${Math.round(Math.min(w, h) * 0.6)}px ${theme.type.display}`,
+          theme.palette.muted,
+          "center",
+        );
         target.restore();
         return;
       }
@@ -513,47 +870,87 @@ function drawComponentInstance(
     runEnterExit(target);
   };
 
+  const drawFilled = (target: CanvasRenderingContext2D) => {
+    const step = fillAt(c.fillLevel, t);
+    if (step === undefined) {
+      drawSubject(target);
+      return;
+    }
+    if (step.level >= 1) {
+      drawSubject(target);
+      return;
+    }
+    if (step.level <= 0) return;
+
+    masked(
+      target,
+      W,
+      H,
+      (inner) => drawSubject(inner),
+      (inner) => paintMask(inner, "wipe", box, step.level, { dir: step.dir }),
+    );
+  };
+
   const drawGhostMagnify = (target: CanvasRenderingContext2D) => {
     if (c.magnify) {
       const r = c.magnify.r ?? Math.hypot(w, h) / 2;
-      magnifyVerb(target, cx, cy, r, c.magnify.zoom ?? 1.6, drawSubject);
+      magnifyVerb(target, cx, cy, r, c.magnify.zoom ?? 1.6, drawFilled);
     } else if (c.ghost != null) {
-      ghostVerb(target, c.ghost, drawSubject);
+      ghostVerb(target, c.ghost, drawFilled);
     } else {
-      drawSubject(target);
+      drawFilled(target);
     }
   };
 
   const drawEmphasized = (target: CanvasRenderingContext2D) => {
-    const emphasisWindows = c.emphasis ? (Array.isArray(c.emphasis) ? c.emphasis : [c.emphasis]) : [];
+    const emphasisWindows = c.emphasis
+      ? Array.isArray(c.emphasis)
+        ? c.emphasis
+        : [c.emphasis]
+      : [];
     const activeEmphasis = [...emphasisWindows].reverse().find((candidate) => {
-      const candidateAt = candidate.at ?? (candidate.cue != null ? cueTimes[candidate.cue] : undefined) ?? at;
-      return t >= candidateAt && (candidate.dur === undefined || t <= candidateAt + candidate.dur);
+      const candidateAt =
+        candidate.at ??
+        (candidate.cue != null ? cueTimes[candidate.cue] : undefined) ??
+        at;
+      return (
+        t >= candidateAt &&
+        (candidate.dur === undefined || t <= candidateAt + candidate.dur)
+      );
     });
     if (!activeEmphasis) {
       drawGhostMagnify(target);
       return;
     }
     const kind = activeEmphasis.kind ?? "punch";
-    const emAt = activeEmphasis.at ?? (activeEmphasis.cue != null ? cueTimes[activeEmphasis.cue] : undefined) ?? at;
+    const emAt =
+      activeEmphasis.at ??
+      (activeEmphasis.cue != null ? cueTimes[activeEmphasis.cue] : undefined) ??
+      at;
     const strength = activeEmphasis.amp ?? 1;
-    if (kind === "punch") withPunch(target, cx, cy, t, emAt, drawGhostMagnify, { amp: 0.12 * strength });
-    else if (kind === "shake") withShake(target, t, emAt, drawGhostMagnify, { mag: 5 * strength });
-    else if (kind === "pulse") pulseScale(target, cx, cy, t, drawGhostMagnify, { amp: 0.05 * strength });
-    else wiggle(target, cx, cy, t, drawGhostMagnify, { amp: 0.035 * strength });
+    // `punch` is a single settling beat at the moment of emphasis, so it still reads as a gesture.
+    // Everything else used to breathe for as long as it was on screen, which pulled the eye to the
+    // effect rather than the thing. They now simply mark it.
+    if (kind === "punch")
+      withPunch(target, cx, cy, t, emAt, drawGhostMagnify, {
+        amp: 0.12 * strength,
+      });
+    else drawGhostMagnify(target);
   };
 
   drawEmphasized(layer);
   layer.restore();
 
   if (mt.trail && mt.trail.length > 1) {
-    const color = c.motion && c.motion.kind === "trace" ? c.motion.color ?? "#5cc8ae" : "#5cc8ae";
+    const trace = c.motions?.find((spec): spec is Extract<MotionSpec, { kind: "trace" }> => spec.kind === "trace");
+    const color = trace?.color ?? "#5cc8ae";
     layer.save();
     layer.strokeStyle = color;
     layer.lineWidth = 2;
     layer.beginPath();
     layer.moveTo(mt.trail[0][0], mt.trail[0][1]);
-    for (let k = 1; k < mt.trail.length; k++) layer.lineTo(mt.trail[k][0], mt.trail[k][1]);
+    for (let k = 1; k < mt.trail.length; k++)
+      layer.lineTo(mt.trail[k][0], mt.trail[k][1]);
     layer.stroke();
     layer.restore();
     tracerDot(layer, mt.trail, 1, { color });
@@ -567,13 +964,26 @@ function paintGroup(c: Extract<Component, { type: "group" }>, rc: RenderCtx) {
   if (!rc.frame) return; // no frame context (e.g. a bare unit test calling paintNative/paintFinal directly) — nothing to draw onto
   const { cx, cy, w, h } = rc;
   const groupBox = { x: cx - w / 2, y: cy - h / 2, w, h };
-  renderGroup(rc.frame, c, groupBox, { at: rc.at, dur: rc.dur }, rc.sceneDuration ?? rc.t, rc.t, rc.cueTimes ?? [], rc.resolveFocal ?? ((_pos) => [cx, cy]), rc.theme);
+  renderGroup(
+    rc.frame,
+    c,
+    groupBox,
+    { at: rc.at, dur: rc.dur },
+    rc.sceneDuration ?? rc.t,
+    rc.t,
+    rc.cueTimes ?? [],
+    rc.resolveFocal ?? ((_pos) => [cx, cy]),
+    rc.theme,
+  );
 }
 
 /** Default a child's `enter` to the group's `childEnter` when the child declares none of its own —
  *  the group-level default entrance (plan Task 4 Step 2). A child with an explicit `enter` (even
  *  `{type:"none"}`) always keeps it. */
-function withDefaultEnter<T extends Component>(kid: T, childEnter: Component["enter"] | undefined): T {
+function withDefaultEnter<T extends Component>(
+  kid: T,
+  childEnter: Component["enter"] | undefined,
+): T {
   if (kid.enter || !childEnter) return kid;
   return { ...kid, enter: childEnter };
 }
@@ -586,7 +996,8 @@ function withDefaultEnter<T extends Component>(kid: T, childEnter: Component["en
  *  clipping the wrong (default) layer for particles/flow/glow/group children left them unclipped, able
  *  to bleed outside the group's box. */
 function actualLayers(c: Component): LayerName[] {
-  if (c.type === "particles" || c.type === "flow" || c.type === "glow") return [c.layer ?? "fx"];
+  if (c.type === "particles" || c.type === "flow" || c.type === "glow")
+    return [c.layer ?? "fx"];
   if (c.type === "group") return c.children.flatMap(actualLayers);
   return [c.layer ?? defaultLayerFor(c.type)];
 }
@@ -613,7 +1024,9 @@ function renderGroup(
   resolveFocal: (pos: unknown) => [number, number],
   theme: Theme,
 ): void {
-  const kids = group.children.filter((k): k is DrawComponent => k.type !== "camera" && k.type !== "attention");
+  const kids = group.children.filter(
+    (k): k is DrawComponent => k.type !== "camera" && k.type !== "attention",
+  );
   if (kids.length === 0) return;
   const placements = layoutGroup(kids, groupBox, group);
 
@@ -625,8 +1038,14 @@ function renderGroup(
   // whole batch is shifted so its cursor position lands on the group's start — so an untimed child
   // batch begins exactly when the group begins.
   const childTimings = group.build
-    ? kids.map((_k, i) => ({ at: groupTiming.at + i * (group.build!.step ?? 0.5), dur: kids[i].dur ?? 0.6 }))
-    : resolveTiming(kids, { cueTimes, gap: 0 }).map((tm) => ({ at: groupTiming.at + tm.at, dur: tm.dur }));
+    ? kids.map((_k, i) => ({
+        at: groupTiming.at + i * (group.build!.step ?? 0.5),
+        dur: kids[i].dur ?? 0.6,
+      }))
+    : resolveTiming(kids, { cueTimes, gap: 0 }).map((tm) => ({
+        at: groupTiming.at + tm.at,
+        dur: tm.dur,
+      }));
 
   // Clip must cover every layer a child ACTUALLY paints to — not `defaultLayerFor`, which reports
   // "annotation" for particles/flow/glow/group as a layout-time placeholder (see `actualLayers`).
@@ -648,7 +1067,17 @@ function renderGroup(
       const kt = childTimings[i];
       if (t < kt.at) return;
       const kidWithEnter = withDefaultEnter(kid, group.childEnter);
-      drawComponentInstance(frame, kidWithEnter, placements[i], kt, sceneDuration, t, cueTimes, resolveFocal, theme);
+      drawComponentInstance(
+        frame,
+        kidWithEnter,
+        placements[i],
+        kt,
+        sceneDuration,
+        t,
+        cueTimes,
+        resolveFocal,
+        theme,
+      );
     });
   } finally {
     if (group.clip) {
@@ -684,7 +1113,8 @@ function primeSvgImage(markup: string): HTMLImageElement | null {
     img = new Image();
     img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(markup);
     svgMarkupCache.set(markup, img);
-    if (typeof img.decode === "function") void img.decode().catch(() => undefined);
+    if (typeof img.decode === "function")
+      void img.decode().catch(() => undefined);
   }
   return img;
 }
@@ -698,7 +1128,13 @@ function getSvgImage(markup: string): HTMLImageElement | null {
 /** Draw a `{type:"vector"}` component's raw Path2D `d` string at `(cx,cy)` — fill/stroke/rotate/scale
  *  per the authored fields, faded in by `enterP`. No-ops under environments without `Path2D` (node/
  *  vitest) so the smoke tests never throw. */
-function paintVector(layer: CanvasRenderingContext2D, c: Extract<Component, { type: "vector" }>, cx: number, cy: number, enterP: number) {
+function paintVector(
+  layer: CanvasRenderingContext2D,
+  c: Extract<Component, { type: "vector" }>,
+  cx: number,
+  cy: number,
+  enterP: number,
+) {
   if (typeof Path2D === "undefined") return;
   const path = new Path2D(c.d);
   layer.save();
@@ -723,16 +1159,59 @@ function paintVector(layer: CanvasRenderingContext2D, c: Extract<Component, { ty
 /** Draw a `{type:"svg"}` component — embedded SVG markup rendered via a lazily-loaded/cached `Image`
  *  (see `getSvgImage`), same async-load pattern as `{type:"image"}`. If the image hasn't finished
  *  loading yet this frame, it's simply skipped (drawn on a later frame once ready). */
-function paintSvg(layer: CanvasRenderingContext2D, c: Extract<Component, { type: "svg" }>, cx: number, cy: number, enterP: number) {
+function paintSvg(
+  layer: CanvasRenderingContext2D,
+  c: Extract<Component, { type: "svg" }>,
+  cx: number,
+  cy: number,
+  enterP: number,
+) {
   if (typeof Image === "undefined") return;
   const img = getSvgImage(c.markup);
-  if (img) drawSvg(layer, img, cx, cy, c.w, c.h, { alpha: enterP, rotate: c.rotate });
+  if (img)
+    drawSvg(layer, img, cx, cy, c.w, c.h, { alpha: enterP, rotate: c.rotate });
+}
+
+/**
+ * The fill level one component has reached at time `t`, easing between the steps it was given.
+ *
+ * Returns undefined when the component has no fill, which is every component that was never the
+ * target of a `fill` action — those draw whole, as they always did. A component that IS filled starts
+ * empty, because the emptiness is half of what a filling teaches.
+ */
+function fillAt(
+  steps: FillStep[] | undefined,
+  t: number,
+): { level: number; dir: MaskOpts["dir"] } | undefined {
+  if (!steps || steps.length === 0) return undefined;
+
+  let level = 0;
+  let dir: MaskOpts["dir"] = steps[0].dir ?? "up";
+  for (const step of steps) {
+    if (t < step.at) break;
+
+    dir = step.dir ?? dir;
+    const span = Math.max(1e-6, step.dur);
+    const progress = Math.min(1, (t - step.at) / span);
+    level = level + (step.to - level) * easeInOutCubic(progress);
+    if (progress < 1) break;
+
+    level = step.to;
+  }
+
+  return { level: Math.max(0, Math.min(1, level)), dir };
 }
 
 /** Draw a `{type:"prop"}` component — a named prop from `PROP_CATALOG`, rendered as its list of
  *  Path2D parts (each with its own fill/stroke), rotated as a whole by `angle` (DEGREES). No-ops
  *  under environments without `Path2D` (node/vitest), same guard as `paintVector`. */
-function paintProp(layer: CanvasRenderingContext2D, c: Extract<Component, { type: "prop" }>, cx: number, cy: number, enterP: number) {
+function paintProp(
+  layer: CanvasRenderingContext2D,
+  c: Extract<Component, { type: "prop" }>,
+  cx: number,
+  cy: number,
+  enterP: number,
+) {
   const parts = PROP_CATALOG[c.name]?.(c.size ?? 1, c.color);
   if (!parts) return;
   if (typeof Path2D === "undefined") return;
@@ -759,7 +1238,12 @@ function paintProp(layer: CanvasRenderingContext2D, c: Extract<Component, { type
 
 /** A small filled-triangle pen nib riding a path at progress `p` — the asset-free "hand follower".
  *  Only meaningful for content that exposes a points array (path/shape/parametric); see `pointsFor`. */
-function drawPenNib(ctx: CanvasRenderingContext2D, pts: Pt[], p: number, color: string) {
+function drawPenNib(
+  ctx: CanvasRenderingContext2D,
+  pts: Pt[],
+  p: number,
+  color: string,
+) {
   if (pts.length < 2) return;
   const at = pointAt(pts, p);
   const size = 9;
@@ -781,18 +1265,25 @@ function drawPenNib(ctx: CanvasRenderingContext2D, pts: Pt[], p: number, color: 
  *  first stop of a tuple. `"none"` (and `""`) mean "no fill" — treat them as absent rather than as a
  *  literal (and truthy) CSS color, so a `{fill:"none", stroke:"X"}` shape neither runs the no-op fill
  *  path nor loses its stroke to a falsely-truthy `fill`. */
-function fillColor(fill: string | [string, string] | undefined): string | undefined {
+function fillColor(
+  fill: string | [string, string] | undefined,
+): string | undefined {
   const c = Array.isArray(fill) ? fill[0] : fill;
   return c && c !== "none" ? c : undefined;
 }
 
 /** Resolve the stroke color/width an eraser should use for a stroke/path component's exit — mirrors
  *  the color each type's own native-enter draw uses, so the erase reads as "the same stroke, undone". */
-function strokeStyleFor(c: DrawComponent): { color: string; width?: number } | null {
+function strokeStyleFor(
+  c: DrawComponent,
+): { color: string; width?: number } | null {
   switch (c.type) {
     case "shape":
       if (c.shape === "disc") return null;
-      return { color: c.stroke ?? fillColor(c.fill) ?? "#eef5ef", width: c.width };
+      return {
+        color: c.stroke ?? fillColor(c.fill) ?? "#eef5ef",
+        width: c.width,
+      };
     case "parametric":
       return { color: c.color ?? "#5cc8ae", width: c.width };
     case "textPath":
@@ -805,21 +1296,28 @@ function strokeStyleFor(c: DrawComponent): { color: string; width?: number } | n
 /** Build the native `erase` exit for stroke/path content (shape path/polygon-family, parametric,
  *  textPath) — anything `pointsFor`/`strokeStyleFor` can resolve a point array + stroke style for.
  *  Returns undefined for non-stroke content, so callers fall back to the fade exit treatment. */
-function nativeEraseFor(c: DrawComponent, rc: RenderCtx): ((layer: CanvasRenderingContext2D, exitP: number) => void) | undefined {
+function nativeEraseFor(
+  c: DrawComponent,
+  rc: RenderCtx,
+): ((layer: CanvasRenderingContext2D, exitP: number) => void) | undefined {
   const pts = pointsFor(c, rc);
   const style = strokeStyleFor(c);
   if (!pts || pts.length < 2 || !style) return undefined;
-  return (layer, exitP) => erase(layer, pts, exitP, { style: { color: style.color, width: style.width } });
+  return (layer, exitP) =>
+    erase(layer, pts, exitP, {
+      style: { color: style.color, width: style.width },
+    });
 }
 
 /** Resolve the point array a "draw"-entrance component strokes on, for pen-nib placement. Only
  *  path/shape/parametric content exposes one; everything else returns null (pen silently ignored). */
 function pointsFor(c: DrawComponent, rc: RenderCtx): Pt[] | null {
   const { cx, cy, w, h } = rc;
-  const r = "r" in c ? c.r ?? Math.min(w, h) / 2 : Math.min(w, h) / 2;
+  const r = "r" in c ? (c.r ?? Math.min(w, h) / 2) : Math.min(w, h) / 2;
   switch (c.type) {
     case "shape": {
-      if (c.shape === "path") return smoothPath(c.points ?? [], { curve: "catmullRom" });
+      if (c.shape === "path")
+        return smoothPath(c.points ?? [], { curve: "catmullRom" });
       if (c.shape === "circle") return circleShape(cx, cy, r);
       if (c.shape === "star") return starShape(cx, cy, r);
       if (c.shape === "heart") return heartShape(cx, cy, r);
@@ -864,10 +1362,16 @@ function paintMapComponent(
   growT: number,
 ) {
   const growKeyframes = c.grow ?? [];
-  const markerRings: GeoFeature[] = (c.markers ?? []).map((m, i) => ({ id: `__marker${i}`, rings: [[[m.lon, m.lat]]] }));
-  const outlineFeature: GeoFeature[] = c.outline ? [{ id: "__outline", rings: [c.outline] }] : [];
-  const growFeatures: GeoFeature[] = growKeyframes.map((ring, i) => ({ id: `__grow${i}`, rings: [ring] }));
-  const proj = fitProjection([...c.features, ...outlineFeature, ...growFeatures, ...markerRings], area, 20);
+  const proj = mapProjection(c, area);
+
+  // 0. The sea: a backdrop map is the whole scene, so the water is painted before any land.
+  if (c.backdrop && c.water) {
+    layer.save();
+    layer.globalAlpha *= enterP;
+    layer.fillStyle = c.water;
+    layer.fillRect(area.x, area.y, area.w, area.h);
+    layer.restore();
+  }
 
   // 1. max-extent outline — stroke only, no fill.
   if (c.outline) {
@@ -894,7 +1398,8 @@ function paintMapComponent(
       layer.globalAlpha *= enterP;
       layer.beginPath();
       layer.moveTo(ring[0][0], ring[0][1]);
-      for (let k = 1; k < ring.length; k++) layer.lineTo(ring[k][0], ring[k][1]);
+      for (let k = 1; k < ring.length; k++)
+        layer.lineTo(ring[k][0], ring[k][1]);
       layer.closePath();
       layer.fillStyle = c.growFill ?? "rgba(154,59,46,0.28)";
       layer.fill();
@@ -909,39 +1414,81 @@ function paintMapComponent(
   // 3. features (existing region fills). `featureColors[i]`, when given, gives each feature its own
   // fill+stroke (same order as `features`) instead of the single shared teal — e.g. the four khanates
   // rendering in four distinct legend-matching colors. Semi-opaque fillAlpha so overlaps still read.
-  drawMap(layer, c.features, proj, (_f, i) => {
+  // Water regions go down first and unstroked: a named gulf is the sea it sits in, not a polygon
+  // floating on it, and the land drawn over it keeps a clean coast.
+  const order = c.features.map((_f, i) => i).sort((a, b) => Number(c.featureColors?.[b] === c.water) - Number(c.featureColors?.[a] === c.water));
+  drawMap(layer, order.map((i) => c.features[i]), proj, (_f, k) => {
+    const i = order[k];
     // Staggered draw-on when `featureStagger` is set: feature `i` animates over its own window; else
     // every feature rides the map's shared `enterP`.
-    const fp = c.featureStagger != null
-      ? clamp01((growT - i * c.featureStagger) / (c.featureDur ?? 2.5))
-      : enterP;
+    const fp =
+      c.featureStagger != null
+        ? clamp01((growT - i * c.featureStagger) / (c.featureDur ?? 2.5))
+        : enterP;
     const color = c.featureColors?.[i];
+    if (color !== undefined && color === c.water) return { fill: color, fillAlpha: 1, p: fp };
+    // Land on a backdrop is solid ground things stand on; an inset map keeps its translucent overlaps.
     return color
-      ? { stroke: color, fill: color, fillAlpha: 0.48, p: fp }
+      ? { stroke: c.ink ?? color, fill: color, fillAlpha: c.backdrop ? 0.92 : 0.48, width: c.backdrop ? 1.2 : 1.5, p: fp }
       : { stroke: "#5b6b78", fill: "rgba(92,200,174,0.18)", p: fp };
   });
+
+  // 3b. named places: a dot and its name, so a city is a point the reader can find and a label can aim at.
+  for (const place of c.places ?? []) {
+    const [x, y] = proj.project([place.lon, place.lat]);
+    layer.save();
+    layer.globalAlpha *= enterP;
+    layer.fillStyle = c.ink ?? "#eef5ef";
+    layer.beginPath();
+    layer.arc(x, y, 3.2, 0, Math.PI * 2);
+    layer.fill();
+    layer.font = "600 12px -apple-system, sans-serif";
+    layer.textAlign = "left";
+    layer.textBaseline = "middle";
+    layer.fillText(place.name, x + 7, y);
+    layer.restore();
+  }
 
   // 4. markers + flows (existing). Each flow can carry its own `at`/`dur` draw-on window (seconds
   // since the map entrance, via `growT`); without them it rides the map's shared `enterP`.
   for (const m of c.markers ?? []) {
     geoMarker(layer, [m.lon, m.lat], proj, {
-      icon: m.icon && iconNames.includes(m.icon as IconName) ? (m.icon as IconName) : undefined,
+      icon:
+        m.icon && iconNames.includes(m.icon as IconName)
+          ? (m.icon as IconName)
+          : undefined,
       label: m.label,
+      ink: c.ink,
       alpha: enterP,
     });
   }
   // `flows` endpoints may be a `[lon,lat]` pair OR a place name (a `places` entry / feature id /
   // marker label on this same map) — resolve names against the map's own place table.
-  const flowNames = (c.flows ?? []).some((f) => typeof f.from === "string" || typeof f.to === "string") ? mapPlaceNames(c) : null;
+  const flowNames = (c.flows ?? []).some(
+    (f) => typeof f.from === "string" || typeof f.to === "string",
+  )
+    ? mapPlaceNames(c)
+    : null;
   const flowLL = (v: [number, number] | string): [number, number] | null =>
-    Array.isArray(v) ? v : (flowNames ? lookupPlace(flowNames, v) ?? null : null);
+    Array.isArray(v)
+      ? v
+      : flowNames
+        ? (lookupPlace(flowNames, v) ?? null)
+        : null;
   for (const f of c.flows ?? []) {
-    const fp = f.at != null || f.dur != null ? clamp01((growT - (f.at ?? 0)) / (f.dur ?? 2.2)) : enterP;
+    const fp =
+      f.at != null || f.dur != null
+        ? clamp01((growT - (f.at ?? 0)) / (f.dur ?? 2.2))
+        : enterP;
     if (fp <= 0) continue;
     const from = flowLL(f.from);
     const to = flowLL(f.to);
     if (!from || !to) continue;
-    flowArrow(layer, from, to, proj, fp, { color: f.color, width: f.width, bend: f.bend });
+    flowArrow(layer, from, to, proj, fp, {
+      color: f.color,
+      width: f.width,
+      bend: f.bend,
+    });
   }
 }
 
@@ -954,7 +1501,11 @@ function paintMapComponent(
  * already pass for e.g. a `map`'s `growDur` (see mongol.ts scene 3, which keys both off `growDur`).
  * Returns `undefined` when there's no playhead to draw at all.
  */
-function resolvePlayhead(c: Extract<Component, { type: "timeline" }>, elapsed: number, defaultOver: number): number | undefined {
+function resolvePlayhead(
+  c: Extract<Component, { type: "timeline" }>,
+  elapsed: number,
+  defaultOver: number,
+): number | undefined {
   if (c.playheadFrom != null && c.playheadTo != null) {
     const over = c.playheadOver ?? defaultOver;
     // Smoothstep (matches the original's `phase`-driven playhead), so it stays in lockstep with a
@@ -972,8 +1523,22 @@ function resolvePlayhead(c: Extract<Component, { type: "timeline" }>, elapsed: n
  * `enterP` exactly, whether it takes raw t/at (drawSlam/drawWordReveal/drawScramble/barChart/scatter)
  * or a pre-clamped p (drawTypewriter/drawMath/chart line-area/shape/parametric/textPath).
  */
-function paintNative(layer: CanvasRenderingContext2D, c: DrawComponent, rc: RenderCtx, enterP: number, enterDur: number) {
+function paintNative(
+  layer: CanvasRenderingContext2D,
+  c: DrawComponent,
+  rc: RenderCtx,
+  enterP: number,
+  enterDur: number,
+) {
   const { at, cx, cy, w, h } = rc;
+  // A zero-length entrance (`initial: "visible"`, or `entrance: "instant"`) carries its progress only
+  // in enterP — `tPrime` collapses to `at`, which every native primitive reads back as progress 0 and
+  // refuses to draw. That is what left a heading set visible from frame zero as a permanent ghost.
+  // Fully-entered content is exactly what paintFinal draws.
+  if (enterDur <= 0) {
+    paintFinal(layer, c, rc);
+    return;
+  }
   const tPrime = at + enterP * enterDur;
   const syntheticRc: RenderCtx = { ...rc, t: tPrime, dur: enterDur };
   const area = { x: cx - w / 2, y: cy - h / 2, w, h };
@@ -982,7 +1547,10 @@ function paintNative(layer: CanvasRenderingContext2D, c: DrawComponent, rc: Rend
     case "heading": {
       const size = c.size ?? 30;
       const font = `700 ${size}px ${rc.theme.type.display}`;
-      drawSlam(layer, c.text, cx, cy, tPrime, at, { font, color: c.color ?? rc.theme.palette.ink });
+      drawSlam(layer, c.text, cx, cy, tPrime, at, {
+        font,
+        color: c.color ?? rc.theme.palette.ink,
+      });
       return;
     }
     case "text": {
@@ -992,12 +1560,34 @@ function paintNative(layer: CanvasRenderingContext2D, c: DrawComponent, rc: Rend
       const leftX = cx - w / 2;
       const mode = c.mode ?? textModeFromEnter(c.enter?.type);
       if (mode === "word") {
-        const wordCount = Math.max(1, c.text.split(/\s+/).filter(Boolean).length);
+        const wordCount = Math.max(
+          1,
+          c.text.split(/\s+/).filter(Boolean).length,
+        );
         const wordDur = Math.max(0.08, Math.min(0.35, enterDur * 0.35));
-        const wordStep = Math.max(0, (enterDur - wordDur) / Math.max(1, wordCount - 1));
-        drawWordReveal(layer, c.text, leftX, cy, tPrime, { font, color, align }, { start: at, step: wordStep, dur: wordDur, mode: "rise" });
+        const wordStep = Math.max(
+          0,
+          (enterDur - wordDur) / Math.max(1, wordCount - 1),
+        );
+        drawWordReveal(
+          layer,
+          c.text,
+          leftX,
+          cy,
+          tPrime,
+          { font, color, align },
+          { start: at, step: wordStep, dur: wordDur, mode: "rise" },
+        );
       } else if (mode === "typewriter") {
-        drawTypewriter(layer, c.text, leftX, cy, enterP, { font, color, align }, { cursor: true, t: tPrime });
+        drawTypewriter(
+          layer,
+          c.text,
+          leftX,
+          cy,
+          enterP,
+          { font, color, align },
+          { cursor: true, t: tPrime },
+        );
       } else if (mode === "slam") {
         drawSlam(layer, c.text, cx, cy, tPrime, at, { font, color });
       } else if (mode === "scramble") {
@@ -1008,29 +1598,55 @@ function paintNative(layer: CanvasRenderingContext2D, c: DrawComponent, rc: Rend
       return;
     }
     case "equation": {
-      drawMath(layer, c.tex, cx, cy, { size: c.size ?? 30, color: c.color ?? "#eef5ef", align: c.align, p: enterP });
+      drawMath(layer, c.tex, cx, cy, {
+        size: c.size ?? 30,
+        color: c.color ?? "#eef5ef",
+        align: c.align,
+        p: enterP,
+      });
       return;
     }
-    case "stat": {
+    case "measure": {
       const size = c.size ?? 44;
       const font = `800 ${size}px ${rc.theme.type.display}`;
-      const suffix = statSuffix(c.unit);
-      // `from` readouts (e.g. a running year counter) smoothstep across their window so they stay in
+      const suffix = measureSuffix(c.unit);
+      // `countFrom` readouts (e.g. a running year counter) smoothstep across their window so they stay in
       // lockstep with other `phase`-eased content (the map's `grow` morph + the timeline playhead,
       // which now ease the same way) — mirroring the original's single `grow = phase(t, …)` driving
       // year/ring/playhead together. Plain 0→value stats keep the default cubic ease (`c.from` unset).
-      const statEase = c.from != null ? smooth : undefined;
+      const countEase = c.countFrom != null ? smooth : undefined;
       // Use the RAW scene time `rc.t` (like the map `grow` + timeline playhead), NOT `tPrime` — `tPrime`
       // is `at + enterP*enterDur`, and since `enterP` is already smoothstep-eased, feeding it to
       // `counterValue` (which eases again) would DOUBLE-ease the count and drift ahead of the
       // playhead/border it should stay locked to.
+      const reading = counterValue(rc.t, at, enterDur, c.countFrom ?? 0, c.value, countEase);
+      const filled = meterFill(c, reading);
+      if (filled !== undefined)
+        drawMeter(layer, cx, cy, size, filled, c.meter ?? "bar", c.color ?? rc.theme.palette.accent, rc.theme.palette.muted);
       drawCounter(
-        layer, cx, cy,
-        counterValue(rc.t, at, enterDur, c.from ?? 0, c.value, statEase),
+        layer,
+        cx,
+        cy,
+        reading,
         { font, color: c.color ?? rc.theme.palette.accent, align: "center" },
-        { commas: c.commas ?? true, decimals: c.decimals, prefix: c.prefix, suffix },
+        {
+          commas: c.commas ?? true,
+          decimals: c.decimals,
+          prefix: c.prefix,
+          suffix,
+        },
       );
-      if (c.label) fadeText(layer, c.label, cx, cy + size * 0.6, enterP, "600 14px " + rc.theme.type.display, rc.theme.palette.muted, "center");
+      if (c.label)
+        fadeText(
+          layer,
+          c.label,
+          cx,
+          cy + size * 0.6,
+          enterP,
+          "600 14px " + rc.theme.type.display,
+          rc.theme.palette.muted,
+          "center",
+        );
       return;
     }
     case "chart": {
@@ -1044,26 +1660,43 @@ function paintNative(layer: CanvasRenderingContext2D, c: DrawComponent, rc: Rend
     case "parametric": {
       const pts = pointsFor(c, rc);
       if (!pts || pts.length < 2) return;
-      strokeOn(layer, pts, enterP, { color: c.color ?? "#5cc8ae", width: c.width });
+      strokeOn(layer, pts, enterP, {
+        color: c.color ?? "#5cc8ae",
+        width: c.width,
+      });
       if (c.enter?.pen) drawPenNib(layer, pts, enterP, c.color ?? "#5cc8ae");
       return;
     }
     case "textPath": {
-      drawTextAlongPath(layer, c.text, c.path, enterP, { font: `500 ${c.size ?? 18}px ${rc.theme.type.display}`, color: c.color ?? rc.theme.palette.ink });
+      drawTextAlongPath(layer, c.text, c.path, enterP, {
+        font: `500 ${c.size ?? 18}px ${rc.theme.type.display}`,
+        color: c.color ?? rc.theme.palette.ink,
+      });
       return;
     }
     case "icon": {
       if (!iconNames.includes(c.name as IconName)) return;
-      drawIcon(layer, c.name as IconName, cx, cy, c.size ?? 28, { color: c.color, filled: c.filled, alpha: enterP });
+      drawIcon(layer, c.name as IconName, cx, cy, c.size ?? 28, {
+        color: c.color,
+        filled: c.filled,
+        alpha: enterP,
+      });
       return;
     }
     case "legend": {
-      colorSemantics().legend(layer, c.categories, cx - w / 2, cy - (c.categories.length * (c.rowH ?? 20)) / 2, { rowH: c.rowH });
+      colorSemantics().legend(
+        layer,
+        c.categories,
+        cx - w / 2,
+        cy - (c.categories.length * (c.rowH ?? 20)) / 2,
+        { rowH: c.rowH },
+      );
       return;
     }
     case "image": {
       const img = getImage(c.src);
-      if (img) drawSvg(layer, img, cx, cy, w, h, { alpha: enterP, rotate: c.rotate });
+      if (img)
+        drawSvg(layer, img, cx, cy, w, h, { alpha: enterP, rotate: c.rotate });
       return;
     }
     case "vector": {
@@ -1071,7 +1704,7 @@ function paintNative(layer: CanvasRenderingContext2D, c: DrawComponent, rc: Rend
       return;
     }
     case "svg": {
-      paintSvg(layer, c, cx, cy, enterP);
+      paintClipped(layer, c.clipBox, () => paintSvg(layer, c, cx, cy, enterP));
       return;
     }
     case "prop": {
@@ -1087,13 +1720,25 @@ function paintNative(layer: CanvasRenderingContext2D, c: DrawComponent, rc: Rend
       const pal = rc.theme.palette;
       timelineAxis(layer, tl, { p: enterP, color: pal.muted, ink: pal.muted });
       timelineEras(layer, tl, c.eras ?? [], enterP);
-      timelineEvents(layer, tl, c.events ?? [], tPrime, { start: at, ink: pal.ink });
+      timelineEvents(layer, tl, c.events ?? [], tPrime, {
+        start: at,
+        ink: pal.ink,
+      });
       const ph = resolvePlayhead(c, rc.t - at, enterDur);
-      if (ph != null) timelinePlayhead(layer, tl, ph, { label: c.playheadLabel ?? true, color: pal.accent });
+      if (ph != null)
+        timelinePlayhead(layer, tl, ph, {
+          label: c.playheadLabel ?? true,
+          color: pal.accent,
+        });
       return;
     }
     case "table": {
-      drawTable(layer, c.rows, area.x, area.y, area.w, { header: c.header, rowH: c.rowH, ink: c.ink, p: enterP });
+      drawTable(layer, c.rows, area.x, area.y, area.w, {
+        header: c.header,
+        rowH: c.rowH,
+        ink: c.ink,
+        p: enterP,
+      });
       return;
     }
     case "group": {
@@ -1109,7 +1754,9 @@ function paintNative(layer: CanvasRenderingContext2D, c: DrawComponent, rc: Rend
       return;
     default: {
       const _exhaustive: never = c;
-      console.warn(`gcl: no native-enter handler for component type "${(_exhaustive as Component).type}"`);
+      console.warn(
+        `gcl: no native-enter handler for component type "${(_exhaustive as Component).type}"`,
+      );
       return;
     }
   }
@@ -1122,18 +1769,56 @@ function paintNative(layer: CanvasRenderingContext2D, c: DrawComponent, rc: Rend
  * integer. Returns `undefined` (defer to `niceTicks`) when the domain isn't a small integer range,
  * so larger/non-integer domains keep their existing "nice" tick behavior.
  */
+/** Run a paint inside a rectangular clip when one is given, leaving the context as it was. */
+function paintClipped(
+  layer: CanvasRenderingContext2D,
+  clip: { x: number; y: number; w: number; h: number } | undefined,
+  paint: () => void,
+): void {
+  if (!clip) {
+    paint();
+    return;
+  }
+  layer.save();
+  layer.beginPath();
+  layer.rect(clip.x, clip.y, clip.w, clip.h);
+  layer.clip();
+  paint();
+  layer.restore();
+}
+
 export function integerTicks([a, b]: [number, number]): number[] | undefined {
   const lo = Math.min(a, b);
   const hi = Math.max(a, b);
   const span = hi - lo;
-  if (span <= 0 || span > 6 || !Number.isInteger(lo) || !Number.isInteger(hi)) return undefined;
+  if (span <= 0 || span > 6 || !Number.isInteger(lo) || !Number.isInteger(hi))
+    return undefined;
   const out: number[] = [];
   for (let v = lo; v <= hi; v++) out.push(v);
   return out;
 }
 
+/**
+ * The extent of a data axis, padded when it is empty or degenerate.
+ *
+ * The category axes below deliberately start at zero, but an INDEPENDENT axis must not: forcing a
+ * series of years through 0 squeezed 1900–2000 into the last 5% of the plot.
+ */
+function dataDomain(values: number[]): [number, number] {
+  const finite = values.filter((value) => Number.isFinite(value));
+  if (finite.length === 0) return [0, 1];
+  const low = Math.min(...finite);
+  const high = Math.max(...finite);
+  return high - low < 1e-9 ? [low - 0.5, high + 0.5] : [low, high];
+}
+
 /** Bar/line/area/scatter/pie/function chart entrance — each family's own native stagger/progress. */
-function paintChart(layer: CanvasRenderingContext2D, c: Extract<Component, { type: "chart" }>, rc: RenderCtx, enterP: number) {
+function paintChart(
+  layer: CanvasRenderingContext2D,
+  c: Extract<Component, { type: "chart" }>,
+  rc: RenderCtx,
+  enterP: number,
+) {
   const { t, at, cx, cy, w, h } = rc;
   const area = { x: cx - w / 2, y: cy - h / 2, w, h };
   const color = c.color ?? "#5cc8ae";
@@ -1142,35 +1827,64 @@ function paintChart(layer: CanvasRenderingContext2D, c: Extract<Component, { typ
     const data: Datum[] = c.data ?? [];
     const ymax = Math.max(1, ...data.map((d) => d.value));
     const plot = makePlot(area, [0, 1], [0, ymax]);
-    if (showAxes) axes(layer, plot, { p: enterP, xLabel: c.xLabel, yLabel: c.yLabel });
+    if (showAxes)
+      axes(layer, plot, { p: enterP, xLabel: c.xLabel, yLabel: c.yLabel });
     barChart(layer, plot, data, { t, start: at, showValues: true, color });
   } else if (c.chart === "line" || c.chart === "area") {
     const series = c.series ?? [];
     const xs = series.map(([x]) => x);
     const ys = series.map(([, y]) => y);
-    const xDomain = c.xDomain ?? [Math.min(0, ...xs), Math.max(1, ...xs)];
+    const xDomain = c.xDomain ?? dataDomain(xs);
     const yDomain = c.yDomain ?? [Math.min(0, ...ys), Math.max(1, ...ys)];
     const plot = makePlot(area, xDomain, yDomain);
-    if (showAxes) axes(layer, plot, { p: enterP, xLabel: c.xLabel, yLabel: c.yLabel, xTicks: integerTicks(xDomain), yTicks: integerTicks(yDomain) });
-    lineChart(layer, plot, series, enterP, { area: c.chart === "area", color, markers: true });
+    if (showAxes)
+      axes(layer, plot, {
+        p: enterP,
+        xLabel: c.xLabel,
+        yLabel: c.yLabel,
+        xTicks: integerTicks(xDomain),
+        yTicks: integerTicks(yDomain),
+      });
+    lineChart(layer, plot, series, enterP, {
+      area: c.chart === "area",
+      color,
+      markers: true,
+    });
   } else if (c.chart === "scatter") {
     const series = c.series ?? [];
     const xs = series.map(([x]) => x);
     const ys = series.map(([, y]) => y);
-    const xDomain = c.xDomain ?? [Math.min(0, ...xs), Math.max(1, ...xs)];
+    const xDomain = c.xDomain ?? dataDomain(xs);
     const yDomain = c.yDomain ?? [Math.min(0, ...ys), Math.max(1, ...ys)];
     const plot = makePlot(area, xDomain, yDomain);
-    if (showAxes) axes(layer, plot, { p: enterP, xLabel: c.xLabel, yLabel: c.yLabel, xTicks: integerTicks(xDomain), yTicks: integerTicks(yDomain) });
+    if (showAxes)
+      axes(layer, plot, {
+        p: enterP,
+        xLabel: c.xLabel,
+        yLabel: c.yLabel,
+        xTicks: integerTicks(xDomain),
+        yTicks: integerTicks(yDomain),
+      });
     scatter(layer, plot, series, t, { color, start: at });
   } else if (c.chart === "pie") {
     const data: Datum[] = c.data ?? [];
-    pie(layer, cx, cy, Math.min(w, h) / 2, data, enterP, { donut: c.donut, labels: true });
+    pie(layer, cx, cy, Math.min(w, h) / 2, data, enterP, {
+      donut: c.donut,
+      labels: true,
+    });
   } else if (c.chart === "function") {
     const xDomain = c.xDomain ?? [-1, 1];
     const yDomain = c.yDomain ?? [-1, 1];
     const plot = makePlot(area, xDomain, yDomain);
     const evalFn = compileExpr(c.fn ?? "x");
-    if (showAxes) axes(layer, plot, { p: enterP, xLabel: c.xLabel, yLabel: c.yLabel, xTicks: integerTicks(xDomain), yTicks: integerTicks(yDomain) });
+    if (showAxes)
+      axes(layer, plot, {
+        p: enterP,
+        xLabel: c.xLabel,
+        yLabel: c.yLabel,
+        xTicks: integerTicks(xDomain),
+        yTicks: integerTicks(yDomain),
+      });
     plotFunction(layer, plot, (x) => evalFn({ x }), enterP, { color });
   } else if (c.chart === "riemann") {
     paintRiemann(layer, area, c, enterP);
@@ -1204,13 +1918,22 @@ function paintRiemann(
   const yDomain: [number, number] = c.yDomain ?? [yMin, yMax];
   const plot = makePlot(area, [a, b], yDomain);
   const showAxes = c.axes !== false;
-  if (showAxes) axes(layer, plot, { p: enterP, xLabel: c.xLabel, yLabel: c.yLabel, xTicks: integerTicks([a, b]), yTicks: integerTicks(yDomain) });
+  if (showAxes)
+    axes(layer, plot, {
+      p: enterP,
+      xLabel: c.xLabel,
+      yLabel: c.yLabel,
+      xTicks: integerTicks([a, b]),
+      yTicks: integerTicks(yDomain),
+    });
 
   const baseY = plot.sy(0);
   const step = 0.6 / n; // stagger so the whole cascade fits within the entrance window
   layer.save();
   for (let i = 0; i < n; i++) {
-    const gp = clamp01((enterP - i * step) / Math.max(1e-3, 1 - (n - 1) * step));
+    const gp = clamp01(
+      (enterP - i * step) / Math.max(1e-3, 1 - (n - 1) * step),
+    );
     if (gp <= 0) continue;
     const x0 = a + i * dx;
     const fx = evalFn({ x: x0 });
@@ -1222,16 +1945,29 @@ function paintRiemann(
     const bottom = fx >= 0 ? baseY : lerpNum(baseY, topFull, gp);
     layer.globalAlpha = 0.55 + 0.35 * gp;
     layer.fillStyle = color;
-    layer.fillRect(Math.min(rx0, rx1), Math.min(top, bottom), Math.abs(rx1 - rx0), Math.max(1, Math.abs(bottom - top)));
+    layer.fillRect(
+      Math.min(rx0, rx1),
+      Math.min(top, bottom),
+      Math.abs(rx1 - rx0),
+      Math.max(1, Math.abs(bottom - top)),
+    );
     layer.strokeStyle = "rgba(255,255,255,0.35)";
     layer.lineWidth = 1;
-    layer.strokeRect(Math.min(rx0, rx1), Math.min(top, bottom), Math.abs(rx1 - rx0), Math.max(1, Math.abs(bottom - top)));
+    layer.strokeRect(
+      Math.min(rx0, rx1),
+      Math.min(top, bottom),
+      Math.abs(rx1 - rx0),
+      Math.max(1, Math.abs(bottom - top)),
+    );
   }
   layer.restore();
 
   // The curve itself draws on last, riding the same overall progress, so it reads as "the rectangles
   // approximate this line".
-  plotFunction(layer, plot, (x) => evalFn({ x }), enterP, { color: color, width: 2 });
+  plotFunction(layer, plot, (x) => evalFn({ x }), enterP, {
+    color: color,
+    width: 2,
+  });
 }
 
 function lerpNum(a: number, b: number, p: number): number {
@@ -1240,12 +1976,22 @@ function lerpNum(a: number, b: number, p: number): number {
 
 /** Shape a→b target point list for a `motion.kind==="morph"` component — same center/r as the shape's
  *  own points, per the target `toShape`/`sides`. */
-function morphTargetShape(toShape: "circle" | "polygon" | "star" | "heart", sides: number | undefined, cx: number, cy: number, r: number): Pt[] {
+function morphTargetShape(
+  toShape: "circle" | "polygon" | "star" | "heart",
+  sides: number | undefined,
+  cx: number,
+  cy: number,
+  r: number,
+): Pt[] {
   switch (toShape) {
-    case "circle": return circleShape(cx, cy, r);
-    case "star": return starShape(cx, cy, r);
-    case "heart": return heartShape(cx, cy, r);
-    default: return polygonShape(cx, cy, r, sides ?? 5);
+    case "circle":
+      return circleShape(cx, cy, r);
+    case "star":
+      return starShape(cx, cy, r);
+    case "heart":
+      return heartShape(cx, cy, r);
+    default:
+      return polygonShape(cx, cy, r, sides ?? 5);
   }
 }
 
@@ -1256,7 +2002,14 @@ function morphTargetShape(toShape: "circle" | "polygon" | "star" | "heart", side
  * derived automatically) or an explicit `[light, dark]` pair; `c.shine` adds a small specular
  * highlight. Deterministic (no randomness, pure function of enterP/geometry).
  */
-function paintDisc(layer: CanvasRenderingContext2D, cx: number, cy: number, r: number, c: Extract<Component, { type: "shape" }>, enterP: number) {
+function paintDisc(
+  layer: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  r: number,
+  c: Extract<Component, { type: "shape" }>,
+  enterP: number,
+) {
   if (r <= 0) return;
   const [light, dark] = discColors(c.fill);
   radialGlow(layer, cx, cy, r * 1.3, light, enterP * 0.6);
@@ -1302,7 +2055,9 @@ function paintDisc(layer: CanvasRenderingContext2D, cx: number, cy: number, r: n
 
 /** Resolve a disc's [light, dark] gradient stops: an explicit tuple wins; a single color derives a
  *  darker shade automatically (multiply toward black); the default is the standard accent teal. */
-function discColors(fill: string | [string, string] | undefined): [string, string] {
+function discColors(
+  fill: string | [string, string] | undefined,
+): [string, string] {
   if (Array.isArray(fill)) return fill;
   const light = fill ?? "#5cc8ae";
   return [light, blendColor(light, "#000000", 0.65)];
@@ -1331,18 +2086,28 @@ function hexToRgb(hex: string): [number, number, number] | null {
 /** Shape entrance: draw-on stroke (with optional pen nib) or fill fade-in, matching P1 behavior.
  *  When `motion.kind === "morph"`, content-level shape A→B interpolation (drawMorph) takes over —
  *  the motion window's phase drives the morph, independent of the enter/exit progress `enterP`. */
-function paintShape(layer: CanvasRenderingContext2D, c: Extract<Component, { type: "shape" }>, rc: RenderCtx, enterP: number) {
+function paintShape(
+  layer: CanvasRenderingContext2D,
+  c: Extract<Component, { type: "shape" }>,
+  rc: RenderCtx,
+  enterP: number,
+) {
   const { cx, cy, w, h } = rc;
   const r = c.r ?? Math.min(w, h) / 2;
-  if (c.motion?.kind === "morph") {
-    const { toShape, sides, at = 0, dur = 1 } = c.motion;
+  const morph = c.motions?.find((spec): spec is Extract<MotionSpec, { kind: "morph" }> => spec.kind === "morph");
+  if (morph) {
+    const { toShape, sides, at = 0, dur = 1 } = morph;
     const p = linearPhase(rc.t, at, dur);
     const a = pointsFor(c, rc) ?? circleShape(cx, cy, r);
     const b = morphTargetShape(toShape, sides, cx, cy, r);
     const fill = fillColor(c.fill);
     layer.save();
     layer.globalAlpha *= enterP;
-    drawMorph(layer, a, b, p, { fill, stroke: c.stroke ?? (fill ? undefined : "#eef5ef"), width: c.width });
+    drawMorph(layer, a, b, p, {
+      fill,
+      stroke: c.stroke ?? (fill ? undefined : "#eef5ef"),
+      width: c.width,
+    });
     layer.restore();
     return;
   }
@@ -1362,8 +2127,12 @@ function paintShape(layer: CanvasRenderingContext2D, c: Extract<Component, { typ
       });
       return;
     }
-    strokeOn(layer, pts, enterP, { color: c.stroke ?? fill ?? "#eef5ef", width: c.width });
-    if (c.enter?.pen) drawPenNib(layer, pts, enterP, c.stroke ?? fill ?? "#eef5ef");
+    strokeOn(layer, pts, enterP, {
+      color: c.stroke ?? fill ?? "#eef5ef",
+      width: c.width,
+    });
+    if (c.enter?.pen)
+      drawPenNib(layer, pts, enterP, c.stroke ?? fill ?? "#eef5ef");
     return;
   }
   if (useBorderThenFill) {
@@ -1387,7 +2156,10 @@ function paintShape(layer: CanvasRenderingContext2D, c: Extract<Component, { typ
   }
   if (c.stroke || !fill) {
     const closed: Pt[] = [...pts, pts[0]];
-    strokeOn(layer, closed, enterP, { color: c.stroke ?? "#eef5ef", width: c.width });
+    strokeOn(layer, closed, enterP, {
+      color: c.stroke ?? "#eef5ef",
+      width: c.width,
+    });
     if (c.enter?.pen) drawPenNib(layer, closed, enterP, c.stroke ?? "#eef5ef");
   }
 }
@@ -1397,14 +2169,27 @@ function paintShape(layer: CanvasRenderingContext2D, c: Extract<Component, { typ
  * entrance+exit wrappers, which animate visibility around the content rather than the content's own
  * progress. Mirrors `paintNative`'s per-type drawing but always at full completion.
  */
-function paintFinal(layer: CanvasRenderingContext2D, c: DrawComponent, rc: RenderCtx) {
+function paintFinal(
+  layer: CanvasRenderingContext2D,
+  c: DrawComponent,
+  rc: RenderCtx,
+) {
   const { cx, cy, w, h } = rc;
   const area = { x: cx - w / 2, y: cy - h / 2, w, h };
   switch (c.type) {
     case "heading": {
       const size = c.size ?? 30;
       const font = `700 ${size}px ${rc.theme.type.display}`;
-      fadeText(layer, c.text, cx, cy, 1, font, c.color ?? rc.theme.palette.ink, "center");
+      fadeText(
+        layer,
+        c.text,
+        cx,
+        cy,
+        1,
+        font,
+        c.color ?? rc.theme.palette.ink,
+        "center",
+      );
       return;
     }
     case "text": {
@@ -1415,19 +2200,45 @@ function paintFinal(layer: CanvasRenderingContext2D, c: DrawComponent, rc: Rende
       return;
     }
     case "equation": {
-      drawMath(layer, c.tex, cx, cy, { size: c.size ?? 30, color: c.color ?? "#eef5ef", align: c.align, p: 1 });
+      drawMath(layer, c.tex, cx, cy, {
+        size: c.size ?? 30,
+        color: c.color ?? "#eef5ef",
+        align: c.align,
+        p: 1,
+      });
       return;
     }
-    case "stat": {
+    case "measure": {
       const size = c.size ?? 44;
       const font = `800 ${size}px ${rc.theme.type.display}`;
-      const suffix = statSuffix(c.unit);
+      const suffix = measureSuffix(c.unit);
+      const resting = meterFill(c, c.value);
+      if (resting !== undefined)
+        drawMeter(layer, cx, cy, size, resting, c.meter ?? "bar", c.color ?? rc.theme.palette.accent, rc.theme.palette.muted);
       drawCounter(
-        layer, cx, cy, c.value,
+        layer,
+        cx,
+        cy,
+        c.value,
         { font, color: c.color ?? rc.theme.palette.accent, align: "center" },
-        { commas: c.commas ?? true, decimals: c.decimals, prefix: c.prefix, suffix },
+        {
+          commas: c.commas ?? true,
+          decimals: c.decimals,
+          prefix: c.prefix,
+          suffix,
+        },
       );
-      if (c.label) fadeText(layer, c.label, cx, cy + size * 0.6, 1, "600 14px " + rc.theme.type.display, rc.theme.palette.muted, "center");
+      if (c.label)
+        fadeText(
+          layer,
+          c.label,
+          cx,
+          cy + size * 0.6,
+          1,
+          "600 14px " + rc.theme.type.display,
+          rc.theme.palette.muted,
+          "center",
+        );
       return;
     }
     case "chart": {
@@ -1445,21 +2256,35 @@ function paintFinal(layer: CanvasRenderingContext2D, c: DrawComponent, rc: Rende
       return;
     }
     case "textPath": {
-      drawTextAlongPath(layer, c.text, c.path, 1, { font: `500 ${c.size ?? 18}px ${rc.theme.type.display}`, color: c.color ?? rc.theme.palette.ink });
+      drawTextAlongPath(layer, c.text, c.path, 1, {
+        font: `500 ${c.size ?? 18}px ${rc.theme.type.display}`,
+        color: c.color ?? rc.theme.palette.ink,
+      });
       return;
     }
     case "icon": {
       if (!iconNames.includes(c.name as IconName)) return;
-      drawIcon(layer, c.name as IconName, cx, cy, c.size ?? 28, { color: c.color, filled: c.filled, alpha: 1 });
+      drawIcon(layer, c.name as IconName, cx, cy, c.size ?? 28, {
+        color: c.color,
+        filled: c.filled,
+        alpha: 1,
+      });
       return;
     }
     case "legend": {
-      colorSemantics().legend(layer, c.categories, cx - w / 2, cy - (c.categories.length * (c.rowH ?? 20)) / 2, { rowH: c.rowH });
+      colorSemantics().legend(
+        layer,
+        c.categories,
+        cx - w / 2,
+        cy - (c.categories.length * (c.rowH ?? 20)) / 2,
+        { rowH: c.rowH },
+      );
       return;
     }
     case "image": {
       const img = getImage(c.src);
-      if (img) drawSvg(layer, img, cx, cy, w, h, { alpha: 1, rotate: c.rotate });
+      if (img)
+        drawSvg(layer, img, cx, cy, w, h, { alpha: 1, rotate: c.rotate });
       return;
     }
     case "vector": {
@@ -1467,7 +2292,7 @@ function paintFinal(layer: CanvasRenderingContext2D, c: DrawComponent, rc: Rende
       return;
     }
     case "svg": {
-      paintSvg(layer, c, cx, cy, 1);
+      paintClipped(layer, c.clipBox, () => paintSvg(layer, c, cx, cy, 1));
       return;
     }
     case "prop": {
@@ -1488,17 +2313,29 @@ function paintFinal(layer: CanvasRenderingContext2D, c: DrawComponent, rc: Rende
       const palF = rc.theme.palette;
       timelineAxis(layer, tl, { p: 1, color: palF.muted, ink: palF.muted });
       timelineEras(layer, tl, c.eras ?? [], 1);
-      timelineEvents(layer, tl, c.events ?? [], rc.t, { start: rc.at - 1e6, ink: palF.ink }); // force-fired: all events already elapsed
+      timelineEvents(layer, tl, c.events ?? [], rc.t, {
+        start: rc.at - 1e6,
+        ink: palF.ink,
+      }); // force-fired: all events already elapsed
       // Steady-state (reached on almost every frame past the short default fade-in — see the `map`
       // case above for the same shape of bug): use REAL elapsed time, not "already complete", so an
       // animated playhead (`playheadFrom`/`playheadTo`) keeps sweeping for as long as `playheadOver`
       // lasts instead of snapping straight to `playheadTo`.
       const ph = resolvePlayhead(c, rc.t - rc.at, c.enter?.dur ?? rc.dur);
-      if (ph != null) timelinePlayhead(layer, tl, ph, { label: c.playheadLabel ?? true, color: palF.accent });
+      if (ph != null)
+        timelinePlayhead(layer, tl, ph, {
+          label: c.playheadLabel ?? true,
+          color: palF.accent,
+        });
       return;
     }
     case "table": {
-      drawTable(layer, c.rows, area.x, area.y, area.w, { header: c.header, rowH: c.rowH, ink: c.ink, p: 1 });
+      drawTable(layer, c.rows, area.x, area.y, area.w, {
+        header: c.header,
+        rowH: c.rowH,
+        ink: c.ink,
+        p: 1,
+      });
       return;
     }
     case "group": {
@@ -1513,7 +2350,9 @@ function paintFinal(layer: CanvasRenderingContext2D, c: DrawComponent, rc: Rende
       return;
     default: {
       const _exhaustive: never = c;
-      console.warn(`gcl: no compile handler yet for component type "${(_exhaustive as Component).type}"`);
+      console.warn(
+        `gcl: no compile handler yet for component type "${(_exhaustive as Component).type}"`,
+      );
       return;
     }
   }

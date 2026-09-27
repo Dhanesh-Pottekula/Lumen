@@ -44,8 +44,10 @@ const SHOTS: Record<ShotToken, ShotDefinition> = {
   detail: { zoom: 2.5, duration: 0.95 },
 };
 
-const sizeRow = (text: number, equation: number, stat: number, visual: number, line: number): Record<ObjectSpec["kind"], number> => ({
-  text, equation, stat, visual, line,
+const sizeRow = (text: number, equation: number, measure: number, visual: number, line: number): Record<ObjectSpec["kind"], number> => ({
+  text, equation, measure, visual, line,
+  angle: line,
+  span: line,
   vector: visual,
   "svg-composite": visual,
   "svg-artwork": visual,
@@ -61,7 +63,9 @@ const sizeRow = (text: number, equation: number, stat: number, visual: number, l
 
 const SIZES: Record<SizeToken, Record<ObjectSpec["kind"], number>> = {
   tiny: sizeRow(14, 20, 22, 0.55, 2),
+  mini: sizeRow(16, 23, 26, 0.67, 2.25),
   small: sizeRow(18, 26, 30, 0.8, 2.5),
+  compact: sizeRow(21, 30, 36, 0.97, 2.75),
   medium: sizeRow(24, 34, 42, 1.15, 3),
   large: sizeRow(32, 46, 56, 1.65, 4),
   hero: sizeRow(42, 60, 72, 2.3, 5),
@@ -104,7 +108,7 @@ const THEME_DATA = { TEXTBOOK, PARCHMENT, BLUEPRINT, CHALKBOARD };
 export function resolveVisualStyle(theme: ThemeName, role: RoleToken = "primary") {
   const value = THEME_DATA[theme];
   const color = role === "hero" || role === "primary" ? value.palette.accent : role === "support" || role === "background" ? value.palette.muted : value.palette.ink;
-  const layer = role === "background" ? "bg" : role === "annotation" || role === "hud" ? "annotation" : role === "hero" ? "fg" : "mid";
+  const layer = role === "background" ? "bg" : role === "annotation" || role === "hud" ? "annotation" : "mid";
   return { color, lineWidth: value.lineStyle.width, layer } as const;
 }
 

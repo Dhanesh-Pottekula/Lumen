@@ -130,12 +130,12 @@ export function flowArrow(ctx: CanvasRenderingContext2D, from: LonLat, to: LonLa
 }
 
 /** A marker (icon pin) + optional label at a coordinate. */
-export function geoMarker(ctx: CanvasRenderingContext2D, ll: LonLat, proj: Projection, opts: { icon?: IconName; color?: string; label?: string; size?: number; alpha?: number } = {}) {
+export function geoMarker(ctx: CanvasRenderingContext2D, ll: LonLat, proj: Projection, opts: { icon?: IconName; color?: string; label?: string; size?: number; alpha?: number; ink?: string } = {}) {
   const [x, y] = proj.project(ll);
   const a = clamp01(opts.alpha ?? 1);
   if (a <= 0) return;
   drawIcon(ctx, opts.icon ?? "pin", x, y - (opts.size ?? 16) / 2, opts.size ?? 16, { color: opts.color ?? "#e24b4a", filled: true, alpha: a });
-  if (opts.label) fadeText(ctx, opts.label, x, y + 14, a, "600 11px -apple-system, sans-serif", "#eef5ef");
+  if (opts.label) fadeText(ctx, opts.label, x, y + 14, a, "600 11px -apple-system, sans-serif", opts.ink ?? "#eef5ef");
 }
 
 /** Bounding-box center of a feature (lon/lat) — handy as a camera focus target once projected. */

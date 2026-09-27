@@ -12,7 +12,7 @@
 import type { Box } from "./anchors";
 import { makePlot } from "../render/charts";
 import { heartShape, polygonShape, starShape } from "../render/morph";
-import { fitProjection, featureCenter } from "../render/geo";
+import { fitProjection, featureCenter, type GeoFeature, type Projection } from "../render/geo";
 import { makeTimeline } from "../render/timeline";
 import type { Component } from "./schema";
 import { compileExpr } from "./expr";
@@ -175,11 +175,31 @@ function shapeAnchors(c: Extract<Component, { type: "shape" }>, box: Box): Recor
   return out;
 }
 
+/**
+ * The one projection a map is drawn, anchored and targeted through.
+ *
+ * Fitted to the LAND (plus any outline, growth ring or marker): a sea the lesson names reaches far
+ * past the coast it matters at, and fitting to it would shrink the country to a corner. Water is
+ * still painted wherever it falls inside the frame. Every path that maps lon/lat to the screen —
+ * the painter, the sub-anchors, the scene's geographic resolver — must call this, or a label lands
+ * beside the place it names.
+ */
+export function mapProjection(
+  c: Extract<Component, { type: "map" }>,
+  area: { x: number; y: number; w: number; h: number },
+): Projection {
+  const land = c.features.filter((_f, i) => c.featureColors?.[i] !== c.water);
+  const markers: GeoFeature[] = (c.markers ?? []).map((m, i) => ({ id: `__marker${i}`, rings: [[[m.lon, m.lat]]] }));
+  const outline: GeoFeature[] = c.outline ? [{ id: "__outline", rings: [c.outline] }] : [];
+  const growth: GeoFeature[] = (c.grow ?? []).map((ring, i) => ({ id: `__grow${i}`, rings: [ring] }));
+  return fitProjection([...(land.length > 0 ? land : c.features), ...outline, ...growth, ...markers], area, 20);
+}
+
 /** map: `<featureId>` → that feature's bbox-center (`featureCenter`), projected via the same
- *  `fitProjection` the map's own draw path uses (../render/geo.ts) — so the anchor lands exactly where the
- *  feature is drawn. Markers publish under their `label` (the only author-supplied identifier). */
+ *  projection the map's own draw path uses — so the anchor lands exactly where the feature is drawn.
+ *  Markers publish under their `label` (the only author-supplied identifier). */
 function mapAnchors(c: Extract<Component, { type: "map" }>, box: Box): Record<string, Vec2> {
-  const proj = fitProjection(c.features, boxArea(box));
+  const proj = mapProjection(c, boxArea(box));
   const out: Record<string, Vec2> = {};
   for (const f of c.features) out[f.id] = proj.project(featureCenter(f));
   for (const m of c.markers ?? []) {
@@ -234,7 +254,7 @@ function propAnchors(c: Extract<Component, { type: "prop" }>, box: Box): Record<
 /**
  * Named points a rich component publishes, in absolute view coords, given its OWN placement box
  * (same box the layout engine already computed for its `id`). Pure/ctx-free. Types without a richer
- * breakdown (text, stat, icon, table, group, ...) fall back to `{ center: boxCenter }` only.
+ * breakdown (text, measure, icon, table, group, ...) fall back to `{ center: boxCenter }` only.
  */
 export function subAnchors(c: Component, box: Box): Record<string, Vec2> {
   const generic = genericBoxAnchors(box);

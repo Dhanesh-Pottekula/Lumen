@@ -4,7 +4,7 @@ import type { Side as CalloutSide, LeaderRoute as CalloutRoute, Container as Cal
 
 export type Vec2 = [number, number];
 
-/** Named layout slots inside the 920×430 view. */
+/** Named layout slots inside the view space (see gcl/viewport.ts). */
 export type Slot =
   | "top-left" | "top" | "top-right"
   | "left" | "center" | "right"
@@ -49,12 +49,21 @@ export interface ExitSpec {
 
 /** Per-component object motion (Family B) — move/fall/orbit/along/spin/trace/morph, pure fns of t. */
 export type Gait = "walk" | "run" | "hop";
+/** How a path is played: start to end and stop, start to end and back again until the scene ends,
+ *  or start to end and again from the start. One leg takes the motion's duration. */
+export type Replay = "once" | "there-and-back" | "loop";
 export type MotionSpec =
   | { kind: "move"; to: Position; from?: Position; at?: number; cue?: number; start?: "with" | "after" | number; dur?: number; gait?: Gait }
   | { kind: "fall"; to?: Position; from?: Position; gravity?: number; at?: number; dur?: number; bounce?: number }
   | { kind: "orbit"; center: Position; radius?: number; rx?: number; ry?: number; from?: number; turns?: number; at?: number; dur?: number }
-  | { kind: "along"; path: Vec2[]; loop?: boolean; at?: number; dur?: number; gait?: Gait }
-  | { kind: "spin"; omega?: number; at?: number; dur?: number }
+  /** `startAt` is the fraction of the path where the traveller already rests, so the motion begins
+   *  there instead of jumping to the path's first point; a there-and-back run then swings out to
+   *  both ends from it. */
+  | { kind: "along"; path: Vec2[]; repeat?: Replay; startAt?: number; leadIn?: boolean; at?: number; dur?: number; gait?: Gait }
+  /** `center` turns the thing about that point instead of its own centre — a pendulum about its pivot, a
+   *  crank about its axle. `sweep` bounds the turn to an arc (radians): played once it opens to the arc, there-
+   *  and-back it swings to either side of rest, one full swing per `dur`. Without `sweep` it turns at `omega`. */
+  | { kind: "spin"; omega?: number; center?: Position; sweep?: number; repeat?: Replay; at?: number; dur?: number }
   | { kind: "trace"; path: Vec2[]; color?: string; dissipate?: number; at?: number; dur?: number }
   | { kind: "morph"; toShape: "circle" | "polygon" | "star" | "heart"; sides?: number; at?: number; dur?: number };
 
@@ -75,8 +84,20 @@ export interface EmphasisSpec {
 }
 
 /** Fields shared by every component. Most are plumbed now, exercised in later phases. */
+/** One step of a fill: the level this component reaches, and when it gets there. */
+export interface FillStep {
+  to: number;
+  at: number;
+  dur: number;
+  dir?: "left" | "right" | "up" | "down";
+}
+
 export interface Base {
   id?: string;
+  /** Progressive fill — water rising, a battery charging, a bar growing. The component is masked to
+   *  the level reached at `t`, which is what makes the CHANGE visible rather than just the states.
+   *  Named apart from the `fill` COLOUR that shapes and charts already carry. */
+  fillLevel?: FillStep[];
   at?: Position;
   cue?: number;                    // narration sentence index this appears with
   start?: "with" | "after" | number; // relative or absolute start (overrides cue)
@@ -84,12 +105,21 @@ export interface Base {
   enter?: EnterSpec;
   exit?: ExitSpec;
   layer?: "bg" | "mid" | "fg" | "annotation" | "fx";
+  /** Paint only inside this box (world units): a backdrop sharing the screen with another is cut to its band. */
+  clipBox?: { x: number; y: number; w: number; h: number };
   // Screen-fixed HUD: when true, this component ignores the scene camera (pan/zoom) and stays put in
   // screen space — for legends/titles/counters that should not move during a camera move. Implemented
   // by routing it to a dedicated screenspace overlay layer (see compile.ts). Per-scene, so it never
   // affects camera tracking of other components or other lessons.
   fixed?: boolean;
-  motion?: MotionSpec;
+  /** Spins turn the thing while any of these plays; journeys (the rest) play one after another, each
+   *  starting where the one before it stopped. */
+  motions?: MotionSpec[];
+  /** A connector pinned to two things. `ends` names them; `ends0` is where they sat when this was
+   *  laid out. The renderer maps the second onto the first each frame, so a string between a pivot
+   *  and a swinging bob turns about the pivot instead of hanging in the air where it was drawn. */
+  ends?: [Position, Position];
+  ends0?: [Vec2, Vec2];
   oscillate?: OscillateSpec;
   // Subject modifiers (Family D, Phase 4) — wrap THIS component's own content draw via the (A)-class
   // verbs (withPunch/withShake/pulseScale/wiggle/ghost/magnify) and predictReveal gating.
@@ -109,11 +139,14 @@ export type Component =
   | (Base & { type: "text"; text: string; role?: "title" | "body" | "bullet" | "caption"; mode?: "fade" | "word" | "typewriter" | "slam" | "scramble"; size?: number; color?: string; align?: CanvasTextAlign })
   | (Base & { type: "textPath"; text: string; path: Vec2[]; size?: number; color?: string })
   | (Base & { type: "equation"; tex: string; size?: number; color?: string; align?: "left" | "center" | "right" })
-  // stat stays as defined in P0 but ALSO accept fmt passthrough:
+  // measure stays as defined in P0 but ALSO accept fmt passthrough:
   // `from` (optional): when set, the counter animates `from → value` (instead of the implicit `0 →
   // value`) — e.g. a running-year readout ("1206" → "1260 CE" via `unit: "CE"`). Purely additive;
   // omitting it preserves the original 0→value counting behavior everywhere else.
-  | (Base & { type: "stat"; value: number; from?: number; unit?: string; label?: string; size?: number; color?: string; commas?: boolean; decimals?: number; prefix?: string })
+  | (Base & { type: "measure"; value: number; countFrom?: number; unit?: string; label?: string; size?: number; color?: string; commas?: boolean; decimals?: number; prefix?: string;
+      // A scale turns the figure into a quantity you can SEE: the meter fills to where `value` sits
+      // between the two bounds, in step with the digits counting, so the length IS the number.
+      scale?: [number, number]; meter?: "bar" | "ring" })
   | (Base & {
       // "riemann" (Phase 6 harvest): n rectangles under `fn` over `xDomain`, building in one-by-one —
       // the classic Riemann-sum calculus visual, harvested as a reusable named chart mode.
@@ -168,6 +201,11 @@ export type Component =
       // region reads as a distinct color instead of one shared fill. Optional; when omitted every
       // feature keeps the existing single-tone style (backward-compatible).
       featureColors?: string[];
+      /** The sea behind the land: painted across the whole box when this map is the scene's backdrop. */
+      water?: string;
+      backdrop?: boolean;
+      /** Ink for place names and marker labels, from the theme so it reads on light paper too. */
+      ink?: string;
       // Staggered feature draw-on: when set, feature `i` draws over the window
       // [`i*featureStagger`, `i*featureStagger + featureDur`] (seconds since the map's entrance) so
       // regions appear one-by-one rather than all at once. Omitted → every feature uses the map's own

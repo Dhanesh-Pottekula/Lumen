@@ -10,7 +10,7 @@
  *   point         → pointerArrow, bouncePointer
  *   de-emphasize  → ghost, emphasizeSurround (desaturate/blur the surround)
  *   magnify       → magnify (loupe)
- *   motion        → wiggle, pulseScale
+ *   motion        → wiggle
  */
 import { clamp01, lerp, wobble } from "./motion";
 import { masked } from "./reveal";
@@ -87,16 +87,38 @@ export interface RingOptions {
   alpha?: number;
 }
 
-/** A ring around a target that gently pulses in radius — a persistent "look here" marker. */
-export function highlightRing(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, t: number, opts: RingOptions = {}) {
-  const rr = r + wobble(t, opts.period ?? 1.4, opts.amp ?? 4);
+/** A steady ring around a target — a persistent "look here" marker. */
+export function highlightRing(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, _t: number, opts: RingOptions = {}) {
   ctx.save();
   ctx.globalAlpha = clamp01(opts.alpha ?? 1);
   ctx.strokeStyle = opts.color ?? ACCENT;
   ctx.lineWidth = opts.width ?? 3;
   ctx.beginPath();
-  ctx.arc(cx, cy, rr, 0, 7);
+  ctx.arc(cx, cy, r, 0, 7);
   ctx.stroke();
+  ctx.restore();
+}
+
+/**
+ * A soft glow BEHIND a target, so the thing itself looks lit rather than ringed.
+ *
+ * `destination-over` paints only where the canvas is still empty, which is how the halo lands under
+ * artwork already drawn this frame instead of washing over it. Nothing here moves with `t`: a marker
+ * that breathes pulls the eye to the marker, which is the opposite of pointing at the thing.
+ */
+export function highlightHalo(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, opts: RingOptions = {}) {
+  const glow = Math.max(12, r * 1.15);
+  const tint = opts.color ?? ACCENT;
+  ctx.save();
+  ctx.globalCompositeOperation = "destination-over";
+  ctx.globalAlpha = clamp01(opts.alpha ?? 0.55);
+  const wash = ctx.createRadialGradient(cx, cy, Math.max(1, glow * 0.35), cx, cy, glow);
+  wash.addColorStop(0, tint);
+  wash.addColorStop(1, "rgba(0,0,0,0)");
+  ctx.fillStyle = wash;
+  ctx.beginPath();
+  ctx.arc(cx, cy, glow, 0, 7);
+  ctx.fill();
   ctx.restore();
 }
 
@@ -159,7 +181,7 @@ export interface FocusBoxOptions {
 
 /** An animated box around a target rect (padding + optional breathing + marching-ant dashes). */
 export function focusBox(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, t: number, opts: FocusBoxOptions = {}) {
-  const pad = (opts.pad ?? 6) + wobble(t, opts.period ?? 1.4, opts.amp ?? 2);
+  const pad = opts.pad ?? 6;
   ctx.save();
   ctx.strokeStyle = opts.color ?? ACCENT;
   ctx.lineWidth = opts.width ?? 2.5;
@@ -310,16 +332,6 @@ export function wiggle(ctx: CanvasRenderingContext2D, cx: number, cy: number, t:
   ctx.restore();
 }
 
-/** Wrap a draw in a scale pulse about (cx,cy) — a heartbeat of emphasis. */
-export function pulseScale(ctx: CanvasRenderingContext2D, cx: number, cy: number, t: number, draw: (c: CanvasRenderingContext2D) => void, opts: { amp?: number; period?: number } = {}) {
-  const s = 1 + wobble(t, opts.period ?? 0.8, opts.amp ?? 0.06);
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.scale(s, s);
-  ctx.translate(-cx, -cy);
-  draw(ctx);
-  ctx.restore();
-}
 
 // ── More markers & pointers ───────────────────────────────────────────────────────────────────────
 

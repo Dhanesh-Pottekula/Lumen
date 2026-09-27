@@ -1,10 +1,10 @@
+import { EXPRESSION_CONSTANTS, EXPRESSION_FUNCTIONS } from "../gcl/expr";
 import { MATH_TEXT_COMMANDS } from "../render/mathtext";
 import { LESSON_SPEC_SCHEMA, SIMPLE_JSON_MAP_ICONS } from "./schema";
 import {
-  SIMPLE_JSON_SVG_ATTRIBUTES,
+  SIMPLE_JSON_SVG_ATTRIBUTE_NAMES,
   SIMPLE_JSON_SVG_MAX_ELEMENTS,
-  SIMPLE_JSON_SVG_MAX_MARKUP_LENGTH,
-  SIMPLE_JSON_SVG_TAGS,
+  SIMPLE_JSON_SVG_TAG_NAMES,
 } from "./svg";
 import { availableVisualAssets, visualAssetAnchors } from "./visual-catalog";
 
@@ -31,27 +31,48 @@ export function getSimpleJsonCapabilities() {
   const properties = schema.properties ?? {};
   const scene = properties.scenes?.items;
   const objectVariants = schema.$defs?.object?.oneOf ?? [];
-  const actionVariants = scene?.properties?.beats?.items?.properties?.actions?.items?.oneOf ?? [];
-  const assets = availableVisualAssets().map((asset) => ({ asset, anchors: visualAssetAnchors(asset) ?? [] }));
+  const actionVariants =
+    scene?.properties?.beats?.items?.properties?.actions?.items?.oneOf ?? [];
+  const assets = availableVisualAssets().map((asset) => ({
+    asset,
+    anchors: visualAssetAnchors(asset) ?? [],
+  }));
 
   return {
     version: "1" as const,
     themes: [...(properties.theme?.enum ?? [])],
     compositions: [...(scene?.properties?.composition?.enum ?? [])],
-    objectKinds: [...new Set(objectVariants.flatMap((variant) => variant.properties?.kind?.const ?? []))],
-    actions: [...new Set(actionVariants.flatMap((variant) => variant.properties?.do?.const ?? []))],
+    objectKinds: [
+      ...new Set(
+        objectVariants.flatMap(
+          (variant) => variant.properties?.kind?.const ?? [],
+        ),
+      ),
+    ],
+    actions: [
+      ...new Set(
+        actionVariants.flatMap(
+          (variant) => variant.properties?.do?.const ?? [],
+        ),
+      ),
+    ],
     visualAssets: assets,
     mapIcons: [...SIMPLE_JSON_MAP_ICONS],
     svg: {
-      tags: [...SIMPLE_JSON_SVG_TAGS],
-      attributes: [...SIMPLE_JSON_SVG_ATTRIBUTES],
-      maxCharacters: SIMPLE_JSON_SVG_MAX_MARKUP_LENGTH,
+      // Canonical SVG spellings — validation is case-insensitive, but the emitted markup is parsed
+      // as case-sensitive XML, so a lower-cased vocabulary invites silently invisible output.
+      tags: [...SIMPLE_JSON_SVG_TAG_NAMES],
+      attributes: [...SIMPLE_JSON_SVG_ATTRIBUTE_NAMES],
       maxElements: SIMPLE_JSON_SVG_MAX_ELEMENTS,
-      publicParts: "root-level <g id=\"...\"> elements",
+      publicParts: 'root-level <g id="..."> elements',
     },
     mathTextCommands: [...MATH_TEXT_COMMANDS],
+    expressionFunctions: [...EXPRESSION_FUNCTIONS],
+    expressionConstants: [...EXPRESSION_CONSTANTS],
     schema: clone(LESSON_SPEC_SCHEMA),
   };
 }
 
-export type SimpleJsonCapabilities = ReturnType<typeof getSimpleJsonCapabilities>;
+export type SimpleJsonCapabilities = ReturnType<
+  typeof getSimpleJsonCapabilities
+>;

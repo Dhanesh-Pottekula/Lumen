@@ -26,8 +26,9 @@ export function formatNumber(n: number, opts: NumberFormat = {}): string {
   const fixed = Math.abs(n).toFixed(decimals);
   const neg = n < 0 && Number(fixed) !== 0; // avoid "-0" when rounding brings a small negative to zero
   let body = fixed;
-  if (commas) {
-    const [int, frac] = fixed.split(".");
+  const [int, frac] = fixed.split(".");
+  // Four digits stay solid: 1980 is a year to a reader, 1,980 is a count.
+  if (commas && int.length > 4) {
     const withCommas = int.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
     body = frac ? `${withCommas}.${frac}` : withCommas;
   }

@@ -128,16 +128,34 @@ export function motionTransform(
       if (spec.path.length < 2) return IDENTITY; // makePath needs >=2 points to define a path
       const dur = spec.dur ?? 2;
       const path = makePath(spec.path);
-      const prog = spec.loop ? (dur > 0 ? ((t - at) / dur) % 1 : 0) : linearPhase(t, at, dur);
-      const p = Math.max(0, prog);
+      // One leg of the path takes `dur`, and the traveller enters the path at `startAt` — where it
+      // already rests — so the first frame moves nothing. Played once it runs to the end and stops;
+      // looped it starts over; there-and-back it is a cosine, p = ½ − ½·cos(π·legs), which is the
+      // timing of anything that swings: fastest through the middle, still at each end, forever.
+      const legs = dur > 0 ? (t - at) / dur : 0;
+      const start = Math.min(1, Math.max(0, spec.startAt ?? 0));
+      const prog =
+        spec.repeat === "loop"
+          ? (legs + start) % 1
+          : spec.repeat === "there-and-back"
+            ? 0.5 - 0.5 * Math.cos(Math.PI * (legs + Math.acos(1 - 2 * start) / Math.PI))
+            : start + (1 - start) * linearPhase(t, at, dur);
+      const p = Math.max(0, Math.min(1, prog));
       const pt = path.at(p * path.length);
-      const gait = spec.loop ? { dy: 0, rot: 0 } : gaitOffset(spec.gait, p, path.length);
+      const gait = spec.repeat ? { dy: 0, rot: 0 } : gaitOffset(spec.gait, p, path.length);
       return { dx: pt.x - bcx, dy: pt.y - bcy + gait.dy, rot: gait.rot, scale: 1 };
     }
     case "spin": {
       const omega = spec.omega ?? Math.PI * 2;
-      const tau = spec.dur !== undefined ? Math.max(0, Math.min(t, at + spec.dur) - at) : Math.max(0, t - at);
-      return { dx: 0, dy: 0, rot: omega * tau, scale: 1 };
+      const rot = spinAngle(spec, omega, t, at);
+      if (spec.center === undefined) return { dx: 0, dy: 0, rot, scale: 1 };
+      // Turning about another point carries the thing's own centre around that point.
+      const [px, py] = resolveFocal(spec.center);
+      const cos = Math.cos(rot);
+      const sin = Math.sin(rot);
+      const nx = px + (bcx - px) * cos - (bcy - py) * sin;
+      const ny = py + (bcx - px) * sin + (bcy - py) * cos;
+      return { dx: nx - bcx, dy: ny - bcy, rot, scale: 1 };
     }
     case "trace": {
       if (spec.path.length < 2) return IDENTITY; // makePath needs >=2 points; no trail either
@@ -164,6 +182,101 @@ export function motionTransform(
       return _exhaustive;
     }
   }
+}
+
+/** The angle a spin has turned by `t`: a bounded `sweep` swings or opens over `dur`, an unbounded spin
+ *  turns at `omega` (held once its `dur` is up). */
+function spinAngle(spec: Extract<MotionSpec, { kind: "spin" }>, omega: number, t: number, at: number): number {
+  const dur = spec.dur ?? 1;
+  if (spec.sweep === undefined) {
+    const tau = spec.dur !== undefined ? Math.max(0, Math.min(t, at + spec.dur) - at) : Math.max(0, t - at);
+    return omega * tau;
+  }
+  const legs = dur > 0 ? Math.max(0, t - at) / dur : 1;
+  const sign = Math.sign(omega) || 1;
+  // A swing rests in the middle and reaches half the sweep to either side, one full swing per `dur`.
+  if (spec.repeat === "there-and-back") return sign * (spec.sweep / 2) * Math.sin(Math.PI * 2 * legs);
+  if (spec.repeat === "loop") return sign * spec.sweep * (legs % 1);
+  return sign * spec.sweep * easeInOutCubic(clamp01(legs));
+}
+
+/** When a journey has delivered the thing and holds it there, or undefined for one that never ends. */
+function journeyEnd(spec: MotionSpec): number | undefined {
+  const at = spec.at ?? 0;
+  switch (spec.kind) {
+    case "move":
+    case "fall":
+    case "morph":
+      return at + (spec.dur ?? 1);
+    case "trace":
+      return at + (spec.dur ?? 2);
+    case "along":
+      return spec.repeat !== undefined && spec.repeat !== "once" ? undefined : at + (spec.dur ?? 2);
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * The transform of a component carrying several motions at once.
+ *
+ * Spins turn the thing whatever else it is doing — the Moon turns on its axis while it orbits. The
+ * journeys (everything else) run one after another: a finished journey banks where it left the thing,
+ * and the next one starts from there — the bee flies to the flower, then flies home along a route —
+ * so a later `move` or lead-in never snaps back to the resting layout first.
+ */
+export function motionsTransform(
+  specs: MotionSpec[] | undefined,
+  box: Box,
+  t: number,
+  resolveFocal: (pos: unknown) => [number, number],
+): MotionTransform {
+  if (!specs || specs.length === 0) return IDENTITY;
+  const out: MotionTransform = { dx: 0, dy: 0, rot: 0, scale: 1 };
+  const carried: [number, number] = [0, 0];
+  let travelling = false;
+  const journeys = specs.filter((spec) => spec.kind !== "spin").sort((a, b) => (a.at ?? 0) - (b.at ?? 0));
+  for (const spec of journeys) {
+    if (travelling) break;
+    const shifted = { ...box, x: box.x + carried[0], y: box.y + carried[1] };
+    const live: MotionSpec =
+      spec.kind === "along" && spec.leadIn && (carried[0] !== 0 || carried[1] !== 0)
+        ? { ...spec, path: [[spec.path[0][0] + carried[0], spec.path[0][1] + carried[1]], ...spec.path.slice(1)] }
+        : spec;
+    const end = journeyEnd(spec);
+    if (end !== undefined && t >= end) {
+      const done = motionTransform(live, shifted, end, resolveFocal);
+      carried[0] += done.dx;
+      carried[1] += done.dy;
+      continue;
+    }
+    const m = motionTransform(live, shifted, t, resolveFocal);
+    out.dx += m.dx;
+    out.dy += m.dy;
+    out.rot += m.rot;
+    out.scale *= m.scale;
+    if (m.trail) out.trail = m.trail;
+    travelling = true;
+  }
+  out.dx += carried[0];
+  out.dy += carried[1];
+  // Spins about one point compose by ANGLE: two swings about a pivot are one swing through their
+  // summed angle, never two displacements added — those agree only while there is a single spin.
+  const turned = new Map<string, number>();
+  for (const spec of specs) {
+    if (spec.kind !== "spin") continue;
+    const key = spec.center === undefined ? "" : JSON.stringify(spec.center);
+    turned.set(key, (turned.get(key) ?? 0) + spinAngle(spec, spec.omega ?? Math.PI * 2, t, spec.at ?? 0));
+  }
+  const [bcx, bcy] = boxCenter(box);
+  for (const [key, rot] of turned) {
+    out.rot += rot;
+    if (key === "") continue;
+    const [px, py] = resolveFocal(JSON.parse(key) as unknown);
+    out.dx += px + (bcx - px) * Math.cos(rot) - (bcy - py) * Math.sin(rot) - bcx;
+    out.dy += py + (bcx - px) * Math.sin(rot) + (bcy - py) * Math.cos(rot) - bcy;
+  }
+  return out;
 }
 
 /** Idle continuous oscillation — additive to the motion offset. Pure function of `t`. */

@@ -75,7 +75,7 @@ export const tortoiseAndHareLessonSpec: LessonSpec = {
       ]),
       beats: [
         { id: "s-b1", actions: [{ do: "show", targets: ["meadow", "sun", "tortoise", "hare"], entrance: "fade" }] },
-        { id: "s-b2", pace: "quick", actions: [{ do: "motion", target: "hare", motion: "orbit", around: "tortoise", orbit: "medium", turns: "one" }] },
+        { id: "s-b2", pace: "quick", actions: [{ do: "motion", target: "hare", motion: "orbit", around: "tortoise", turns: 1 }] },
         { id: "s-b3", actions: [{ do: "label", target: "hare", text: "Nobody's faster than me!", style: "bubble" }, { do: "emphasize", target: "hare", emphasis: "pulse", strength: "strong" }] },
       ],
     },

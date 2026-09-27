@@ -14,8 +14,22 @@ export type CompositionToken =
   | "table"
   | "custom-relational";
 export type PaceToken = "instant" | "quick" | "normal" | "slow" | "dramatic";
-export type SizeToken = "tiny" | "small" | "medium" | "large" | "hero" | "fill";
-export type RoleToken = "background" | "support" | "primary" | "hero" | "annotation" | "hud";
+export type SizeToken =
+  | "tiny"
+  | "mini"
+  | "small"
+  | "compact"
+  | "medium"
+  | "large"
+  | "hero"
+  | "fill";
+export type RoleToken =
+  | "background"
+  | "support"
+  | "primary"
+  | "hero"
+  | "annotation"
+  | "hud";
 export type ZoneToken =
   | "title"
   | "main"
@@ -37,11 +51,23 @@ export type EntranceToken =
   | "word-by-word"
   | "typewriter"
   | "scramble";
-export type ExitToken = "instant" | "fade" | "erase" | "wipe" | "iris" | "dissolve" | "slide" | "shrink";
+export type ExitToken =
+  | "instant"
+  | "fade"
+  | "erase"
+  | "wipe"
+  | "iris"
+  | "dissolve"
+  | "slide"
+  | "shrink";
 
 export type PlacementSpec =
   | { mode: "zone"; zone: ZoneToken }
-  | { mode: "relative"; target: string; relation: "above" | "below" | "left-of" | "right-of" | "near" }
+  | {
+      mode: "relative";
+      target: string;
+      relation: "above" | "below" | "left-of" | "right-of" | "near";
+    }
   | { mode: "anchor"; target: string };
 
 export interface ObjectBase {
@@ -62,9 +88,35 @@ export interface CategoryDatumSpec {
 }
 
 export type MapIconToken =
-  | "arrow" | "check" | "cross" | "plus" | "minus" | "star" | "heart" | "circle" | "square" | "triangle"
-  | "gear" | "bolt" | "drop" | "sun" | "leaf" | "flame" | "factory" | "home" | "person" | "book"
-  | "flask" | "atom" | "clock" | "pin" | "warning" | "info" | "search" | "cloud" | "mountain" | "seed";
+  | "check"
+  | "cross"
+  | "plus"
+  | "minus"
+  | "star"
+  | "heart"
+  | "circle"
+  | "square"
+  | "triangle"
+  | "gear"
+  | "bolt"
+  | "drop"
+  | "sun"
+  | "leaf"
+  | "flame"
+  | "factory"
+  | "home"
+  | "person"
+  | "book"
+  | "flask"
+  | "atom"
+  | "clock"
+  | "pin"
+  | "warning"
+  | "info"
+  | "search"
+  | "cloud"
+  | "mountain"
+  | "seed";
 
 export interface MapFeatureSpec {
   id: string;
@@ -109,12 +161,27 @@ interface ChartBase {
   yLabel?: string;
 }
 
-export type ChartObjectSpec = ObjectBase & ChartBase & (
-  | { kind: "chart"; chart: "bar" | "pie" | "donut"; data: CategoryDatumSpec[] }
-  | { kind: "chart"; chart: "line" | "area" | "scatter"; series: [number, number][] }
-  | { kind: "chart"; chart: "function"; function: string }
-  | { kind: "chart"; chart: "riemann"; function: string; rectangles?: "few" | "several" | "many" | "dense" }
-);
+export type ChartObjectSpec = ObjectBase &
+  ChartBase &
+  (
+    | {
+        kind: "chart";
+        chart: "bar" | "pie" | "donut";
+        data: CategoryDatumSpec[];
+      }
+    | {
+        kind: "chart";
+        chart: "line" | "area" | "scatter";
+        series: [number, number][];
+      }
+    | { kind: "chart"; chart: "function"; function: string }
+    | {
+        kind: "chart";
+        chart: "riemann";
+        function: string;
+        rectangles?: "few" | "several" | "many" | "dense";
+      }
+  );
 
 export type ObjectSpec =
   | (ObjectBase & {
@@ -124,16 +191,26 @@ export type ObjectSpec =
     })
   | (ObjectBase & { kind: "equation"; value: string })
   | (ObjectBase & {
-      kind: "stat";
+      kind: "measure";
       value: number;
-      from?: number;
+      /** Counts from here to `value` as it appears. Defaults to 0, so a figure always rolls up. */
+      countFrom?: number;
       unit?: string;
       label?: string;
       decimals?: number;
       commas?: boolean;
       prefix?: string;
+      /** The range the figure lives in. Give one and the meter shows how big the number IS, which
+       *  digits alone never do; two measures sharing a scale are directly comparable by length. */
+      scale?: [number, number];
+      meter?: "bar" | "ring";
     })
-  | (ObjectBase & { kind: "visual"; asset: string; color?: string; orientation?: "left" | "right" | "up" | "down" })
+  | (ObjectBase & {
+      kind: "visual";
+      asset: string;
+      color?: string;
+      orientation?: "left" | "right" | "up" | "down";
+    })
   | (ObjectBase & {
       kind: "vector";
       d: string;
@@ -158,8 +235,36 @@ export type ObjectSpec =
       svg: string;
       /** Root-level group ids that are teaching aids and must be hidden before the scene finishes. */
       temporaryParts?: string[];
+      /** Rendered width in view units, when the author needs a size the six size words cannot
+       *  express — an apple beside a planet. Overrides `size`; the height follows the viewBox. */
+      width?: number;
+      /** How the drawing was asked for, carried through so a stored film still says what it meant
+       *  to draw. Provenance only — the engine draws `svg` and never reads these. */
+      draw?: string;
+      parts?: string[];
+      pixels?: [number, number];
     })
-  | (ObjectBase & { kind: "line"; from: string; to: string; form?: "straight" | "elbow" | "curved" | "arrow" | "traced" })
+  | (ObjectBase & {
+      /** The arc between two directions out of a shared corner — the mark geometry and optics need
+       *  to say "thirty degrees" in a picture rather than only in the narration. */
+      kind: "angle";
+      at: string;
+      from: string;
+      to: string;
+    })
+  | (ObjectBase & {
+      /** A measured distance: a line with a cap at each end, meaning HOW FAR APART rather than
+       *  CONNECTED TO. A plain line already means the second thing. */
+      kind: "span";
+      from: string;
+      to: string;
+    })
+  | (ObjectBase & {
+      kind: "line";
+      from: string;
+      to: string;
+      form?: "straight" | "elbow" | "curved" | "traced";
+    })
   | (ObjectBase & {
       kind: "shape";
       shape: "circle" | "polygon" | "star" | "heart" | "disc";
@@ -170,6 +275,11 @@ export type ObjectSpec =
       kind: "curve";
       x: string;
       y: string;
+      /** Lay the shape BETWEEN two things instead of dropping it in a zone: the formula is drawn in
+       *  its own frame, then turned and stretched so its start sits on `from` and its end on `to`.
+       *  A sine wave from the sun to a leaf is the wave's shape along the sun-to-leaf axis. */
+      from?: string;
+      to?: string;
       domain?: [number, number];
       appearance?: "solid" | "dashed";
     })
@@ -178,7 +288,13 @@ export type ObjectSpec =
   | (ObjectBase & {
       kind: "map";
       features: MapFeatureSpec[];
-      markers?: Array<{ lon: number; lat: number; label?: string; icon?: MapIconToken; category?: string }>;
+      markers?: Array<{
+        lon: number;
+        lat: number;
+        label?: string;
+        icon?: MapIconToken;
+        category?: string;
+      }>;
       places?: MapPlaceSpec[];
       flows?: MapFlowSpec[];
       outline?: [number, number][];
@@ -191,7 +307,12 @@ export type ObjectSpec =
       from: number;
       to: number;
       events?: Array<{ at: number; label: string; side?: "above" | "below" }>;
-      eras?: Array<{ from: number; to: number; label: string; category?: string }>;
+      eras?: Array<{
+        from: number;
+        to: number;
+        label: string;
+        category?: string;
+      }>;
       playhead?: number | { from: number; to: number; pace?: PaceToken };
     })
   | (ObjectBase & { kind: "table"; rows: string[][]; header?: boolean })
@@ -204,10 +325,24 @@ export type ObjectSpec =
       clip?: boolean;
     });
 
+/** How full a thing is, in the only steps a reader can actually tell apart. */
+export type FillToken = "empty" | "quarter" | "half" | "three-quarters" | "full";
+
 export type ActionSpec =
+  | {
+      do: "fill";
+      target: string;
+      to: FillToken;
+      direction?: "up" | "down" | "left" | "right";
+    }
   | { do: "show"; targets: string[]; entrance?: EntranceToken }
   | { do: "hide"; targets: string[]; exit?: ExitToken }
-  | { do: "camera"; target: string; shot?: ShotToken; movement?: "cut" | "move" | "push" }
+  | {
+      do: "camera";
+      target: string;
+      shot?: ShotToken;
+      movement?: "cut" | "move" | "push";
+    }
   | {
       do: "label";
       target: string;
@@ -221,24 +356,82 @@ export type ActionSpec =
       returnTo?: "overview";
       stops: Array<{ target: string; label: string; shot?: ShotToken }>;
     }
-  | { do: "motion"; target: string; motion: "move"; to: string; gait?: "walk" | "run" | "hop" }
-  | { do: "motion"; target: string; motion: "fall"; to: string; bounce?: "none" | "soft" | "strong" }
   | {
       do: "motion";
       target: string;
+      /** Pieces that ride rigidly with the target — a rod with its bob, a cup in a hand — named as parts or objects. */
+      with?: string[];
+      motion: "move";
+      to: string;
+      /** Where the mover stops: against the target's edge (default) or all the way in. */
+      land?: "surface" | "centre";
+      gait?: "walk" | "run" | "hop";
+    }
+  | {
+      do: "motion";
+      target: string;
+      /** Pieces that ride rigidly with the target — a rod with its bob, a cup in a hand — named as parts or objects. */
+      with?: string[];
+      motion: "fall";
+      to: string;
+      /** Where the mover stops: against the target's edge (default) or all the way in. */
+      land?: "surface" | "centre";
+      bounce?: "none" | "soft" | "strong";
+    }
+  | {
+      do: "motion";
+      target: string;
+      /** Pieces that ride rigidly with the target — a rod with its bob, a cup in a hand — named as parts or objects. */
+      with?: string[];
       motion: "orbit";
       around: string;
-      orbit?: "small" | "medium" | "large";
-      turns?: "half" | "one" | "two" | "many";
+      turns?: number;
       direction?: "clockwise" | "counterclockwise";
     }
-  | { do: "motion"; target: string; motion: "along"; along: string; gait?: "walk" | "run" | "hop" }
-  | { do: "motion"; target: string; motion: "spin"; direction?: "clockwise" | "counterclockwise" }
-  | { do: "emphasize"; target: string; emphasis: "punch" | "shake" | "pulse" | "wiggle"; strength?: "subtle" | "normal" | "strong" }
+  | {
+      do: "motion";
+      target: string;
+      /** Pieces that ride rigidly with the target — a rod with its bob, a cup in a hand — named as parts or objects. */
+      with?: string[];
+      motion: "along";
+      along: string;
+      gait?: "walk" | "run" | "hop";
+      repeat?: "once" | "there-and-back" | "loop";
+    }
+  | {
+      do: "motion";
+      target: string;
+      /** Pieces that ride rigidly with the target — a rod with its bob, a cup in a hand — named as parts or objects. */
+      with?: string[];
+      motion: "spin";
+      direction?: "clockwise" | "counterclockwise";
+      /** The point it turns about when not its own centre: a pendulum about `clock.pivot`. */
+      about?: string;
+      /** Turn through this many degrees instead of going round and round. */
+      sweep?: number;
+      /** How a bounded sweep plays: open once, swing to either side of rest, or ratchet round. */
+      repeat?: "once" | "there-and-back" | "loop";
+    }
+  | {
+      do: "emphasize";
+      target: string;
+      emphasis: "punch" | "shake" | "pulse" | "wiggle";
+      strength?: "subtle" | "normal" | "strong";
+    }
   | {
       do: "attention";
       target: string;
-      verb: "callout" | "highlight" | "spotlight" | "dim" | "box" | "brackets" | "encircle" | "converge" | "spark" | "vignette" | "rings";
+      verb:
+        | "callout"
+        | "spotlight"
+        | "dim"
+        | "box"
+        | "brackets"
+        | "encircle"
+        | "converge"
+        | "spark"
+        | "vignette"
+        | "rings";
       from?: string;
       text?: string;
       title?: string;
@@ -257,9 +450,34 @@ export type ActionSpec =
       route?: "auto" | "straight" | "elbow" | "curve";
       style?: "text" | "pill" | "rect" | "tag" | "bubble" | "badge";
     }
-  | { do: "effect"; effect: "particles"; target: string; preset?: "fire" | "smoke" | "sparks" | "rain" | "snow" | "dust" | "confetti" | "energy"; intensity?: "subtle" | "normal" | "strong" }
-  | { do: "effect"; effect: "glow"; target: string; intensity?: "subtle" | "normal" | "strong" }
-  | { do: "effect"; effect: "flow"; from: string; to: string; intensity?: "subtle" | "normal" | "strong" };
+  | {
+      do: "effect";
+      effect: "particles";
+      target: string;
+      preset?:
+        | "fire"
+        | "smoke"
+        | "sparks"
+        | "rain"
+        | "snow"
+        | "dust"
+        | "confetti"
+        | "energy";
+      intensity?: "subtle" | "normal" | "strong";
+    }
+  | {
+      do: "effect";
+      effect: "glow";
+      target: string;
+      intensity?: "subtle" | "normal" | "strong";
+    }
+  | {
+      do: "effect";
+      effect: "flow";
+      from: string;
+      to: string;
+      intensity?: "subtle" | "normal" | "strong";
+    };
 
 export interface BeatSpec {
   id: string;

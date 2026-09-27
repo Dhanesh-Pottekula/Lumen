@@ -8,7 +8,11 @@
  */
 
 type TokKind = "num" | "ident" | "op" | "lparen" | "rparen" | "comma";
-interface Tok { kind: TokKind; text: string; value?: number }
+interface Tok {
+  kind: TokKind;
+  text: string;
+  value?: number;
+}
 
 const FUNCS: Record<string, (...args: number[]) => number> = {
   sin: Math.sin,
@@ -33,7 +37,18 @@ const FUNCS: Record<string, (...args: number[]) => number> = {
 
 const CONSTS: Record<string, number> = { pi: Math.PI, e: Math.E };
 
-const OP_PREC: Record<string, number> = { "+": 2, "-": 2, "*": 3, "/": 3, "u-": 5, "^": 6 };
+/** Literal author-facing vocabulary; evaluator functions themselves remain private. */
+export const EXPRESSION_FUNCTIONS = Object.freeze(Object.keys(FUNCS));
+export const EXPRESSION_CONSTANTS = Object.freeze(Object.keys(CONSTS));
+
+const OP_PREC: Record<string, number> = {
+  "+": 2,
+  "-": 2,
+  "*": 3,
+  "/": 3,
+  "u-": 5,
+  "^": 6,
+};
 const OP_RIGHT_ASSOC: Record<string, boolean> = { "^": true, "u-": true };
 
 // ── Tokenizer ────────────────────────────────────────────────────────────────────────────────────
@@ -48,7 +63,10 @@ function tokenize(src: string): Tok[] {
       i++;
       continue;
     }
-    if (ch >= "0" && ch <= "9" || (ch === "." && src[i + 1] >= "0" && src[i + 1] <= "9")) {
+    if (
+      (ch >= "0" && ch <= "9") ||
+      (ch === "." && src[i + 1] >= "0" && src[i + 1] <= "9")
+    ) {
       let j = i;
       while (j < n && src[j] >= "0" && src[j] <= "9") j++;
       if (src[j] === ".") {
@@ -79,10 +97,26 @@ function tokenize(src: string): Tok[] {
       i = j;
       continue;
     }
-    if (ch === "(") { toks.push({ kind: "lparen", text: ch }); i++; continue; }
-    if (ch === ")") { toks.push({ kind: "rparen", text: ch }); i++; continue; }
-    if (ch === ",") { toks.push({ kind: "comma", text: ch }); i++; continue; }
-    if ("+-*/^".includes(ch)) { toks.push({ kind: "op", text: ch }); i++; continue; }
+    if (ch === "(") {
+      toks.push({ kind: "lparen", text: ch });
+      i++;
+      continue;
+    }
+    if (ch === ")") {
+      toks.push({ kind: "rparen", text: ch });
+      i++;
+      continue;
+    }
+    if (ch === ",") {
+      toks.push({ kind: "comma", text: ch });
+      i++;
+      continue;
+    }
+    if ("+-*/^".includes(ch)) {
+      toks.push({ kind: "op", text: ch });
+      i++;
+      continue;
+    }
     throw new Error(`unexpected character "${ch}" at ${i}`);
   }
   return toks;
@@ -95,8 +129,12 @@ function insertImplicitMultiplication(toks: Tok[]): Tok[] {
     const cur = toks[i];
     if (out.length > 0) {
       const prev = out[out.length - 1];
-      const prevEndsValue = prev.kind === "num" || prev.kind === "rparen" || (prev.kind === "ident" && !(prev.text in FUNCS));
-      const curStartsValue = cur.kind === "num" || cur.kind === "lparen" || cur.kind === "ident";
+      const prevEndsValue =
+        prev.kind === "num" ||
+        prev.kind === "rparen" ||
+        (prev.kind === "ident" && !(prev.text in FUNCS));
+      const curStartsValue =
+        cur.kind === "num" || cur.kind === "lparen" || cur.kind === "ident";
       if (prevEndsValue && curStartsValue) out.push({ kind: "op", text: "*" });
     }
     out.push(cur);
@@ -140,9 +178,15 @@ function toRpn(toks: Tok[]): RpnItem[] {
     } else if (t.kind === "op") {
       let opText = t.text;
       // unary minus: at start, after another operator, or after '(' or ','
-      if (opText === "-" && (prevKind === "start" || prevKind === "op" || prevKind === "unary")) {
+      if (
+        opText === "-" &&
+        (prevKind === "start" || prevKind === "op" || prevKind === "unary")
+      ) {
         opText = "u-";
-      } else if (opText === "+" && (prevKind === "start" || prevKind === "op" || prevKind === "unary")) {
+      } else if (
+        opText === "+" &&
+        (prevKind === "start" || prevKind === "op" || prevKind === "unary")
+      ) {
         // unary plus is a no-op; skip emitting anything
         prevKind = "unary";
         continue;
@@ -160,7 +204,8 @@ function toRpn(toks: Tok[]): RpnItem[] {
         stack.length > 0 &&
         stack[stack.length - 1].kind === "op" &&
         (OP_PREC[stack[stack.length - 1].text] > OP_PREC[opText] ||
-          (OP_PREC[stack[stack.length - 1].text] === OP_PREC[opText] && !OP_RIGHT_ASSOC[opText]))
+          (OP_PREC[stack[stack.length - 1].text] === OP_PREC[opText] &&
+            !OP_RIGHT_ASSOC[opText]))
       ) {
         const top = stack.pop()!;
         output.push({ kind: "op", op: top.text });
@@ -189,7 +234,11 @@ function toRpn(toks: Tok[]): RpnItem[] {
       if (stack.length === 0) throw new Error("mismatched parens");
       stack.pop(); // discard the lparen
       const argc = argCounts.pop() ?? 1;
-      if (stack.length > 0 && stack[stack.length - 1].kind === "ident" && stack[stack.length - 1].text in FUNCS) {
+      if (
+        stack.length > 0 &&
+        stack[stack.length - 1].kind === "ident" &&
+        stack[stack.length - 1].text in FUNCS
+      ) {
         const fn = stack.pop()!;
         output.push({ kind: "func", name: fn.text, argc });
       }
@@ -223,14 +272,26 @@ function evalRpn(rpn: RpnItem[], vars: Record<string, number>): number {
       }
       const b = st.pop();
       const a = st.pop();
-      if (a === undefined || b === undefined) throw new Error("stack underflow");
+      if (a === undefined || b === undefined)
+        throw new Error("stack underflow");
       switch (item.op) {
-        case "+": st.push(a + b); break;
-        case "-": st.push(a - b); break;
-        case "*": st.push(a * b); break;
-        case "/": st.push(a / b); break;
-        case "^": st.push(Math.pow(a, b)); break;
-        default: throw new Error(`unknown operator "${item.op}"`);
+        case "+":
+          st.push(a + b);
+          break;
+        case "-":
+          st.push(a - b);
+          break;
+        case "*":
+          st.push(a * b);
+          break;
+        case "/":
+          st.push(a / b);
+          break;
+        case "^":
+          st.push(Math.pow(a, b));
+          break;
+        default:
+          throw new Error(`unknown operator "${item.op}"`);
       }
     } else if (item.kind === "func") {
       const fn = FUNCS[item.name];
@@ -257,7 +318,7 @@ function evalRpn(rpn: RpnItem[], vars: Record<string, number>): number {
  * render paths) should treat NaN samples as "nothing to draw" rather than throwing.
  */
 export type ExpressionParseResult =
-  | { valid: true; evaluate: (vars: Record<string, number>) => number }
+  | { valid: true; evaluate: (vars: Record<string, number>) => number; variables: string[] }
   | { valid: false; error: string };
 
 /** Parse an authored expression without hiding the failure from validators and LLM repair loops. */
@@ -268,18 +329,29 @@ export function parseExpr(src: string): ExpressionParseResult {
     rpn = toRpn(toks);
     if (rpn.length === 0) throw new Error("empty expression");
   } catch (error) {
-    return { valid: false, error: error instanceof Error ? error.message : "invalid expression" };
+    return {
+      valid: false,
+      error: error instanceof Error ? error.message : "invalid expression",
+    };
   }
-  return { valid: true, evaluate: (vars: Record<string, number>) => {
-    try {
-      return evalRpn(rpn, vars);
-    } catch {
-      return NaN;
-    }
-  } };
+  return {
+    valid: true,
+    evaluate: (vars: Record<string, number>) => {
+      try {
+        return evalRpn(rpn, vars);
+      } catch {
+        return NaN;
+      }
+    },
+    // Reported so a validator can refuse a name the renderer will never bind. An unbound variable
+    // evaluates to 0, which turns a curve into a single repeated point and reads as nothing drawn.
+    variables: [...new Set(rpn.filter((item) => item.kind === "var").map((item) => item.name))],
+  };
 }
 
-export function compileExpr(src: string): (vars: Record<string, number>) => number {
+export function compileExpr(
+  src: string,
+): (vars: Record<string, number>) => number {
   const parsed = parseExpr(src);
   return parsed.valid ? parsed.evaluate : () => NaN;
 }

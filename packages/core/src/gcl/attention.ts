@@ -49,7 +49,10 @@ export function attnGeom(target: unknown, boxes: Map<string, Box>, viewW: number
     const box = boxes.get(target)!;
     const cx = box.x + box.w / 2;
     const cy = box.y + box.h / 2;
-    const r = Math.hypot(box.w, box.h) / 2;
+    // The box's longer half-side, not its diagonal. A halo is drawn at 1.15x this, so the diagonal
+    // put a 340-wide artwork under a 276-unit glow on a 540-wide screen — a wash over the whole
+    // frame that reads as pointing at nothing rather than at the thing.
+    const r = Math.max(box.w, box.h) / 2;
     return { cx, cy, r, box };
   }
   const [cx, cy] = resolvePosition(target as Position, { viewW, viewH, boxes, geo });

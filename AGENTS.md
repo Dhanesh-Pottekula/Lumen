@@ -28,5 +28,20 @@ playground into a public package.
    stale temporary objects, and motion-path continuity.
 8. Run `npm run typecheck`, `npm run build`, and `npm run pack:audit`.
 
+## Writing code here
+
+- Write no comment by default. A comment is a last resort for a constraint or a
+  browser/runtime quirk the code cannot express. A comment that says WHAT the
+  code does is not allowed — fix the naming instead. Never narrate a change or a
+  design that used to exist.
+- Delete dead code in the change that orphaned it: unreachable exports, branches,
+  parameters, table entries, and any helper left with no caller. Never leave it
+  "in case".
+- A derivable value is not data, and a variable that only ever holds one value is
+  not state. Remove it along with every branch that tested it.
+- Prefer the simplest form: an early return over a state variable threaded to a
+  shared exit, a flat sequence over nested conditionals. Do not add a layer or an
+  option for a case that does not exist yet.
+
 Do not publish, commit, push, or expose a provider key unless the user
 explicitly authorizes that action.

@@ -23,10 +23,10 @@ function stringTargets(component: Component): Array<{ value: Position | undefine
     targets.push({ value: component.from, field: "from" });
     targets.push({ value: component.to, field: "to" });
   }
-  if (component.motion) {
-    if (component.motion.kind === "move" || component.motion.kind === "fall") targets.push({ value: component.motion.to, field: "motion/to" });
-    if (component.motion.kind === "orbit") targets.push({ value: component.motion.center, field: "motion/center" });
-  }
+  (component.motions ?? []).forEach((motion, index) => {
+    if (motion.kind === "move" || motion.kind === "fall") targets.push({ value: motion.to, field: `motions/${index}/to` });
+    if (motion.kind === "orbit" || motion.kind === "spin") targets.push({ value: motion.center, field: `motions/${index}/center` });
+  });
   return targets;
 }
 
@@ -56,32 +56,38 @@ function validateScene(components: Component[], offset: number): Diagnostic[] {
       }
     }
 
+    // Later journeys start where the one before left the thing, so only the first can jump from rest.
     const resting = component.id ? positions.get(component.id) : undefined;
-    if (resting && component.motion?.kind === "orbit" && typeof component.motion.center === "string") {
-      const center = positions.get(component.motion.center);
+    const journey = (component.motions ?? []).find((motion) => motion.kind !== "spin");
+    if (resting && journey?.kind === "orbit" && typeof journey.center === "string") {
+      const center = positions.get(journey.center);
       if (center) {
-        const from = component.motion.from ?? 0;
-        const rx = component.motion.rx ?? component.motion.radius ?? 80;
-        const ry = component.motion.ry ?? component.motion.radius ?? 80;
+        const from = journey.from ?? 0;
+        const rx = journey.rx ?? journey.radius ?? 80;
+        const ry = journey.ry ?? journey.radius ?? 80;
         const expected: [number, number] = [center[0] + Math.cos(from) * rx, center[1] + Math.sin(from) * ry];
         const jump = Math.hypot(resting[0] - expected[0], resting[1] - expected[1]);
         if (jump > 0.5) {
           errors.push({
             code: "CANONICAL_ERROR",
-            path: `/${offset + index}/motion`,
+            path: `/${offset + index}/motions/0`,
             message: `Orbit motion would jump ${jump.toFixed(1)} view units on its first frame`,
-            received: component.motion,
+            received: journey,
           });
         }
       }
     }
-    if (resting && component.motion?.kind === "along" && component.motion.path.length > 0) {
-      const first = component.motion.path[0];
+    if (resting && journey?.kind === "along" && journey.path.length > 0) {
+      // The traveller enters the path at `startAt` — where it already rests — so that is the point
+      // the first frame is measured against, not the path's first sample.
+      const path = journey.path;
+      const entry = Math.min(1, Math.max(0, journey.startAt ?? 0));
+      const first = path[Math.round(entry * (path.length - 1))];
       const jump = Math.hypot(resting[0] - first[0], resting[1] - first[1]);
       if (jump > 0.5) {
         errors.push({
           code: "CANONICAL_ERROR",
-          path: `/${offset + index}/motion/path/0`,
+          path: `/${offset + index}/motions/0/path/0`,
           message: `Along-path motion would jump ${jump.toFixed(1)} view units on its first frame`,
           received: first,
         });

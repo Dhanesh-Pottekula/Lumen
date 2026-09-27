@@ -24,7 +24,11 @@ export interface Plot extends PlotArea {
   sy(v: number): number;
 }
 
-export function makePlot(area: PlotArea, xDomain: [number, number], yDomain: [number, number]): Plot {
+export function makePlot(
+  area: PlotArea,
+  xDomain: [number, number],
+  yDomain: [number, number],
+): Plot {
   const [x0, x1] = xDomain;
   const [y0, y1] = yDomain;
   return {
@@ -47,7 +51,8 @@ export function niceTicks([a, b]: [number, number], count = 5): number[] {
   const step = (norm >= 5 ? 5 : norm >= 2 ? 2 : 1) * mag;
   const start = Math.ceil(lo2 / step) * step;
   const out: number[] = [];
-  for (let v = start; v <= hi2 + 1e-9; v += step) out.push(Math.round(v / step) * step);
+  for (let v = start; v <= hi2 + 1e-9; v += step)
+    out.push(Math.round(v / step) * step);
   return out;
 }
 
@@ -70,12 +75,21 @@ export interface AxesOptions {
 function tickDecimals(values: number[]): number {
   for (let decimals = 0; decimals <= 3; decimals++) {
     const scale = 10 ** decimals;
-    if (values.every((value) => Math.abs(value * scale - Math.round(value * scale)) < 1e-7)) return decimals;
+    if (
+      values.every(
+        (value) => Math.abs(value * scale - Math.round(value * scale)) < 1e-7,
+      )
+    )
+      return decimals;
   }
   return 3;
 }
 
-export function axes(ctx: CanvasRenderingContext2D, plot: Plot, o: AxesOptions = {}) {
+export function axes(
+  ctx: CanvasRenderingContext2D,
+  plot: Plot,
+  o: AxesOptions = {},
+) {
   const color = o.color ?? "#5b6b78";
   const gridColor = o.gridColor ?? "rgba(255,255,255,0.06)";
   const ink = o.ink ?? "#93a4b0";
@@ -116,9 +130,11 @@ export function axes(ctx: CanvasRenderingContext2D, plot: Plot, o: AxesOptions =
   ctx.textAlign = "center";
   const xFormat = o.fmt ?? { decimals: tickDecimals(xTicks) };
   const yFormat = o.fmt ?? { decimals: tickDecimals(yTicks) };
-  for (const v of xTicks) ctx.fillText(formatNumber(v, xFormat), plot.sx(v), plot.y + plot.h + 16);
+  for (const v of xTicks)
+    ctx.fillText(formatNumber(v, xFormat), plot.sx(v), plot.y + plot.h + 16);
   ctx.textAlign = "right";
-  for (const v of yTicks) ctx.fillText(formatNumber(v, yFormat), plot.x - 8, plot.sy(v) + 4);
+  for (const v of yTicks)
+    ctx.fillText(formatNumber(v, yFormat), plot.x - 8, plot.sy(v) + 4);
   // axis titles
   if (o.xLabel) {
     ctx.textAlign = "center";
@@ -150,9 +166,16 @@ export function plotFunction(
   const pts: Pt[] = [];
   for (let i = 0; i <= samples; i++) {
     const x = lerp(plot.xDomain[0], plot.xDomain[1], i / samples);
-    pts.push([plot.sx(x), plot.sy(fn(x))]);
+    const y = plot.sy(fn(x));
+    // Skip samples outside the function's domain. One non-finite point poisons the cumulative arc
+    // length that drives the reveal, so the canvas discarded the ENTIRE path — sqrt, log and 1/x
+    // plotted nothing at all. The parametric painter has always filtered; match it.
+    if (Number.isFinite(y)) pts.push([plot.sx(x), y]);
   }
-  strokeOn(ctx, pts, p, { color: opts.color ?? "#5cc8ae", width: opts.width ?? 2.5 });
+  strokeOn(ctx, pts, p, {
+    color: opts.color ?? "#5cc8ae",
+    width: opts.width ?? 2.5,
+  });
 }
 
 // ── Bar chart ────────────────────────────────────────────────────────────────────────────────────
@@ -176,7 +199,12 @@ export interface BarOptions {
 }
 
 /** Bars grow up from the baseline in a staggered cascade. Values from the plot's yDomain. */
-export function barChart(ctx: CanvasRenderingContext2D, plot: Plot, data: Datum[], o: BarOptions) {
+export function barChart(
+  ctx: CanvasRenderingContext2D,
+  plot: Plot,
+  data: Datum[],
+  o: BarOptions,
+) {
   const gap = o.gap ?? 0.35;
   const slot = plot.w / data.length;
   const bw = slot * (1 - gap);
@@ -221,7 +249,13 @@ export interface LineOptions {
 }
 
 /** A line series bound to [x,y] data, drawing on to `p`, with optional area fill + markers. */
-export function lineChart(ctx: CanvasRenderingContext2D, plot: Plot, series: [number, number][], p: number, o: LineOptions = {}) {
+export function lineChart(
+  ctx: CanvasRenderingContext2D,
+  plot: Plot,
+  series: [number, number][],
+  p: number,
+  o: LineOptions = {},
+) {
   const pts: Pt[] = series.map(([x, y]) => [plot.sx(x), plot.sy(y)]);
   const P = clamp01(p);
   if (o.area && P > 0) {
@@ -255,7 +289,13 @@ export function lineChart(ctx: CanvasRenderingContext2D, plot: Plot, series: [nu
 }
 
 /** Scatter points appearing in a staggered cascade. */
-export function scatter(ctx: CanvasRenderingContext2D, plot: Plot, points: [number, number][], t: number, o: { color?: string; r?: number; start?: number; step?: number } = {}) {
+export function scatter(
+  ctx: CanvasRenderingContext2D,
+  plot: Plot,
+  points: [number, number][],
+  t: number,
+  o: { color?: string; r?: number; start?: number; step?: number } = {},
+) {
   const step = o.step ?? 0.03;
   ctx.save();
   ctx.fillStyle = o.color ?? "#e8a13c";
@@ -280,12 +320,27 @@ export interface PieOptions {
 }
 
 /** Pie/donut wedges sweep in as `p` 0→1 (proportional to each datum's share). */
-export function pie(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, data: Datum[], p: number, o: PieOptions = {}) {
+export function pie(
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  r: number,
+  data: Datum[],
+  p: number,
+  o: PieOptions = {},
+) {
   const total = data.reduce((s, d) => s + d.value, 0) || 1;
   const P = clamp01(p);
   const inner = (o.donut ?? 0) * r;
   let a = o.startAngle ?? -Math.PI / 2;
-  const palette = ["#5cc8ae", "#e8a13c", "#6db0e8", "#c94b6b", "#a06be8", "#38ef7d"];
+  const palette = [
+    "#5cc8ae",
+    "#e8a13c",
+    "#6db0e8",
+    "#c94b6b",
+    "#a06be8",
+    "#38ef7d",
+  ];
   ctx.save();
   data.forEach((d, i) => {
     const frac = d.value / total;
@@ -305,7 +360,11 @@ export function pie(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: nu
       ctx.font = "600 11px -apple-system, sans-serif";
       ctx.textAlign = "center";
       ctx.globalAlpha = clamp01((P - 0.7) / 0.3);
-      ctx.fillText(`${Math.round(frac * 100)}%`, cx + Math.cos(mid) * lr, cy + Math.sin(mid) * lr + 4);
+      ctx.fillText(
+        `${Math.round(frac * 100)}%`,
+        cx + Math.cos(mid) * lr,
+        cy + Math.sin(mid) * lr + 4,
+      );
       ctx.globalAlpha = 1;
     }
     a += frac * Math.PI * 2;

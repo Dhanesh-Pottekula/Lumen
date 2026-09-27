@@ -46,7 +46,7 @@ Hard rules (these are enforced by the compiler; violating them fails the lesson)
 7. **Chart data by chart kind:** `bar`/`pie`/`donut` need `data`; `line`/`area`/`scatter` need
    `series`; `function`/`riemann` need `function`.
 8. **Motion fields by motion kind:** `move`/`fall` need `to`; `orbit` needs `around`; `along` needs
-   `along`; `spin` needs no destination. One motion per object per scene. The authored resting
+   `along`; `spin` needs no destination (`about` turns it round another point). One journey per beat per object, spins on top. The authored resting
    position **is** motion frame zero — put an orbiting object on its visible ring, and an along-path
    object at one endpoint.
 9. **Screen-fixed content:** use `role: "hud"` for readouts, or `space: "screen"` for other
@@ -1583,6 +1583,13 @@ Sequential—Earth appears first, then Moon:
 
 ---
 
+### 9.x Maps as the ground of a scene
+
+A `map` with `role: "background"` fills the frame: the sea is painted across the whole view and the
+land is fitted inside it. Features sharing a `category` share a colour; a category containing `sea`,
+`gulf`, `strait`, `water` or `lake` is painted as water. `places` are drawn as a dot with the name
+beside it. Artwork stands on a region with `placement: {mode: "anchor", target: "<map>.<featureId>"}`.
+
 ## 12. Action catalogue
 
 There are 11 action forms.
@@ -1761,12 +1768,13 @@ For `along`, place the moving target at either endpoint of the line. The compile
 the nearer endpoint and reverses the path when needed. If neither endpoint matches, it adds a lead-in
 segment to prevent a first-frame jump and returns a `MOTION_PATH_ADJUSTED` warning.
 
-All scheduled motion is inert before its beat starts. Canonical validation rejects an orbit or
-along-path motion whose first frame differs from the object's resolved resting position.
+All scheduled motion is inert before its beat starts. A traveller is moved onto its route before the scene starts (the nearer end of a line or aimed curve, the nearest point of an anchored curve), and a part that cannot be moved has the curve brought to it, so the first frame of a motion never jumps.
 
 Fall uses automatic gravity and bounce strength.
 
-Exactly one motion action may target an object in a scene. Multiple independent motion programs are ambiguous and are rejected with `MULTIPLE_MOTION`; split them across objects or scenes.
+`spin` turns a thing about its own centre, or about another point with `about` (`"about": "clock.pivot"` swings the pendulum about its pin, `"about": "crank.axle"` turns the arms about the axle). Add `sweep` (degrees) to bound the turn: played `once` it opens through the sweep, `there-and-back` it swings to either side of rest, one swing per beat. An orbit whose rider sits on its centre is compiled as a spin about that centre.
+
+An object may carry several motion actions in a scene. Spins combine with anything — the Moon orbits while it spins. Journeys (`move`, `fall`, `orbit`, `along`) run one after another, each starting where the previous one stopped, so a bee can `move` to the flower in one beat and travel `along` a route home in a later one. Two journeys in the same beat, or a journey after an `orbit` or a repeating `along` (which never end), are rejected with `MULTIPLE_MOTION`.
 
 ### 12.7 `emphasize`
 
@@ -2200,7 +2208,7 @@ generate JSON → compile → repair every diagnostic → compile again → rend
 | `INVALID_DATA` | Object data is structurally present but semantically unusable. |
 | `UNKNOWN_MAP_PLACE` | A map flow names a place not declared by that map. |
 | `INVALID_GROUP_CHILD` | A group child has forbidden placement/lifecycle fields or duplicate IDs. |
-| `MULTIPLE_MOTION` | More than one motion program targets the same object in one scene. |
+| `MULTIPLE_MOTION` | Two journeys move one object in the same beat, or a journey follows an orbit or repeating path that never ends. |
 | `PLACEMENT_CYCLE` | Relative placements depend on each other circularly. |
 | `CANONICAL_ERROR` | Compiled GCL violates the renderer's canonical contract. |
 | `TARGET_NOT_VISIBLE` | A target is used before it has appeared; warning if it becomes visible later. |
@@ -2209,8 +2217,9 @@ generate JSON → compile → repair every diagnostic → compile again → rend
 | `LAYOUT_COLLISION` | Two objects overlap substantially while simultaneously visible without an explicit relational placement. |
 | `CALLOUT_OVERFLOW` | A callout cannot fit safely around its target. |
 | `IMPRECISE_SVG_BOUNDS` | A spatially targeted SVG part fell back to whole-viewBox bounds. |
-| `MOTION_GEOMETRY_FALLBACK` | Orbit target begins on its center, so the compiler must use the semantic fallback radius. |
 | `MOTION_PATH_ADJUSTED` | Along-path target does not begin at either path endpoint; a lead-in was inserted to avoid a jump. |
+| `ASSUMED_VISIBLE` | An object the scene declares but never shows is treated as on screen from the scene's first frame. |
+| `ANCHOR_FALLBACK` | A placement or connector named an anchor its object does not expose; it resolves to the object's centre. |
 
 Diagnostics include a JSON path and, where possible, suggestions and available targets. Fix the earliest structural error first because later reference errors may be consequences of it.
 

@@ -18,7 +18,10 @@ const SYMBOLS: Record<string, string> = {
   equiv: "≡", to: "→", rightarrow: "→", Rightarrow: "⇒", leftarrow: "←", leftrightarrow: "↔",
   infty: "∞", partial: "∂", nabla: "∇", int: "∫", sum: "∑", prod: "∏", cdots: "⋯", ldots: "…",
   deg: "°", propto: "∝", in: "∈", forall: "∀", exists: "∃", angle: "∠", perp: "⊥", cup: "∪", cap: "∩",
-  lim: "lim", ln: "ln", ",": " ", ";": " ", " ": " ",
+  lim: "lim", ln: "ln", log: "log", exp: "exp", sin: "sin", cos: "cos", tan: "tan", cot: "cot",
+  sec: "sec", csc: "csc", arcsin: "arcsin", arccos: "arccos", arctan: "arctan", sinh: "sinh",
+  cosh: "cosh", tanh: "tanh", min: "min", max: "max", det: "det", gcd: "gcd", bmod: "mod",
+  quad: "  ", qquad: "    ", "!": "", ":": " ", left: "", right: "", displaystyle: "", mathrm: "", operatorname: "", ",": " ", ";": " ", " ": " ",
 };
 
 export const MATH_TEXT_COMMANDS = [...Object.keys(SYMBOLS), "frac", "sqrt", "text"] as const;

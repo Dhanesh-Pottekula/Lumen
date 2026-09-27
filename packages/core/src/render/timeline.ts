@@ -33,9 +33,22 @@ export function makeTimeline(area: { x: number; y: number; w: number; h: number 
   };
 }
 
-/** Format a year with BCE/CE. */
-export function formatYear(y: number): string {
-  return y < 0 ? `${Math.abs(Math.round(y))} BCE` : `${Math.round(y)} CE`;
+/** Format a year; the era is written only when the axis reaches into BCE, so 1857 stays 1857. */
+export function formatYear(y: number, era = false): string {
+  if (y < 0) return `${Math.abs(Math.round(y))} BCE`;
+  return era ? `${Math.round(y)} CE` : `${Math.round(y)}`;
+}
+
+/** Whole-year ticks: a short span marks every year, a long one at a nice step, never two ticks one label. */
+function yearTicks(from: number, to: number, count: number): number[] {
+  const lo = Math.ceil(Math.min(from, to));
+  const hi = Math.floor(Math.max(from, to));
+  if (hi - lo < count) {
+    const out: number[] = [];
+    for (let y = lo; y <= hi; y++) out.push(y);
+    return out;
+  }
+  return niceTicks([from, to], count).filter((v) => Number.isInteger(v));
 }
 
 export interface AxisOptions {
@@ -51,7 +64,8 @@ export function timelineAxis(ctx: CanvasRenderingContext2D, tl: Timeline, o: Axi
   const color = o.color ?? "#5b6b78";
   const ink = o.ink ?? "#93a4b0";
   const by = tl.y + tl.h * (o.baselineFrac ?? 0.5);
-  const ticks = o.ticks ?? niceTicks([tl.from, tl.to], 6);
+  const ticks = o.ticks ?? yearTicks(tl.from, tl.to, 6);
+  const era = Math.min(tl.from, tl.to) < 0;
   // baseline draws on
   strokeOn(ctx, [[tl.x, by], [tl.x + tl.w, by]] as Pt[], clamp01(o.p ?? 1), { color, width: 2 });
   const p = clamp01(o.p ?? 1);
@@ -67,7 +81,10 @@ export function timelineAxis(ctx: CanvasRenderingContext2D, tl: Timeline, o: Axi
     ctx.moveTo(tl.sx(v), by - 4);
     ctx.lineTo(tl.sx(v), by + 4);
     ctx.stroke();
-    ctx.fillText(formatYear(v), tl.sx(v), by + 18);
+    // A tick at either end of the axis is pulled back inside it rather than cut off at the frame.
+    const label = formatYear(v, era);
+    const half = ctx.measureText(label).width / 2;
+    ctx.fillText(label, Math.min(Math.max(tl.sx(v), tl.x + half), tl.x + tl.w - half), by + 18);
   }
   ctx.restore();
 }
@@ -143,7 +160,10 @@ export function events(ctx: CanvasRenderingContext2D, tl: Timeline, list: Timeli
     ctx.arc(x, baseY, 3.5, 0, 7);
     ctx.fill();
     ctx.fillStyle = opts.ink ?? "#eef5ef";
-    ctx.fillText(ev.label, x, baseY + dir * (stem + (dir < 0 ? 4 : 12)));
+    // A label at either end of the axis is pulled back inside it rather than cut off at the frame.
+    const half = ctx.measureText(ev.label).width / 2;
+    const labelX = Math.min(Math.max(x, tl.x + half), tl.x + tl.w - half);
+    ctx.fillText(ev.label, labelX, baseY + dir * (stem + (dir < 0 ? 4 : 12)));
   });
   ctx.restore();
 }

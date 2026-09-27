@@ -18,7 +18,6 @@ const VISUAL_ASSETS: Record<string, Omit<VisualAssetDefinition, "id" | "draw" | 
   "nature.tree": { bounds: { width: 60, height: 80 } },
   "physics.cannon": { bounds: { width: 70, height: 70 }, facing: "left" },
   "physics.planet": { bounds: { width: 64, height: 44 } },
-  "symbols.arrow": { bounds: { width: 44, height: 20 }, facing: "right" },
   "symbols.star": { bounds: { width: 44, height: 44 } },
 };
 
@@ -40,6 +39,12 @@ export function resolveVisualAsset(id: string): VisualAssetDefinition | undefine
     anchors: { ...(PROP_ANCHORS[id] ?? {}) },
     facing: metadata.facing,
   };
+}
+
+/** A symbol is an abstract mark and has to read against the film's ink. Every other asset is a
+ *  thing with colours of its own — tinting those paints Earth in the heading colour. */
+export function assetTakesThemeInk(id: string): boolean {
+  return id.startsWith("symbols.");
 }
 
 export function availableVisualAssets(): string[] {

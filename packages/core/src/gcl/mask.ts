@@ -44,8 +44,10 @@ export function maskRects(kind: MaskKind, box: Box, p: number, opts: MaskOpts = 
       const dir = opts.dir ?? "left";
       if (dir === "left") return [[box.x, box.y, box.w * P, box.h]];
       if (dir === "right") return [[box.x + box.w * (1 - P), box.y, box.w * P, box.h]];
-      if (dir === "up") return [[box.x, box.y, box.w, box.h * P]];
-      return [[box.x, box.y + box.h * (1 - P), box.w, box.h * P]]; // down
+      // The direction names where the revealed edge TRAVELS, matching revealRect in render/reveal.ts:
+      // "up" grows from the base upward, which is what a thing filling up looks like.
+      if (dir === "up") return [[box.x, box.y + box.h * (1 - P), box.w, box.h * P]];
+      return [[box.x, box.y, box.w, box.h * P]]; // down
     }
     case "blinds": {
       const count = Math.max(1, opts.count ?? 6);

@@ -56,9 +56,13 @@ export function measureComponent(c: DrawComponent): Size {
       const fontPx = c.size ?? ROLE_SIZE.title;
       return { w: estimateTextWidth(c.text, fontPx), h: fontPx * 1.3 };
     }
-    case "stat": {
+    case "measure": {
       const size = c.size ?? 44;
-      return { w: estimateTextWidth(String(c.value) + (c.unit ?? ""), size), h: size * 1.5 };
+      const digits = estimateTextWidth(String(c.value) + (c.unit ?? ""), size);
+      if (!c.scale) return { w: digits, h: size * 1.5 };
+      if (c.meter === "ring") return { w: size * 3.2, h: size * 3.2 };
+
+      return { w: Math.max(digits, size * 4.5), h: size * 1.5 + size * 0.62 };
     }
     case "equation": {
       const m = measureMath(c.tex, c.size ?? 30);

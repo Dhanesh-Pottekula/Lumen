@@ -21,11 +21,19 @@ import type { CanvasSlideDefinition, CaptionSegment } from "./types";
 
 export type TransitionKind = "crossfade" | "zoom-through" | "whip-pan";
 
+export interface ProgressDotColors {
+  active: string;
+  completed: string;
+  pending: string;
+}
+
 export interface ComposeOptions {
   /** Seconds of overlap between consecutive scenes. Default 2.5. */
   crossfade?: number;
   /** Draw one progress dot per scene along the bottom (films of 2+ scenes). Default true. */
   progressDots?: boolean;
+  /** Optional host-aware colors for active, completed, and pending progress dots. */
+  progressDotColors?: ProgressDotColors;
   /** Apply a filmic overlay (vignette + grain + grade) to the final frame. Default false. */
   filmGrade?: boolean;
   /** Art-direction theme passed to each scene's FrameCtx. Default TEXTBOOK. */
@@ -39,7 +47,12 @@ export interface ComposeOptions {
  * scene start) and `fadeOut` (1→0 at scene end) drive an entrance/exit scale (zoom-through) or slide
  * (whip-pan). Pure. Returns a scale about center and an x offset in canvas px.
  */
-function transitionParams(kind: TransitionKind, fadeIn: number, fadeOut: number, canvasW: number): { scale: number; dx: number } {
+function transitionParams(
+  kind: TransitionKind,
+  fadeIn: number,
+  fadeOut: number,
+  canvasW: number,
+): { scale: number; dx: number } {
   if (kind === "zoom-through") {
     let scale = 1;
     if (fadeIn < 1) scale *= lerp(1.14, 1, fadeIn); // enters slightly large, settles
@@ -57,7 +70,13 @@ function transitionParams(kind: TransitionKind, fadeIn: number, fadeOut: number,
 
 /** The filmic pass (vignette + grade + grain) now lives on the fx layer via `frame.grade()`, applied
  *  once to the whole composited film below. A single film-level frame carries it, theme-driven. */
-function applyFilmGrade(ctx: CanvasRenderingContext2D, viewW: number, viewH: number, t: number, theme: Theme) {
+function applyFilmGrade(
+  ctx: CanvasRenderingContext2D,
+  viewW: number,
+  viewH: number,
+  t: number,
+  theme: Theme,
+) {
   const film = createFrame(ctx, t, viewW, viewH, theme);
   film.grade({ vignette: theme.fx.vignette, grain: theme.fx.grain });
   film.finish();
@@ -77,7 +96,8 @@ export function composeSlides(
   scenes: CanvasSlideDefinition[],
   options: ComposeOptions = {},
 ): CanvasSlideDefinition {
-  if (scenes.length === 0) throw new Error("composeSlides needs at least one scene");
+  if (scenes.length === 0)
+    throw new Error("composeSlides needs at least one scene");
 
   const { viewW, viewH } = scenes[0];
   scenes.forEach((s, i) => {
@@ -89,6 +109,11 @@ export function composeSlides(
   });
 
   const progressDots = options.progressDots ?? true;
+  const progressDotColors = options.progressDotColors ?? {
+    active: "#e8a13c",
+    completed: "#5cc8ae",
+    pending: "#39434d",
+  };
   const filmGrade = options.filmGrade ?? false;
   const theme = options.theme ?? TEXTBOOK;
   const transition = options.transition ?? "crossfade";
@@ -106,7 +131,12 @@ export function composeSlides(
   const windows: SceneWindow[] = [];
   let cursor = 0;
   for (const scene of scenes) {
-    windows.push({ scene, start: cursor, end: cursor + scene.duration, dotEnd: cursor + scene.duration });
+    windows.push({
+      scene,
+      start: cursor,
+      end: cursor + scene.duration,
+      dotEnd: cursor + scene.duration,
+    });
     cursor += scene.duration - crossfade;
   }
   const duration = cursor + crossfade;
@@ -121,7 +151,10 @@ export function composeSlides(
 
   // Lazily-created shared offscreen scratch buffer, resized to match the main
   // canvas's device-pixel size on demand. Created on first buffered render.
-  let buffer: HTMLCanvasElement | { width: number; height: number; getContext: (id: "2d") => unknown } | null = null;
+  let buffer:
+    | HTMLCanvasElement
+    | { width: number; height: number; getContext: (id: "2d") => unknown }
+    | null = null;
 
   /** True when the environment/context support the offscreen-buffer compositing path. */
   function canBuffer(ctx: CanvasRenderingContext2D): boolean {
@@ -145,7 +178,11 @@ export function composeSlides(
         const only = windows[0];
         const localT = t;
         const f = createFrame(ctx, localT, viewW, viewH, theme);
-        only.scene.render(ctx, Math.max(0, Math.min(localT, only.scene.duration)), f);
+        only.scene.render(
+          ctx,
+          Math.max(0, Math.min(localT, only.scene.duration)),
+          f,
+        );
         f.finish();
         if (filmGrade) applyFilmGrade(ctx, viewW, viewH, t, theme);
         return;
@@ -161,9 +198,22 @@ export function composeSlides(
         const isFirstWindow = start === firstStart;
         // First/last scenes hold (no crossfade partner) — the film opens and closes on a full frame;
         // scene-internal animation handles the intro/outro. Only interior boundaries crossfade.
-        const fadeIn = crossfade > 0 ? (isFirstWindow ? 1 : phase(t, start, start + crossfade)) : t >= start ? 1 : 0;
+        const fadeIn =
+          crossfade > 0
+            ? isFirstWindow
+              ? 1
+              : phase(t, start, start + crossfade)
+            : t >= start
+              ? 1
+              : 0;
         const fadeOut =
-          crossfade > 0 ? (isLastWindow ? 1 : 1 - phase(t, end - crossfade, end)) : (isLastWindow ? t <= end : t < end) ? 1 : 0;
+          crossfade > 0
+            ? isLastWindow
+              ? 1
+              : 1 - phase(t, end - crossfade, end)
+            : (isLastWindow ? t <= end : t < end)
+              ? 1
+              : 0;
         const alpha = fadeIn * fadeOut;
         if (alpha <= 0) continue;
         const localT = Math.max(0, Math.min(t - start, scene.duration));
@@ -212,7 +262,11 @@ export function composeSlides(
           const active = t >= start && t < dotEnd;
           ctx.beginPath();
           ctx.arc(x0 + i * 16, viewH - 8, active ? 3.4 : 2.2, 0, 7);
-          ctx.fillStyle = active ? "#e8a13c" : t >= dotEnd ? "#5cc8ae" : "#39434d";
+          ctx.fillStyle = active
+            ? progressDotColors.active
+            : t >= dotEnd
+              ? progressDotColors.completed
+              : progressDotColors.pending;
           ctx.fill();
         });
       }
