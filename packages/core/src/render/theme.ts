@@ -10,9 +10,15 @@ export type Palette = {
   bg: string;
   surface: string;
   ink: string;
+  /** The one colour that marks the thing being taught. */
   accent: string;
+  /** The colour a comparison takes against the accent: a colour-blind-safe partner, differing in lightness as well as hue. */
+  second: string;
   muted: string;
+  /** Kept for what is wrong, dangerous or bad, never a general accent. */
   danger: string;
+  /** Kept for what is good, the green partner of `danger`. */
+  good: string;
 };
 export type TextureKind = "none" | "parchment" | "blueprint" | "chalkboard";
 
@@ -39,7 +45,7 @@ const SANS = "-apple-system, system-ui, sans-serif";
 
 export const TEXTBOOK: Theme = {
   name: "textbook",
-  palette: { bg: "#16222c", surface: "#1e2c38", ink: "#eef5ef", accent: "#5cc8ae", muted: "#93a4b0", danger: "#e24b4a" },
+  palette: { bg: "#16222c", surface: "#1e2c38", ink: "#eef5ef", accent: "#5cc8ae", second: "#e8913a", muted: "#93a4b0", danger: "#e24b4a", good: "#7cd36a" },
   texture: "none",
   lineStyle: { width: 2, roughness: 0 },
   type: { display: SANS, body: SANS, mono: "ui-monospace, monospace" },
@@ -57,7 +63,9 @@ export const TEXTBOOK: Theme = {
 
 export const PARCHMENT: Theme = {
   name: "parchment",
-  palette: { bg: "#efe2c4", surface: "#e6d3a8", ink: "#4a2f1a", accent: "#9a3b2e", muted: "#8a7048", danger: "#8c2b1e" },
+  // Blue marks the subject and orange what it is compared with; red stays for wrong. Every writing colour
+  // holds 4.5:1 on the page and on the white card the app lays it on.
+  palette: { bg: "#efe2c4", surface: "#e6d3a8", ink: "#4a2f1a", accent: "#1d4f8f", second: "#a8520f", muted: "#735c3a", danger: "#b42318", good: "#2e7d32" },
   texture: "parchment",
   lineStyle: { width: 2.4, roughness: 1.6 },
   type: { display: "Georgia, 'Times New Roman', serif", body: "Georgia, serif", mono: "ui-monospace, monospace" },
@@ -67,7 +75,7 @@ export const PARCHMENT: Theme = {
 
 export const BLUEPRINT: Theme = {
   name: "blueprint",
-  palette: { bg: "#0d2b52", surface: "#123a6b", ink: "#dbe9ff", accent: "#7fd0ff", muted: "#7f9fce", danger: "#ff8a8a" },
+  palette: { bg: "#0d2b52", surface: "#123a6b", ink: "#dbe9ff", accent: "#7fd0ff", second: "#e8913a", muted: "#7f9fce", danger: "#ff8a8a", good: "#86e39a" },
   texture: "blueprint",
   lineStyle: { width: 1.6, roughness: 0 },
   type: { display: SANS, body: SANS, mono: "ui-monospace, monospace" },
@@ -77,7 +85,7 @@ export const BLUEPRINT: Theme = {
 
 export const CHALKBOARD: Theme = {
   name: "chalkboard",
-  palette: { bg: "#1f2a26", surface: "#26332e", ink: "#eaf3ec", accent: "#ffe08a", muted: "#9db3a6", danger: "#ff9a9a" },
+  palette: { bg: "#1f2a26", surface: "#26332e", ink: "#eaf3ec", accent: "#ffe08a", second: "#6cb6ff", muted: "#9db3a6", danger: "#ff9a9a", good: "#9be58f" },
   texture: "chalkboard",
   lineStyle: { width: 2.6, roughness: 1.2 },
   type: { display: SANS, body: SANS, mono: "ui-monospace, monospace" },

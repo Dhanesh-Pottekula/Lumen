@@ -12,3 +12,6 @@ export const VIEW_HEIGHT = 960;
 
 /** Inset the compiler keeps every object inside, so edge-authored strokes stay fully drawn. */
 export const VIEW_INSET = 8;
+
+/** The smallest writing anything draws, in view units: on a phone card one unit is about 0.68 pt, so 18 is 12 pt. */
+export const MIN_TEXT = 18;

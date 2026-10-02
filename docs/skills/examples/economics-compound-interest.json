@@ -8,17 +8,6 @@
       "composition": "hero",
       "objects": [
         {
-          "id": "hook-title",
-          "kind": "text",
-          "text": "The most powerful force in finance",
-          "textRole": "heading",
-          "role": "hero",
-          "placement": {
-            "mode": "zone",
-            "zone": "title"
-          }
-        },
-        {
           "id": "principal",
           "kind": "stat",
           "value": 1000,
@@ -44,18 +33,6 @@
         }
       ],
       "beats": [
-        {
-          "id": "hook-b1",
-          "actions": [
-            {
-              "do": "show",
-              "targets": [
-                "hook-title"
-              ],
-              "entrance": "slam"
-            }
-          ]
-        },
         {
           "id": "hook-b2",
           "actions": [
@@ -86,17 +63,6 @@
       "id": "growth-curve",
       "composition": "data",
       "objects": [
-        {
-          "id": "s2-title",
-          "kind": "text",
-          "text": "It grows on its own growth",
-          "textRole": "title",
-          "role": "annotation",
-          "placement": {
-            "mode": "zone",
-            "zone": "title"
-          }
-        },
         {
           "id": "growth",
           "kind": "chart",
@@ -136,18 +102,6 @@
         }
       ],
       "beats": [
-        {
-          "id": "growth-curve-b1",
-          "actions": [
-            {
-              "do": "show",
-              "targets": [
-                "s2-title"
-              ],
-              "entrance": "fade"
-            }
-          ]
-        },
         {
           "id": "growth-curve-b2",
           "actions": [
@@ -199,17 +153,6 @@
       "id": "compare",
       "composition": "comparison",
       "objects": [
-        {
-          "id": "s3-title",
-          "kind": "text",
-          "text": "Simple vs. compound",
-          "textRole": "title",
-          "role": "annotation",
-          "placement": {
-            "mode": "zone",
-            "zone": "title"
-          }
-        },
         {
           "id": "simple",
           "kind": "chart",
@@ -286,18 +229,6 @@
         }
       ],
       "beats": [
-        {
-          "id": "compare-b1",
-          "actions": [
-            {
-              "do": "show",
-              "targets": [
-                "s3-title"
-              ],
-              "entrance": "fade"
-            }
-          ]
-        },
         {
           "id": "compare-b2",
           "actions": [
@@ -381,7 +312,7 @@
           "id": "takeaway",
           "kind": "text",
           "text": "Start early. Time does the work.",
-          "textRole": "title",
+          "textRole": "body",
           "role": "annotation",
           "placement": {
             "mode": "zone",

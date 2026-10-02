@@ -10,13 +10,15 @@
  * a canvas, and is exact on re-seek.
  */
 import type { Box } from "./anchors";
-import { makePlot } from "../render/charts";
+import { makePlot, seriesLines } from "../render/charts";
 import { heartShape, polygonShape, starShape } from "../render/morph";
-import { fitProjection, featureCenter, type GeoFeature, type Projection } from "../render/geo";
+import { circleReach, fitProjection, featureCenter, mapLegendSize, type GeoFeature, type Projection } from "../render/geo";
 import { makeTimeline } from "../render/timeline";
 import type { Component } from "./schema";
+import { handleNames, handlePoint, sideCourse, type FigureSpec } from "../geometry/figure";
 import { compileExpr } from "./expr";
 import { PROP_ANCHORS } from "./props";
+import { RIEMANN_DEFAULT, seriesDomains } from "./segments";
 
 export type Vec2 = [number, number];
 
@@ -64,13 +66,13 @@ function chartBarAnchors(c: Extract<Component, { type: "chart" }>, box: Box): Re
 
 /** chart riemann: bar0..barN at each rectangle's top-center point, mirroring `paintRiemann`'s EXACT
  *  geometry in compile.ts — riemann components have NO `data`; they draw from `fn`/`xDomain`/`n` via
- *  `compileExpr`, so this reads those fields (with the same defaults: `xDomain` [0,1], `n` 8) and
+ *  `compileExpr`, so this reads those fields (with the same defaults: `xDomain` [0,1], `n` RIEMANN_DEFAULT) and
  *  reproduces the same sampling, yDomain fallback, and per-rectangle x0/dx/top math (left-endpoint
  *  height, baseline at `plot.sy(0)`). Plus `peak` (the rectangle with the largest |fn value|) and
  *  `first`/`last`. */
 function chartRiemannAnchors(c: Extract<Component, { type: "chart" }>, box: Box): Record<string, Vec2> {
   const [a, b] = c.xDomain ?? [0, 1];
-  const n = Math.max(1, Math.floor(c.n ?? 8));
+  const n = Math.max(1, Math.floor(c.n ?? RIEMANN_DEFAULT));
   const evalFn = compileExpr(c.fn ?? "x");
   const dx = (b - a) / n;
 
@@ -108,16 +110,13 @@ function chartRiemannAnchors(c: Extract<Component, { type: "chart" }>, box: Box)
   return out;
 }
 
-/** chart line/area/scatter: pt0..ptN at each [x,y] datum's plotted point, via the same xDomain/
- *  yDomain fallback `paintChart` uses. Plus `peak` (max-y datum) and `first`/`last`. */
+/** chart line/area/scatter: pt0..ptN at each [x,y] datum of the first line's plotted point, on the
+ *  domains `paintChart` plots every line on. Plus `peak` (max-y datum) and `first`/`last`. */
 function chartSeriesAnchors(c: Extract<Component, { type: "chart" }>, box: Box): Record<string, Vec2> {
-  const series = c.series ?? [];
+  const series = seriesLines(c.series ?? [])[0] ?? [];
   if (series.length === 0) return {};
-  const xs = series.map(([x]) => x);
-  const ys = series.map(([, y]) => y);
-  const xDomain = c.xDomain ?? [Math.min(0, ...xs), Math.max(1, ...xs)];
-  const yDomain = c.yDomain ?? [Math.min(0, ...ys), Math.max(1, ...ys)];
-  const plot = makePlot(boxArea(box), xDomain, yDomain);
+  const domains = seriesDomains(c);
+  const plot = makePlot(boxArea(box), domains.x, domains.y);
   const out: Record<string, Vec2> = {};
   let peakIdx = 0;
   series.forEach(([x, y], i) => {
@@ -175,6 +174,29 @@ function shapeAnchors(c: Extract<Component, { type: "shape" }>, box: Box): Recor
   return out;
 }
 
+/** A drawn figure's corners `v<i>`, and the middle of each side `s<i>`, exactly where its d passes. */
+function figureAnchors(figure: FigureSpec): Record<string, Vec2> {
+  const out: Record<string, Vec2> = {};
+  for (const name of handleNames(figure)) {
+    const point = handlePoint(figure, figure.corners, name);
+    if (point) out[name] = point;
+  }
+  return out;
+}
+
+/** The box each side of a figure spans, which a highlight, a camera move or a label aimed at the side reads. */
+export function sideBoxes(figure: FigureSpec): Record<string, Box> {
+  const out: Record<string, Box> = {};
+  figure.corners.forEach((_, i) => {
+    const course = sideCourse(figure, figure.corners, i);
+    if (!course) return;
+    const [xs, ys] = [course.map(([x]) => x), course.map(([, y]) => y)];
+    const [x, y] = [Math.min(...xs), Math.min(...ys)];
+    out[`s${i}`] = { x, y, w: Math.max(2, Math.max(...xs) - x), h: Math.max(2, Math.max(...ys) - y) };
+  });
+  return out;
+}
+
 /**
  * The one projection a map is drawn, anchored and targeted through.
  *
@@ -192,7 +214,23 @@ export function mapProjection(
   const markers: GeoFeature[] = (c.markers ?? []).map((m, i) => ({ id: `__marker${i}`, rings: [[[m.lon, m.lat]]] }));
   const outline: GeoFeature[] = c.outline ? [{ id: "__outline", rings: [c.outline] }] : [];
   const growth: GeoFeature[] = (c.grow ?? []).map((ring, i) => ({ id: `__grow${i}`, rings: [ring] }));
-  return fitProjection([...(land.length > 0 ? land : c.features), ...outline, ...growth, ...markers], area, 20);
+  return fitProjection([...(land.length > 0 ? land : c.features), ...outline, ...growth, ...markers], mapLandArea(c, area), 20);
+}
+
+/** Where a map's key sits: the foot of its box. */
+export function mapLegendFoot(area: { y: number; h: number }): number {
+  return area.y + area.h - 4;
+}
+
+/**
+ * The part of a map's box its land is fitted into: all of it, less the room its key takes in the
+ * lower-left corner — a column down the left of a wide map, a band across the foot of a tall one.
+ */
+function mapLandArea(c: Extract<Component, { type: "map" }>, area: { x: number; y: number; w: number; h: number }) {
+  if (!c.legend) return area;
+  const key = mapLegendSize(c.legend.title, c.legend.ramp !== undefined, c.markers?.some((m) => m.value !== undefined) ? circleReach(area) : undefined);
+  if (area.w > area.h) return { ...area, x: area.x + key.w + 8, w: Math.max(20, area.w - key.w - 8) };
+  return { ...area, h: Math.max(20, mapLegendFoot(area) - key.h - 8 - area.y) };
 }
 
 /** map: `<featureId>` → that feature's bbox-center (`featureCenter`), projected via the same
@@ -205,6 +243,11 @@ function mapAnchors(c: Extract<Component, { type: "map" }>, box: Box): Record<st
   for (const m of c.markers ?? []) {
     if (m.label) {
       const [x, y] = proj.project([m.lon, m.lat]);
+      // A valued marker is a circle centred on its place, not a pin standing on it.
+      if (m.value !== undefined) {
+        out[m.label] = [x, y];
+        continue;
+      }
       // geoMarker (../render/geo.ts) draws the icon centered at y - size/2. The schema has no per-marker
       // `size` field (compile.ts never passes one to geoMarker either), so this always resolves to
       // geoMarker's own default (16) — matching draw-time behavior exactly, not just approximating it.
@@ -258,6 +301,7 @@ function propAnchors(c: Extract<Component, { type: "prop" }>, box: Box): Record<
  */
 export function subAnchors(c: Component, box: Box): Record<string, Vec2> {
   const generic = genericBoxAnchors(box);
+  if (c.type !== "camera" && c.type !== "attention" && c.figure) return { ...generic, ...figureAnchors(c.figure) };
   switch (c.type) {
     case "chart": {
       if (c.chart === "bar") return { ...generic, ...chartBarAnchors(c, box) };

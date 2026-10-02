@@ -4,9 +4,38 @@ import {
   VIEW_INSET,
   VIEW_WIDTH,
 } from "../gcl/viewport";
-import type { ResolvedLesson } from "./resolve";
+import { boxPolygon, meets, rectAt, type Pt } from "../geometry/place";
+import { silhouetteOn, type ResolvedLesson, type ResolvedObject } from "./resolve";
+import { joinsTwo } from "./registry";
+
+// Two things' overlap is sampled this many points across the boxes' common part.
+const OVERLAP_SAMPLES = 12;
+
+const shoelace = (points: Pt[]) => Math.abs(points.reduce((sum, [x, y], i) => sum + x * points[(i + 1) % points.length][1] - points[(i + 1) % points.length][0] * y, 0)) / 2;
+
+/** How much of the smaller of two things lies on the other, as they are drawn: a cut-out's own outline, not the transparent box around it. */
+function drawnOverlap(a: ResolvedObject, b: ResolvedObject): number {
+  const [x, y] = [Math.max(a.box.x, b.box.x), Math.max(a.box.y, b.box.y)];
+  const [w, h] = [Math.min(a.box.x + a.box.w, b.box.x + b.box.w) - x, Math.min(a.box.y + a.box.h, b.box.y + b.box.h) - y];
+  if (w <= 0 || h <= 0) return 0;
+  const [one, two] = [silhouetteOn(a) ?? boxPolygon(a.box), silhouetteOn(b) ?? boxPolygon(b.box)];
+  let shared = 0;
+  for (let i = 0; i < OVERLAP_SAMPLES; i++)
+    for (let j = 0; j < OVERLAP_SAMPLES; j++) {
+      const point = rectAt([x + (w * (i + 0.5)) / OVERLAP_SAMPLES, y + (h * (j + 0.5)) / OVERLAP_SAMPLES], [0.01, 0.01]);
+      if (meets({ area: one }, point) && meets({ area: two }, point)) shared++;
+    }
+  return ((shared / OVERLAP_SAMPLES ** 2) * w * h) / Math.max(1, Math.min(shoelace(one), shoelace(two)));
+}
+
+// Below this share of the frame the subject is too small to teach from.
+const SPLIT_BELOW = 0.55;
+// The height a subject can be drawn at while what is set above and below it keeps its room.
+const SUBJECT_HEIGHT = VIEW_HEIGHT * 0.7;
 
 export type DiagnosticCode =
+  | "SPLIT_STEP"
+  | "LIE_FACTOR"
   | "INVALID_JSON"
   | "SCHEMA_ERROR"
   | "DUPLICATE_ID"
@@ -16,6 +45,8 @@ export type DiagnosticCode =
   | "INVALID_ACTION_TARGET"
   | "INVALID_LIFECYCLE"
   | "INVALID_SVG"
+  | "INVALID_IMAGE"
+  | "INVALID_PATH"
   | "INVALID_SVG_BOUNDS"
   | "IMPRECISE_SVG_BOUNDS"
   | "INVALID_EXPRESSION"
@@ -35,10 +66,16 @@ export type DiagnosticCode =
   | "CALLOUT_OVERFLOW"
   | "MOTION_PATH_ADJUSTED"
   | "ASSUMED_VISIBLE"
+  | "READ_AS_BCE"
+  | "SILHOUETTE_FRAGMENT"
+  | "RAISED_TO_READABLE"
   | "ANCHOR_FALLBACK"
+  | "MOTION_REFUSED"
   | "DROPPED_SCENE"
   | "DROPPED_ACTION"
   | "DROPPED_OBJECT"
+  | "DROPPED_CHECK"
+  | "DROPPED_FIELD"
   | "NO_DRAWABLE_SCENE";
 
 export interface Diagnostic {
@@ -179,6 +216,32 @@ function calloutBox(
 }
 
 /**
+ * Why a chart's drawn lengths would misstate its numbers, or undefined when they are true to them:
+ * bars measured from a baseline other than zero (the lie factor is how far the drawn ratio of the
+ * longest to the shortest bar strays from the numbers'), bars cut off by the axis, or parts of a whole
+ * given a negative share.
+ */
+function lieFactor(source: ResolvedLesson["scenes"][number]["objects"][number]["source"]): string | undefined {
+  if (source.kind !== "chart") return undefined;
+  const values =
+    "data" in source ? source.data.map((datum) => datum.value) : source.chart === "stack" ? source.series.flat().map(([, y]) => y) : undefined;
+  if (!values || values.length === 0) return undefined;
+  if (["pie", "donut", "units", "seats"].includes(source.chart)) {
+    return values.some((value) => value < 0) ? "a part of a whole cannot be negative; the slices misstate the shares" : undefined;
+  }
+  if (!["bar", "hbar", "stack"].includes(source.chart) || !source.yDomain) return undefined;
+  const [low, high] = source.yDomain;
+  if (values.some((value) => value > high || value < Math.min(low, 0))) return `bars run past the axis (${low} to ${high}) and are cut short`;
+  const base = low;
+  const positive = values.filter((value) => value > 0);
+  if (base === 0 || positive.length < 2) return undefined;
+  const [least, most] = [Math.min(...positive), Math.max(...positive)];
+  if (least <= base) return `bars start at ${base}, not 0, so a bar at or below it vanishes`;
+  const lie = (most - base) / (least - base) / (most / least);
+  return Math.abs(lie - 1) > 0.05 ? `bars start at ${base}, not 0, so their lengths exaggerate the difference ${lie.toFixed(1)} times; start the axis at 0` : undefined;
+}
+
+/**
  * Diagnostics that require the deterministic layout result rather than only
  * the source schema. Keeping these checks in the compiler response gives an
  * LLM actionable feedback before a malformed lesson reaches the renderer.
@@ -190,8 +253,33 @@ export function analyzeResolvedLesson(lesson: ResolvedLesson): Diagnostic[] {
     const authoredObjects = scene.objects.filter(
       (object) => object.compositeParent === undefined,
     );
+    scene.beats.forEach((beat, beatIndex) =>
+      beat.actions.forEach((action, actionIndex) => {
+        if (action.kind === "motion" && action.refused)
+          warnings.push({ code: "MOTION_REFUSED", path: `/scenes/${sceneIndex}/beats/${beatIndex}/actions/${actionIndex}`, message: `${action.refused}; the motion is not played`, received: action.source });
+      }),
+    );
     authoredObjects.forEach((object, objectIndex) => {
-      if (object.source.kind === "line" || object.source.role === "background")
+      if (object.blocked) warnings.push({ code: "LAYOUT_COLLISION", path: `/scenes/${sceneIndex}/objects/${objectIndex}/placement`, message: `'${object.id}' has no open space beside what it is set on and is written across something drawn; show fewer things with it, shorten it, or set it elsewhere`, received: object.source.placement });
+      if (object.raised) warnings.push({ code: "RAISED_TO_READABLE", path: `/scenes/${sceneIndex}/objects/${objectIndex}`, message: `'${object.id}' would be drawn too small to make out; it is drawn at the smallest size that reads`, received: object.source.size });
+      const lie = lieFactor(object.source);
+      if (lie === undefined) return;
+      warnings.push({ code: "LIE_FACTOR", path: `/scenes/${sceneIndex}/objects/${objectIndex}`, message: `'${object.id}': ${lie}`, received: object.source.kind === "chart" ? object.source.yDomain : undefined });
+    });
+    // A subject squeezed to make room for everything else on screen is a step showing too much at once.
+    authoredObjects.forEach((object, objectIndex) => {
+      if (object.rank !== "lead") return;
+      const fills = Math.max(object.box.w / (VIEW_WIDTH * 0.9), object.box.h / SUBJECT_HEIGHT);
+      if (fills >= SPLIT_BELOW) return;
+      warnings.push({
+        code: "SPLIT_STEP",
+        path: `/scenes/${sceneIndex}/objects/${objectIndex}`,
+        message: `The subject '${object.id}' fills only ${Math.round(fills * 100)}% of the frame to make room for what is shown with it; split this step so the subject can be shown large`,
+        received: object.box,
+      });
+    });
+    authoredObjects.forEach((object, objectIndex) => {
+      if (joinsTwo(object.source) || object.source.role === "background")
         return;
       const { x, y, w, h } = object.box;
       const overflow = {
@@ -243,9 +331,21 @@ export function analyzeResolvedLesson(lesson: ResolvedLesson): Diagnostic[] {
             action.source.do === "hide" &&
             targetsObject(action.source.targets),
         );
+      // A picture that steps aside leaves its laid-out slot as it goes.
+      const aside = scene.beats
+        .flatMap((beat) => beat.actions)
+        .find((action) => {
+          const placement = object.source.placement;
+          const bearer = (object.source.attach?.to ?? (placement && placement.mode !== "zone" ? placement.target : undefined))?.split(".")[0];
+          return action.source.do === "aside" && (action.source.target === object.id || action.source.target === bearer);
+        });
+      // Its box is where it rests: once a journey takes it off, the box no longer says where it is.
+      const departs = scene.beats
+        .flatMap((beat) => beat.actions)
+        .find((action) => action.kind === "motion" && action.source.do === "motion" && !("refused" in action && action.refused) && ["move", "fall", "wander", "along"].includes(action.source.motion) && (action.source.target === object.id || (action.source.with ?? []).includes(object.id)));
       const startsVisible = object.source.initial === "visible";
       if (!startsVisible && !show) return undefined;
-      return [startsVisible ? 0 : show!.start, hide?.start ?? scene.duration];
+      return [startsVisible ? 0 : show!.start, Math.min(hide?.start ?? scene.duration, aside?.start ?? scene.duration, departs?.start ?? scene.duration)];
     };
     const intentionallyRelated = (
       a: (typeof authoredObjects)[number],
@@ -261,14 +361,36 @@ export function analyzeResolvedLesson(lesson: ResolvedLesson): Diagnostic[] {
           (placement.target === id || placement.target.startsWith(`${id}.`))
         );
       };
-      return targets(a, b.id) || targets(b, a.id);
+      // Set beside a thing that stands, sits or is fixed on the other is set on the other too: a second caravan by the one on the map.
+      // A thing attached to another stands where that one stands: wings on a bee set near a flower are near it too.
+      const byId = new Map(authoredObjects.map((object) => [object.id, object]));
+      const onOther = (object: (typeof authoredObjects)[number], id: string) => {
+        const seen = new Set<string>();
+        for (let at = object, first = true; at && !seen.has(at.id); ) {
+          seen.add(at.id);
+          const placement = at.source.placement;
+          const written = "in" in at.source && typeof at.source.in === "string" ? at.source.in : undefined;
+          const fixed = at.source.attach?.to ?? (placement?.mode === "anchor" || (placement?.mode === "relative" && (first || ["on", "inside"].includes(placement.relation) || (placement.relation === "near" && placement.target.includes(".")))) ? placement.target : written);
+          if (fixed === undefined) return false;
+          if (fixed === id || fixed.startsWith(`${id}.`)) return true;
+          first = at.source.attach !== undefined;
+          at = byId.get(fixed.split(".")[0])!;
+        }
+        return false;
+      };
+      // A picture fixed whole on another stands in for it, as a sunset sky laid over the day sky: what is set on the one is set on the other.
+      const standsIn = (over: (typeof authoredObjects)[number], set: (typeof authoredObjects)[number]) => {
+        const host = over.source.attach?.to;
+        return host !== undefined && !host.includes(".") && onOther(set, host);
+      };
+      return targets(a, b.id) || targets(b, a.id) || onOther(a, b.id) || onOther(b, a.id) || standsIn(a, b) || standsIn(b, a);
     };
     for (let left = 0; left < authoredObjects.length; left++) {
       for (let right = left + 1; right < authoredObjects.length; right++) {
         const a = authoredObjects[left];
         const b = authoredObjects[right];
         // A route or a measure is drawn over the things it joins by definition.
-        const ROUTES = new Set(["line", "span", "curve", "angle"]);
+        const ROUTES = new Set(["line", "span", "curve", "angle", "path"]);
         if (ROUTES.has(a.source.kind) || ROUTES.has(b.source.kind)) continue;
         if (
           [a.source.role, b.source.role].some(
@@ -291,10 +413,7 @@ export function analyzeResolvedLesson(lesson: ResolvedLesson): Diagnostic[] {
         const y = Math.max(a.box.y, b.box.y);
         const width = Math.min(a.box.x + a.box.w, b.box.x + b.box.w) - x;
         const height = Math.min(a.box.y + a.box.h, b.box.y + b.box.h) - y;
-        if (width <= 0 || height <= 0) continue;
-        const ratio =
-          (width * height) /
-          Math.max(1, Math.min(a.box.w * a.box.h, b.box.w * b.box.h));
+        const ratio = drawnOverlap(a, b);
         if (ratio < 0.55) continue;
         warnings.push({
           code: "LAYOUT_COLLISION",

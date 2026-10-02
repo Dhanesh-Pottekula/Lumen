@@ -51,12 +51,11 @@ export const waterCycleLessonSpec: LessonSpec = {
       narration:
         "Where does rain come from, and where does it go? Follow the same water as sunlight lifts it, clouds gather it, rain returns it, and rivers carry it back.",
       objects: [
-        { id: "overview-title", kind: "text", text: "WATER MOVES IN A CYCLE", textRole: "heading", placement: { mode: "zone", zone: "title" } },
         { id: "overview-diagram", kind: "svg-artwork", svg: WATER_CYCLE, size: "large", placement: { mode: "zone", zone: "main" } },
         { id: "overview-caption", kind: "text", text: "evaporation → condensation → precipitation → collection", textRole: "caption", size: "small", placement: { mode: "zone", zone: "footer" } },
       ],
       beats: [
-        { id: "overview-show", pace: "slow", actions: [{ do: "show", targets: ["overview-title", "overview-diagram"], entrance: "fade" }] },
+        { id: "overview-show", pace: "slow", actions: [{ do: "show", targets: ["overview-diagram"], entrance: "fade" }] },
         { id: "overview-label", actions: [{ do: "show", targets: ["overview-caption"], entrance: "word-by-word" }] },
       ],
     },
@@ -66,12 +65,11 @@ export const waterCycleLessonSpec: LessonSpec = {
       narration:
         "Start at the surface. Sunlight transfers energy to liquid water. Some molecules move fast enough to escape upward as invisible water vapor. That change is evaporation.",
       objects: [
-        { id: "evaporation-title", kind: "text", text: "1. EVAPORATION", textRole: "heading", placement: { mode: "zone", zone: "title" } },
         { id: "evaporation-diagram", kind: "svg-artwork", svg: EVAPORATION, size: "large", placement: { mode: "zone", zone: "main" } },
         { id: "evaporation-caption", kind: "text", text: "sunlight adds energy • liquid water becomes vapor", textRole: "caption", size: "small", placement: { mode: "zone", zone: "footer" } },
       ],
       beats: [
-        { id: "evaporation-show", pace: "slow", actions: [{ do: "show", targets: ["evaporation-title", "evaporation-diagram"], entrance: "draw" }] },
+        { id: "evaporation-show", pace: "slow", actions: [{ do: "show", targets: ["evaporation-diagram"], entrance: "draw" }] },
         { id: "evaporation-label", actions: [{ do: "show", targets: ["evaporation-caption"], entrance: "word-by-word" }] },
       ],
     },
@@ -81,12 +79,11 @@ export const waterCycleLessonSpec: LessonSpec = {
       narration:
         "Higher air is cooler. As vapor rises and loses energy, water molecules crowd together into tiny liquid droplets. Many droplets together become a visible cloud. That is condensation.",
       objects: [
-        { id: "condensation-title", kind: "text", text: "2. CONDENSATION", textRole: "heading", placement: { mode: "zone", zone: "title" } },
         { id: "condensation-diagram", kind: "svg-artwork", svg: CONDENSATION, size: "large", placement: { mode: "zone", zone: "main" } },
         { id: "condensation-caption", kind: "text", text: "cooling vapor → tiny liquid droplets → cloud", textRole: "caption", size: "small", placement: { mode: "zone", zone: "footer" } },
       ],
       beats: [
-        { id: "condensation-show", pace: "slow", actions: [{ do: "show", targets: ["condensation-title", "condensation-diagram"], entrance: "fade" }] },
+        { id: "condensation-show", pace: "slow", actions: [{ do: "show", targets: ["condensation-diagram"], entrance: "fade" }] },
         { id: "condensation-label", actions: [{ do: "show", targets: ["condensation-caption"], entrance: "word-by-word" }] },
       ],
     },
@@ -96,12 +93,11 @@ export const waterCycleLessonSpec: LessonSpec = {
       narration:
         "Cloud droplets collide and grow. When they become too heavy to stay aloft, precipitation falls. Water then collects in soil, rivers, lakes, and oceans, ready for sunlight to begin the cycle again.",
       objects: [
-        { id: "return-title", kind: "text", text: "3. RETURN AND COLLECT", textRole: "heading", placement: { mode: "zone", zone: "title" } },
         { id: "return-diagram", kind: "svg-artwork", svg: PRECIPITATION, size: "large", placement: { mode: "zone", zone: "main" } },
         { id: "return-caption", kind: "text", text: "droplets grow → rain falls → water collects and flows", textRole: "caption", size: "small", placement: { mode: "zone", zone: "footer" } },
       ],
       beats: [
-        { id: "return-show", pace: "slow", actions: [{ do: "show", targets: ["return-title", "return-diagram"], entrance: "draw" }] },
+        { id: "return-show", pace: "slow", actions: [{ do: "show", targets: ["return-diagram"], entrance: "draw" }] },
         { id: "return-label", actions: [{ do: "show", targets: ["return-caption"], entrance: "word-by-word" }] },
       ],
     },

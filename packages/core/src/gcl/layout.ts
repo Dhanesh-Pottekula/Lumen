@@ -2,20 +2,15 @@
 /** Pure auto-placement engine: measures every component then flows/anchors it into view space. */
 import type { Box } from "./anchors";
 import { resolvePosition } from "./anchors";
-import { measureComponent } from "./measure";
-import { subAnchors } from "./subanchors";
+import { absoluteBox, measureComponent } from "./measure";
+import { sideBoxes, subAnchors } from "./subanchors";
 import type { Component, DrawComponent, Position, Vec2 } from "./schema";
 
 export interface Placement { index: number; cx: number; cy: number; w: number; h: number }
 export interface LayoutResult { placements: Placement[]; boxes: Map<string, Box> }
 
 const GAP = 18;
-const TITLE_Y = 70;
 const WIDE_FRACTION = 0.5;
-
-function isTitleText(c: DrawComponent): boolean {
-  return (c.type === "text" && c.role === "title") || c.type === "heading";
-}
 
 function hasExplicitAt(c: DrawComponent): boolean {
   return c.at !== undefined;
@@ -50,18 +45,10 @@ export function layoutScene(components: DrawComponent[], viewW: number, viewH: n
     placements[i].cy = cy;
   }
 
-  // Pass 2: auto-flow. Title-role text pins to the top band; everything else stacks centered in
-  // the middle band. A single wide component (chart/map/timeline wider than half the view) centers alone.
-  const titleAuto = autoIdx.filter((i) => isTitleText(components[i]));
-  const restAuto = autoIdx.filter((i) => !isTitleText(components[i]));
-
-  for (const i of titleAuto) {
-    placements[i].cx = viewW / 2;
-    placements[i].cy = TITLE_Y;
-  }
-
-  const wideAuto = restAuto.filter((i) => sizes[i].w > viewW * WIDE_FRACTION);
-  const stackAuto = restAuto.filter((i) => !wideAuto.includes(i));
+  // Pass 2: auto-flow. Everything stacks centered in the middle band. A single wide component
+  // (chart/map/timeline wider than half the view) centers alone.
+  const wideAuto = autoIdx.filter((i) => sizes[i].w > viewW * WIDE_FRACTION);
+  const stackAuto = autoIdx.filter((i) => !wideAuto.includes(i));
 
   // Wide components each get their own centered row, stacked in encounter order after any stacked group.
   const stackHeight = stackAuto.reduce((s, i) => s + sizes[i].h, 0) + Math.max(0, stackAuto.length - 1) * GAP;
@@ -79,6 +66,11 @@ export function layoutScene(components: DrawComponent[], viewW: number, viewH: n
     placements[i].cy = wideY + sizes[i].h / 2;
     wideY += sizes[i].h + GAP;
   }
+
+  components.forEach((c, i) => {
+    const drawn = absoluteBox(c);
+    if (drawn) placements[i] = { index: i, cx: drawn.x + drawn.w / 2, cy: drawn.y + drawn.h / 2, w: drawn.w, h: drawn.h };
+  });
 
   // Build the id → box map from every placement computed so far, and — for components with an id —
   // also register their sub-anchors ("<id>.<handle>" → a tiny Box at that point) so the EXISTING
@@ -125,6 +117,7 @@ function registerSubAnchors(id: string, c: DrawComponent, box: Box, boxes: Map<s
   for (const [handle, [px, py]] of Object.entries(anchors)) {
     boxes.set(`${id}.${handle}`, { x: px - SUB_ANCHOR_SIZE / 2, y: py - SUB_ANCHOR_SIZE / 2, w: SUB_ANCHOR_SIZE, h: SUB_ANCHOR_SIZE });
   }
+  if (c.figure) for (const [side, sideBox] of Object.entries(sideBoxes(c.figure))) boxes.set(`${id}.${side}`, sideBox);
 }
 
 const GROUP_GAP = 18;

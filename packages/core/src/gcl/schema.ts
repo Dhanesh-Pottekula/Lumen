@@ -1,6 +1,8 @@
 // src/gcl/schema.ts
 /** The generic-component-layer authoring schema (Phase 0 subset). Flat stream of scene markers + components. */
 import type { Side as CalloutSide, LeaderRoute as CalloutRoute, Container as CalloutContainer } from "../render/callout";
+import type { FigureOp } from "../render/figure";
+import type { FigureSpec } from "../geometry/figure";
 
 export type Vec2 = [number, number];
 
@@ -34,7 +36,6 @@ export interface EnterSpec {
   count?: number;                               // blinds slats
   seed?: number;                                // dissolve/checkerboard
   points?: Vec2[];                              // clip polygon (absolute coords)
-  pen?: boolean;                                // draw: ride a pen nib along the stroke
 }
 
 /** How a component exits — independent of its enter, driven by absolute-time (or scene-relative) windows. */
@@ -53,19 +54,28 @@ export type Gait = "walk" | "run" | "hop";
  *  or start to end and again from the start. One leg takes the motion's duration. */
 export type Replay = "once" | "there-and-back" | "loop";
 export type MotionSpec =
-  | { kind: "move"; to: Position; from?: Position; at?: number; cue?: number; start?: "with" | "after" | number; dur?: number; gait?: Gait }
-  | { kind: "fall"; to?: Position; from?: Position; gravity?: number; at?: number; dur?: number; bounce?: number }
-  | { kind: "orbit"; center: Position; radius?: number; rx?: number; ry?: number; from?: number; turns?: number; at?: number; dur?: number }
+  | { kind: "move"; trail?: Trail; dates?: TrailDates; to: Position; from?: Position; at?: number; cue?: number; start?: "with" | "after" | number; dur?: number; gait?: Gait }
+  | { kind: "fall"; trail?: Trail; dates?: TrailDates; to?: Position; from?: Position; gravity?: number; at?: number; dur?: number; bounce?: number }
+  | { kind: "orbit"; trail?: Trail; dates?: TrailDates; center: Position; radius?: number; rx?: number; ry?: number; from?: number; turns?: number; at?: number; dur?: number }
   /** `startAt` is the fraction of the path where the traveller already rests, so the motion begins
    *  there instead of jumping to the path's first point; a there-and-back run then swings out to
    *  both ends from it. */
-  | { kind: "along"; path: Vec2[]; repeat?: Replay; startAt?: number; leadIn?: boolean; at?: number; dur?: number; gait?: Gait }
+  | { kind: "along"; trail?: Trail; dates?: TrailDates; path: Vec2[]; repeat?: Replay; startAt?: number; leadIn?: boolean; at?: number; dur?: number; gait?: Gait; face?: boolean }
   /** `center` turns the thing about that point instead of its own centre — a pendulum about its pivot, a
    *  crank about its axle. `sweep` bounds the turn to an arc (radians): played once it opens to the arc, there-
    *  and-back it swings to either side of rest, one full swing per `dur`. Without `sweep` it turns at `omega`. */
   | { kind: "spin"; omega?: number; center?: Position; sweep?: number; repeat?: Replay; at?: number; dur?: number }
   | { kind: "trace"; path: Vec2[]; color?: string; dissipate?: number; at?: number; dur?: number }
-  | { kind: "morph"; toShape: "circle" | "polygon" | "star" | "heart"; sides?: number; at?: number; dur?: number };
+  /** `toCorners` are the drawn figure's corners in the new shape, which its handles move to as it changes. */
+  | { kind: "morph"; toShape?: "circle" | "polygon" | "star" | "heart"; sides?: number; toPoints?: Vec2[]; toCorners?: Vec2[]; at?: number; dur?: number }
+  /** Steps aside: the picture's centre goes to `to` as it shrinks to `scale` and fades to `mute` opacity, and stays so.
+   *  `pivot` is the picture's centre from this component's own, for a part drawn on its own. */
+  | { kind: "aside"; to: Vec2; scale: number; mute: number; pivot?: Vec2; at?: number; dur?: number };
+
+/** What a journey leaves behind it: a dotted route, or faded copies of the traveller along the way. */
+export type Trail = "dots" | "ghosts";
+/** Moments of a ghost-trailed journey, evenly spaced from its start to its end, each written where the traveller was then. */
+export type TrailDates = string[];
 
 /** Idle continuous oscillation (breathe/wobble/pulse) layered additively atop motion/placement. */
 export interface OscillateSpec {
@@ -120,6 +130,13 @@ export interface Base {
    *  and a swinging bob turns about the pivot instead of hanging in the air where it was drawn. */
   ends?: [Position, Position];
   ends0?: [Vec2, Vec2];
+  /** Drawn in the frame `ref` sets (a thing, a part, a figure's corner or side), lying at rest as `o`, `x`, `y`:
+   *  the renderer redraws it in that frame wherever the frame is now. */
+  pin?: { ref: string; o: Vec2; x: Vec2; y: Vec2 };
+  /** A drawn figure's corners and sides at rest, which `<id>.v<i>`, `<id>.s<i>` and `<id>.s<i>@t` name; `unit` is the view units one grid unit spans. */
+  figure?: FigureSpec & { unit: number };
+  /** An angle mark, redrawn between where its corner and arms are now; `rest` is where they were laid out. */
+  arc?: { at: Position; from: Position; to: Position; reach: number; rest: [Vec2, Vec2, Vec2] };
   oscillate?: OscillateSpec;
   // Subject modifiers (Family D, Phase 4) — wrap THIS component's own content draw via the (A)-class
   // verbs (withPunch/withShake/pulseScale/wiggle/ghost/magnify) and predictReveal gating.
@@ -127,16 +144,36 @@ export interface Base {
   ghost?: number;   // 0..1 residual opacity (de-emphasize this element)
   magnify?: { zoom?: number; r?: number };
   predict?: { revealAt?: number; revealCue?: number; poseAt?: number };
+  /** Writing set over a picture: a soft plate of the page colour is laid under it so it keeps its contrast. */
+  plate?: boolean;
+  /** Writing set apart from what it names: a thin line runs from its edge to this point on it, and goes with it. */
+  pointer?: Vec2;
+  /** A picture drawn larger than it is beside what it is measured against: set in a ringed disc, as a close-up. */
+  lens?: boolean;
+  /** The point a journey carries it by, from its centre (the feet of a thing that stands); its dotted trail runs there. */
+  carriedBy?: Vec2;
+}
+
+/** A character's spoken line as laid out: its rows of words, when each is written, and the block they fill. */
+export interface SpeechLine {
+  rows: string[][];
+  /** When each word is written, in reading order. */
+  reveal: number[];
+  /** The words, by reading-order index, written in the cue's `color`. */
+  stressed?: number[];
+  /** The block's size at rest, centred on `spot`. */
+  size: [number, number];
+  align: "left" | "right" | "center";
 }
 
 /** Attention overlay verbs (Family D, Phase 4) — a (B)-class indicator pointing at a resolved anchor. */
 export type AttnVerb = "callout" | "highlight" | "spotlight" | "dim" | "pointer" | "box"
-  | "brackets" | "encircle" | "converge" | "spark" | "vignette" | "rings";
+  | "brackets" | "encircle" | "outline" | "converge" | "spark" | "vignette" | "rings" | "trace" | "underline" | "hold" | "cancel"
+  | "strike" | "tick" | "trend" | "speech";
 
 export type Component =
-  | (Base & { type: "heading"; text: string; size?: number; color?: string })
   // text: role drives default size/weight/placement; mode drives kinetic entrance
-  | (Base & { type: "text"; text: string; role?: "title" | "body" | "bullet" | "caption"; mode?: "fade" | "word" | "typewriter" | "slam" | "scramble"; size?: number; color?: string; align?: CanvasTextAlign })
+  | (Base & { type: "text"; text: string; role?: "body" | "bullet" | "caption"; mode?: "fade" | "word" | "typewriter" | "slam" | "scramble"; size?: number; color?: string; align?: CanvasTextAlign })
   | (Base & { type: "textPath"; text: string; path: Vec2[]; size?: number; color?: string })
   | (Base & { type: "equation"; tex: string; size?: number; color?: string; align?: "left" | "center" | "right" })
   // measure stays as defined in P0 but ALSO accept fmt passthrough:
@@ -146,37 +183,57 @@ export type Component =
   | (Base & { type: "measure"; value: number; countFrom?: number; unit?: string; label?: string; size?: number; color?: string; commas?: boolean; decimals?: number; prefix?: string;
       // A scale turns the figure into a quantity you can SEE: the meter fills to where `value` sits
       // between the two bounds, in step with the digits counting, so the length IS the number.
-      scale?: [number, number]; meter?: "bar" | "ring" })
+      scale?: [number, number]; meter?: "bar" | "ring";
+      // The meter alone, its number never written, for an amount the voice gives no number for.
+      quiet?: boolean })
   | (Base & {
       // "riemann" (Phase 6 harvest): n rectangles under `fn` over `xDomain`, building in one-by-one —
       // the classic Riemann-sum calculus visual, harvested as a reusable named chart mode.
       type: "chart"; chart: "bar" | "line" | "area" | "scatter" | "pie" | "function" | "riemann";
       data?: { label: string; value: number; color?: string }[];   // bar/pie
-      series?: [number, number][];                                   // line/area/scatter
+      series?: [number, number][] | [number, number][][];            // line/area/scatter: one line or several
+      names?: string[];                                              // each line's name, at its end
       fn?: string;                                                   // function (safe-expr in x) — function/riemann
       n?: number;                                                     // riemann: rectangle count
       xDomain?: [number, number]; yDomain?: [number, number];
       w?: number; h?: number; color?: string; donut?: number; axes?: boolean; xLabel?: string; yLabel?: string;
+      trend?: boolean;                                               // scatter: the least-squares line through the points
     })
   | (Base & {
       type: "shape"; shape: "circle" | "polygon" | "star" | "heart" | "path" | "disc";
       r?: number; sides?: number; points?: Vec2[]; fill?: string | [string, string]; stroke?: string; width?: number;
       shine?: boolean; // disc: render as a shaded sphere (radial gradient light→dark + rim glow)
+      // path: `points` are already exact (flattened from path commands) and must not be re-smoothed.
+      smooth?: boolean;
+      closed?: boolean;
+      arrow?: "start" | "end" | "both";
+      dash?: number[];
     })
-  | (Base & { type: "parametric"; fx: string; fy: string; uDomain?: [number, number]; samples?: number; color?: string; width?: number })
+  | (Base & { type: "parametric"; fx: string; fy: string; uDomain?: [number, number]; samples?: number; color?: string; width?: number; dash?: number[] })
   | (Base & { type: "icon"; name: string; size?: number; color?: string; filled?: boolean })
+  // An invisible target: a measured box that anchors, attention and motions resolve against, and that
+  // paints nothing. `follows` names the component it rides with, so it takes that component's motions.
+  | (Base & { type: "region"; w: number; h: number; follows?: string; outline?: Vec2[]; tint?: string;
+      // A still wash of one colour laid inside the outline while the region's owner is on screen.
+      wash?: { color: string; alpha: number } })
   | (Base & { type: "image"; src: string; w: number; h: number; rotate?: number })
   // Family G — SVG/vector primitives: raw Path2D `d` strings, embedded SVG markup, or a named prop
   // pulled from the reusable prop catalog (see gcl/props.ts). All three are static content (no native
   // progress of their own beyond a simple fade-in via enterP) — see compile.ts's paint switch.
   | (Base & { type: "vector"; d: string; fill?: string; stroke?: string; width?: number; w?: number; h?: number; scale?: number; rotate?: number })
-  | (Base & { type: "svg"; markup: string; w: number; h: number; rotate?: number })
+  | (Base & { type: "svg"; markup: string; w: number; h: number; rotate?: number; strokes?: Vec2[][] })
   | (Base & { type: "prop"; name: string; size?: number; angle?: number; color?: string; w?: number; h?: number })
-  | (Base & { type: "legend"; categories: string[]; rowH?: number })
+  | (Base & { type: "legend"; categories: string[]; rowH?: number;
+      // Each row's swatch colour, and how strongly a swatch is filled: a key matching faint tints is faint too.
+      colors?: string[]; swatchAlpha?: number; ink?: string })
   | (Base & {
       type: "map";
       features: { id: string; rings: [number, number][][] }[];
-      markers?: { lon: number; lat: number; label?: string; icon?: string }[];
+      // A marker with a `value` is a proportional circle, its AREA the quantity, in `color`.
+      markers?: { lon: number; lat: number; label?: string; icon?: string; value?: number; color?: string }[];
+      // The key a data map is read by: its quantity's name, the shading ramp of its valued regions
+      // (lightest `colors[0]` at `low`), and the circle sizes when markers carry values.
+      legend?: { title: string; ramp?: { low: number; high: number; colors: string[] } };
       // Named places this map exposes for targeting: `flows`, and any component's `at`/`target`/`to`,
       // can then reference them by name (e.g. `"beijing"`) instead of raw coords. Feature `id`s and
       // marker `label`s are auto-registered too (see compile.ts `buildSceneGeo`).
@@ -216,8 +273,10 @@ export type Component =
     })
   | (Base & {
       type: "timeline"; from: number; to: number;
-      events?: { at: number; label: string; above?: boolean }[];
-      eras?: { from: number; to: number; label: string; color?: string }[];
+      events?: { at: number; label: string; above?: boolean; track?: number }[];
+      eras?: { from: number; to: number; label: string; color?: string; track?: number }[];
+      // Named lanes the events and eras sit on, one track each, and cause arrows between events by index.
+      lanes?: string[]; links?: { from: number; to: number; label?: string }[];
       // `playhead`: a fixed marker year (backward-compatible — still works as before). For an
       // ANIMATED playhead that sweeps across a window, set `playheadFrom`/`playheadTo` (+ optionally
       // `playheadOver` for the sweep duration in seconds, default = the component's own `dur`); the
@@ -231,15 +290,33 @@ export type Component =
   // Family A — table: a plain data grid (Phase 6). New primitive kept in gcl/table.ts (reuse-only:
   // NOT added to render/*); measured/compiled like any other content component.
   | (Base & { type: "table"; rows: string[][]; header?: boolean; w?: number; rowH?: number; colColor?: string; ink?: string })
+  // A laid-out drawing (a data chart, a diagram's node, a line of working): ops about its centre, built
+  // up by its entrance. `dimAt` fades it back from that time on, once later work has taken the eye.
+  | (Base & { type: "figure"; w: number; h: number; ops: FigureOp[]; dimAt?: number })
   // camera directive — a component-position item in the flat stream, excluded from the draw loop
   // and layout auto-flow; resolved once per scene into a pure cameraAt(t) via gcl/camera.ts.
-  | (Base & { type: "camera"; to?: Position; zoom?: number; rot?: number; kind?: "move" | "pushIn" })
+  | (Base & { type: "camera"; to?: Position; zoom?: number; rot?: number; kind?: "move" | "pushIn" | "arc" })
   // attention overlay directive — like camera, excluded from the draw loop and layout auto-flow (it
   // has no measured content of its own); resolves `target`/`from` via the layout `boxes` map through
   // gcl/attention.ts and draws a (B)-class indicator on the annotation (or fx) layer. See compile.ts.
   | (Base & {
       type: "attention"; verb: AttnVerb; target: Position; from?: Position; // pointer needs 2 pts
       text?: string; title?: string; side?: CalloutSide; route?: CalloutRoute; container?: CalloutContainer; color?: string; radius?: number;
+      outline?: Vec2[]; // the target's exact shape, resting: `outline` traces it and `dim` cuts it out
+      avoid?: { x: number; y: number; w: number; h: number }[]; // callout: writing on screen with it, which it never covers
+      others?: string[]; // dim: the other pictures on screen, softened toward the page while the target glows
+      quiet?: boolean; // dim: only the others soften, and the target is not glowed — something else is marking it
+      course?: Vec2[]; // trace and outline: the points the target draws, which the colour runs along from first to last; callout: the stroke it names
+      soften?: string[]; // the target's sibling pieces (a chart's other bars), faded back while the cue lights it
+      // callout laid out by the compiler: the label's centre and where its pointer line ends, both at rest,
+      // carried with the target as it moves; `leader` false writes it with no line (on the part itself).
+      spot?: Vec2; point?: Vec2; leader?: boolean; fontPx?: number;
+      subdued?: boolean; // callout: blended onto the picture, no plate, never asking for the eye
+      ink?: string; // callout: the colour its words are written in
+      through?: boolean; // strike: one stroke through writing, instead of a cross over a thing
+      way?: "up" | "down"; // trend: whether the amount beside it rises or falls
+      settles?: number; // trend: when its beat ends, from which it is drawn in ink instead of `color`
+      speech?: SpeechLine; // speech: the spoken line written at `spot`, its tick aimed at `point`
     })
   // Family E — atmosphere: particles/flow/glow, simple stream components compiling to `emit`/
   // `radialGlow` on the fx layer (see gcl/particles.ts + compile.ts). Time is always `t - startTime`.

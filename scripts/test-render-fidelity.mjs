@@ -49,7 +49,7 @@ function compiled(spec, timing) {
 }
 
 // The host surface mirrors the engine's own view space (gcl/viewport.ts).
-const VIEW = { width: 960, height: 540 };
+const VIEW = { width: 540, height: 960 };
 
 function recordingCanvas(records) {
   const canvas = {
@@ -161,7 +161,7 @@ function recordingCanvas(records) {
   return { canvas, context };
 }
 
-function renderRecords(spec) {
+function renderRecords(spec, at) {
   const records = [];
   globalThis.document = {
     createElement(name) {
@@ -176,17 +176,16 @@ function renderRecords(spec) {
     true,
     rendered.valid ? undefined : JSON.stringify(rendered.errors),
   );
-  rendered.slide.render(main.context, rendered.slide.duration);
+  rendered.slide.render(main.context, at ?? rendered.slide.duration);
   return { records, rendered };
 }
 
-const headingAndChart = compiled(
+const textAndChart = compiled(
   shown([
     {
-      id: "heading",
+      id: "words",
       kind: "text",
-      text: "A clear heading",
-      textRole: "heading",
+      text: "A clear line",
       placement: { mode: "zone", zone: "main" },
     },
     {
@@ -198,16 +197,18 @@ const headingAndChart = compiled(
     },
   ]),
 );
-const heading = headingAndChart.resolved.scenes[0].objects.find(
-  (object) => object.id === "heading",
+const words = textAndChart.resolved.scenes[0].objects.find(
+  (object) => object.id === "words",
 );
-const chart = headingAndChart.resolved.scenes[0].objects.find(
+const chart = textAndChart.resolved.scenes[0].objects.find(
   (object) => object.id === "chart",
 );
-assert.ok(
-  heading.position[1] < chart.position[1],
-  "overlap separation must keep the heading above the chart",
-);
+const apart =
+  words.box.y + words.box.h <= chart.box.y ||
+  chart.box.y + chart.box.h <= words.box.y ||
+  words.box.x + words.box.w <= chart.box.x ||
+  chart.box.x + chart.box.w <= words.box.x;
+assert.ok(apart, "writing laid over a chart moves to the nearest spot clear of it");
 
 const measurement = compiled(
   shown([
@@ -221,7 +222,7 @@ const measurement = compiled(
     },
     {
       id: "stat",
-      kind: "stat",
+      kind: "measure",
       value: 1234,
       prefix: "$",
       unit: "kg",
@@ -247,14 +248,12 @@ assert.ok(
   "equation layout must measure rendered math, not raw TeX length",
 );
 const stat = byId.get("stat");
-const expectedStatWidth = Math.max(
-  "$1,234 kg".length * stat.size * 0.62 + stat.size,
-  "total mass".length * 14 * 0.62 + 14,
-);
-assert.equal(
-  stat.box.w,
-  expectedStatWidth,
-  "stat layout must include formatted prefix, grouping, unit, and label",
+const bare = compiled(
+  shown([{ id: "stat", kind: "measure", value: 1234, commas: false, size: "large", placement: { mode: "zone", zone: "footer" } }]),
+).resolved.scenes[0].objects.find((object) => object.id === "stat");
+assert.ok(
+  stat.box.w > bare.box.w && stat.box.h > bare.box.h,
+  "measure layout must include formatted prefix, grouping, unit, and label",
 );
 
 const spinning = compiled(
@@ -357,19 +356,18 @@ assert.ok(
   "1900..2000 series must span the plot rather than its final sliver",
 );
 
-const visibleHeading = lesson(
+const visibleText = lesson(
   [
     {
       id: "visible",
       kind: "text",
       text: "Always visible",
-      textRole: "heading",
       initial: "visible",
     },
   ],
   [{ do: "emphasize", target: "visible", emphasis: "pulse" }],
 );
-const visibleRecords = renderRecords(visibleHeading).records.filter(
+const visibleRecords = renderRecords(visibleText).records.filter(
   (record) => record.op === "fillText" && record.text === "Always visible",
 );
 assert.ok(
@@ -464,5 +462,55 @@ assert.deepEqual(
   untimed.resolved.scenes.map((scene) => scene.duration),
   "invalid keyed floors must also be ignored at the engine boundary",
 );
+
+const swingSpec = lesson(
+  [
+    { id: "pin", kind: "shape", shape: "circle", size: "small", placement: { mode: "zone", zone: "main" }, initial: "visible" },
+    { id: "bob", kind: "shape", shape: "polygon", sides: 3, size: "small", placement: { mode: "relative", target: "pin", relation: "below" }, initial: "visible" },
+  ],
+  [],
+);
+swingSpec.scenes[0].beats = [
+  { id: "rest", pace: "normal", actions: [{ do: "emphasize", target: "pin", emphasis: "pulse" }] },
+  { id: "first", pace: "normal", actions: [{ do: "motion", target: "bob", motion: "spin", about: "pin", sweep: 60, repeat: "there-and-back" }] },
+  { id: "second", pace: "normal", actions: [{ do: "motion", target: "bob", motion: "spin", about: "pin", sweep: 60, repeat: "there-and-back" }] },
+];
+const second = compileLessonSpec(swingSpec).resolved.scenes[0].beats[2];
+const swungRecords = renderRecords(swingSpec, second.start + second.duration / 4).records;
+const turned = Math.max(0, ...swungRecords.filter((record) => record.op === "rotate").map((record) => Math.abs(record.values[0])));
+assert.ok(turned <= (30 * Math.PI) / 180 + 0.01, `one swing per beat: an earlier swing has ended before the next begins, turned ${turned}`);
+
+const crowded = lesson(
+  [
+    { id: "hub", kind: "shape", shape: "circle", size: "medium", placement: { mode: "zone", zone: "main" } },
+    ...["above", "below", "left-of", "right-of"].map((relation) => ({ id: `caption-${relation}`, kind: "text", text: `caption ${relation}`, placement: { mode: "relative", target: "hub", relation } })),
+  ],
+  [
+    { do: "show", targets: ["hub", "caption-above", "caption-below", "caption-left-of", "caption-right-of"], entrance: "instant" },
+    { do: "label", target: "hub", text: "LABELLED", style: "pill" },
+  ],
+);
+crowded.scenes[0].beats[0].pace = "normal";
+const crowdedCompiled = compiled(crowded);
+const captions = crowdedCompiled.resolved.scenes[0].objects.filter((object) => object.id.startsWith("caption-")).map((object) => object.box);
+const shownLabel = crowdedCompiled.gcl.find((item) => item.type === "attention");
+const crowdedRun = renderRecords(crowded, shownLabel.start + shownLabel.dur + 0.05);
+const labelDraw = crowdedRun.records.find((record) => record.op === "fillText" && record.text === "LABELLED");
+assert.ok(labelDraw, "the label is drawn");
+assert.ok(
+  captions.every((box) => !(labelDraw.x > box.x - 4 && labelDraw.x < box.x + box.w + 4 && labelDraw.y > box.y - 4 && labelDraw.y < box.y + box.h + 4)),
+  "a label is never set over the writing on screen with it",
+);
+
+const PIXEL = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNgYGBgAAAABQABeqhXUAAAAABJRU5ErkJggg==";
+const traced = lesson(
+  [{ id: "map", kind: "image", src: PIXEL, aspect: 1, size: "large", hotspots: { france: [0.2, 0.2, 0.4, 0.4] }, outlines: { france: [[0.2, 0.2], [0.6, 0.2], [0.6, 0.6], [0.2, 0.6]] }, placement: { mode: "zone", zone: "main" } }],
+  [{ do: "show", targets: ["map"], entrance: "instant" }],
+);
+traced.scenes[0].beats.push({ id: "b2", pace: "normal", actions: [{ do: "attention", target: "map.france", verb: "outline" }] });
+const tracedMark = compiled(traced).gcl.find((item) => item.type === "attention");
+const lateStrokes = renderRecords(traced, tracedMark.start + tracedMark.dur * 0.85).records.filter((record) => record.op === "stroke" && record.path.length >= 4);
+const widths = lateStrokes.map((record) => record.lineWidth).sort((a, b) => b - a);
+assert.ok(widths.length >= 2 && widths[0] > widths[1], `a part's outline is still drawn late in its beat, over a wider halo: ${widths}`);
 
 console.log("render fidelity: ok");

@@ -52,6 +52,31 @@ export function linearPhase(t: number, at: number, dur: number): number {
   return dur > 0 ? clamp01((t - at) / dur) : t >= at ? 1 : 0;
 }
 
+/** Seconds a repeating motion may run: it then stops on the pose it passes once a cycle (WCAG 2.2.2). */
+export const LOOP_LIMIT = 5;
+
+/** One cycle of a motion that repeats until the scene ends, or undefined for one that finishes. */
+function cycleOf(spec: MotionSpec): number | undefined {
+  if (spec.kind === "along") return spec.repeat === "loop" ? (spec.dur ?? 2) : spec.repeat === "there-and-back" ? 2 * (spec.dur ?? 2) : undefined;
+  if (spec.kind === "orbit") return spec.dur === undefined ? 4 / Math.max(1e-6, Math.abs(spec.turns ?? 1)) : undefined;
+  if (spec.kind !== "spin") return undefined;
+  if (spec.sweep === undefined) return spec.dur === undefined ? (Math.PI * 2) / Math.max(1e-6, Math.abs(spec.omega ?? Math.PI * 2)) : undefined;
+  return spec.repeat === "there-and-back" || spec.repeat === "loop" ? (spec.dur ?? 1) : undefined;
+}
+
+/** When a repeating motion stops: after the last whole cycle inside the loop limit and before `until`,
+ *  so it rests where it began. */
+export function settledAt(from: number, cycle: number, until = Number.POSITIVE_INFINITY): number {
+  const limit = Math.min(LOOP_LIMIT, until - from);
+  return from + (cycle <= limit ? Math.floor(limit / cycle) * cycle : limit);
+}
+
+/** The time a motion is played at: `t`, or the moment a repeating one stopped, at the latest `until`. */
+function playedAt(spec: MotionSpec, t: number, until?: number): number {
+  const cycle = cycleOf(spec);
+  return cycle === undefined ? t : Math.min(t, settledAt(spec.at ?? 0, cycle, until));
+}
+
 /** Resolve a `Position` to a view-space point via the caller-bound `resolveFocal`, defaulting to the
  *  box's own center when unset (so `move`/`fall` without an explicit `from` starts at rest). */
 function resolvePos(pos: Position | undefined, fallback: [number, number], resolveFocal: (pos: unknown) => [number, number]): [number, number] {
@@ -67,6 +92,7 @@ export function motionTransform(
   box: Box,
   t: number,
   resolveFocal: (pos: unknown) => [number, number],
+  resolveCentre: (pos: unknown) => [number, number] = resolveFocal,
 ): MotionTransform {
   if (!spec) return IDENTITY;
   const [bcx, bcy] = boxCenter(box);
@@ -76,6 +102,7 @@ export function motionTransform(
   // In particular, orbit/along compute absolute path positions, so without
   // this guard they could move an object even while an earlier beat is shown.
   if (t < at) return IDENTITY;
+  t = playedAt(spec, t);
 
   switch (spec.kind) {
     case "move": {
@@ -112,7 +139,7 @@ export function motionTransform(
     }
     case "orbit": {
       const dur = spec.dur ?? 4;
-      const center = resolveFocal(spec.center);
+      const center = resolveCentre(spec.center);
       const rx = spec.rx ?? spec.radius ?? 80;
       const ry = spec.ry ?? spec.radius ?? 80;
       const from = spec.from ?? 0;
@@ -143,7 +170,8 @@ export function motionTransform(
       const p = Math.max(0, Math.min(1, prog));
       const pt = path.at(p * path.length);
       const gait = spec.repeat ? { dy: 0, rot: 0 } : gaitOffset(spec.gait, p, path.length);
-      return { dx: pt.x - bcx, dy: pt.y - bcy + gait.dy, rot: gait.rot, scale: 1 };
+      const heading = spec.face ? pt.angle - path.at(start * path.length).angle : 0;
+      return { dx: pt.x - bcx, dy: pt.y - bcy + gait.dy, rot: gait.rot + heading, scale: 1 };
     }
     case "spin": {
       const omega = spec.omega ?? Math.PI * 2;
@@ -173,6 +201,15 @@ export function motionTransform(
         trail.push([sPt.x, sPt.y]);
       }
       return { dx: pt.x - bcx, dy: pt.y - bcy, rot: 0, scale: 1, trail };
+    }
+    case "aside": {
+      const p = easeInOutCubic(linearPhase(t, at, spec.dur ?? 1));
+      const scale = 1 + (spec.scale - 1) * p;
+      const [px, py] = spec.pivot ?? [0, 0];
+      // The picture's centre travels to `to` while everything drawn of it shrinks about that centre.
+      const [ox, oy] = [bcx + px, bcy + py];
+      const [cx, cy] = [ox + (spec.to[0] - ox) * p, oy + (spec.to[1] - oy) * p];
+      return { dx: cx - bcx - scale * px, dy: cy - bcy - scale * py, rot: 0, scale };
     }
     case "morph":
       // Content-level: handled by the shape painter (drawMorph), not a placement transform.
@@ -207,11 +244,16 @@ function journeyEnd(spec: MotionSpec): number | undefined {
     case "move":
     case "fall":
     case "morph":
+    case "aside":
       return at + (spec.dur ?? 1);
     case "trace":
       return at + (spec.dur ?? 2);
     case "along":
-      return spec.repeat !== undefined && spec.repeat !== "once" ? undefined : at + (spec.dur ?? 2);
+    case "orbit": {
+      const cycle = cycleOf(spec);
+      if (cycle !== undefined) return settledAt(at, cycle);
+      return spec.kind === "along" ? at + (spec.dur ?? 2) : undefined;
+    }
     default:
       return undefined;
   }
@@ -230,10 +272,12 @@ export function motionsTransform(
   box: Box,
   t: number,
   resolveFocal: (pos: unknown) => [number, number],
+  resolveCentre: (pos: unknown) => [number, number] = resolveFocal,
 ): MotionTransform {
   if (!specs || specs.length === 0) return IDENTITY;
   const out: MotionTransform = { dx: 0, dy: 0, rot: 0, scale: 1 };
   const carried: [number, number] = [0, 0];
+  let carriedScale = 1;
   let travelling = false;
   const journeys = specs.filter((spec) => spec.kind !== "spin").sort((a, b) => (a.at ?? 0) - (b.at ?? 0));
   for (const spec of journeys) {
@@ -245,12 +289,13 @@ export function motionsTransform(
         : spec;
     const end = journeyEnd(spec);
     if (end !== undefined && t >= end) {
-      const done = motionTransform(live, shifted, end, resolveFocal);
+      const done = motionTransform(live, shifted, end, resolveFocal, resolveCentre);
       carried[0] += done.dx;
       carried[1] += done.dy;
+      carriedScale *= done.scale;
       continue;
     }
-    const m = motionTransform(live, shifted, t, resolveFocal);
+    const m = motionTransform(live, shifted, t, resolveFocal, resolveCentre);
     out.dx += m.dx;
     out.dy += m.dy;
     out.rot += m.rot;
@@ -260,13 +305,16 @@ export function motionsTransform(
   }
   out.dx += carried[0];
   out.dy += carried[1];
+  out.scale *= carriedScale;
   // Spins about one point compose by ANGLE: two swings about a pivot are one swing through their
   // summed angle, never two displacements added — those agree only while there is a single spin.
   const turned = new Map<string, number>();
-  for (const spec of specs) {
-    if (spec.kind !== "spin") continue;
+  const spins = specs.filter((spec): spec is Extract<MotionSpec, { kind: "spin" }> => spec.kind === "spin");
+  for (const spec of spins) {
     const key = spec.center === undefined ? "" : JSON.stringify(spec.center);
-    turned.set(key, (turned.get(key) ?? 0) + spinAngle(spec, spec.omega ?? Math.PI * 2, t, spec.at ?? 0));
+    // A later spin takes the thing over: a repeating one comes to rest before it, or the two angles would add.
+    const handover = Math.min(...spins.map((other) => other.at ?? 0).filter((at) => at > (spec.at ?? 0)));
+    turned.set(key, (turned.get(key) ?? 0) + spinAngle(spec, spec.omega ?? Math.PI * 2, playedAt(spec, t, handover), spec.at ?? 0));
   }
   const [bcx, bcy] = boxCenter(box);
   for (const [key, rot] of turned) {
@@ -279,9 +327,20 @@ export function motionsTransform(
   return out;
 }
 
-/** Idle continuous oscillation — additive to the motion offset. Pure function of `t`. */
-export function oscillateOffset(osc: OscillateSpec | undefined, t: number): { dx: number; dy: number; rot: number; scale: number } {
+/** How much a thing that stepped aside has faded back by `t`: 1 until it steps aside, then down to its `mute`. */
+export function mutedAt(specs: MotionSpec[] | undefined, t: number): number {
+  const aside = specs?.find((spec): spec is Extract<MotionSpec, { kind: "aside" }> => spec.kind === "aside");
+  if (!aside || t < (aside.at ?? 0)) return 1;
+  return 1 - (1 - aside.mute) * easeInOutCubic(linearPhase(t, aside.at ?? 0, aside.dur ?? 1));
+}
+
+/** Idle continuous oscillation — additive to the motion offset. Pure function of `t`; it settles
+ *  on its rest phase once it has run the loop limit from `from`, when the thing appeared. */
+export function oscillateOffset(osc: OscillateSpec | undefined, t: number, from = 0): { dx: number; dy: number; rot: number; scale: number } {
   if (!osc) return { dx: 0, dy: 0, rot: 0, scale: 0 };
+  // The waves are phased from time zero, so the rest pose recurs at whole periods of the clock itself.
+  const rest = Math.floor((from + LOOP_LIMIT) / osc.period) * osc.period;
+  t = Math.min(t, rest >= from ? rest : from + LOOP_LIMIT);
   const axis = osc.axis ?? "y";
   const mode = osc.mode ?? "wobble";
   let value: number;

@@ -30,7 +30,7 @@ export interface ProgressDotColors {
 export interface ComposeOptions {
   /** Seconds of overlap between consecutive scenes. Default 2.5. */
   crossfade?: number;
-  /** Draw one progress dot per scene along the bottom (films of 2+ scenes). Default true. */
+  /** Draw one progress dot per scene along the top edge (films of 2+ scenes). Default true. */
   progressDots?: boolean;
   /** Optional host-aware colors for active, completed, and pending progress dots. */
   progressDotColors?: ProgressDotColors;
@@ -256,12 +256,13 @@ export function composeSlides(
         ctx.restore();
       }
 
+      // The bottom of the frame is the app's caption line; the top edge sits inside the inset nothing is laid out in.
       if (progressDots) {
         const x0 = viewW / 2 - (windows.length - 1) * 8;
         windows.forEach(({ dotEnd, start }, i) => {
           const active = t >= start && t < dotEnd;
           ctx.beginPath();
-          ctx.arc(x0 + i * 16, viewH - 8, active ? 3.4 : 2.2, 0, 7);
+          ctx.arc(x0 + i * 16, 5, active ? 3.4 : 2.2, 0, 7);
           ctx.fillStyle = active
             ? progressDotColors.active
             : t >= dotEnd

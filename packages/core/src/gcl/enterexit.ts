@@ -111,7 +111,8 @@ export function applyEnterExit(
     return;
   }
 
-  if (isMaskKind(enterKind)) {
+  // A finished reveal is the content itself: the mask is only the layout's estimate of its box, and held on it cut the ends off writing wider than the estimate.
+  if (isMaskKind(enterKind) && enterP < 1) {
     masked(layer, W, H, (c) => paintContent(c), (c) => paintMask(c, enterKind, box, enterP, enter));
     return;
   }

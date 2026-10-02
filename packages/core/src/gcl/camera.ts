@@ -13,7 +13,7 @@ export interface CamDirective {
   focal: [number, number];
   zoom: number;
   rot: number;
-  kind: "move" | "pushIn";
+  kind: "move" | "pushIn" | "arc";
 }
 
 /**
@@ -37,6 +37,18 @@ export function clampCamera(cam: Camera, viewW: number, viewH: number): Camera {
     zoom,
     rot: cam.rot,
   };
+}
+
+const ARC_BOW = 0.25;
+
+/** A move whose focus bows sideways on the way, like a crane sweeping round, instead of panning straight. */
+function arcMove(from: Camera, to: Camera, t: number, at: number, dur: number): Camera {
+  const straight = move(from, to, t, at, dur);
+  const p = Math.min(1, Math.max(0, (t - at) / dur));
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const bow = Math.sin(Math.PI * p) * ARC_BOW;
+  return { ...straight, x: straight.x - dy * bow, y: straight.y + dx * bow };
 }
 
 /** Resolve the camera at time `t` from a list of (already-timed) camera directives. */
@@ -66,7 +78,9 @@ export function cameraAt(directives: CamDirective[], t: number, viewW: number, v
   const cam: Camera =
     active.kind === "pushIn"
       ? pushIn(viewW, viewH, active.focal[0], active.focal[1], prevTarget.zoom, active.zoom, t, active.at, active.dur)
-      : move(prevTarget, thisTarget, t, active.at, active.dur);
+      : active.kind === "arc"
+        ? arcMove(prevTarget, thisTarget, t, active.at, active.dur)
+        : move(prevTarget, thisTarget, t, active.at, active.dur);
 
   return isNeutral(cam, viewW, viewH) ? neutral : clampCamera(cam, viewW, viewH);
 }

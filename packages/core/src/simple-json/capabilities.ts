@@ -24,7 +24,8 @@ function clone<T>(value: T): T {
 /**
  * The machine-readable source of truth supplied to lesson-generating LLMs.
  * Values are derived from the executable schema and registries so prompts do
- * not drift from the compiler as capabilities evolve.
+ * not drift from the compiler as capabilities evolve. The film scene writer reads it
+ * through `renderCatalog` (catalog.ts), which holds the words for every entry.
  */
 export function getSimpleJsonCapabilities() {
   const schema = LESSON_SPEC_SCHEMA as unknown as JsonSchemaNode;

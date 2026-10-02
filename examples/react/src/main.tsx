@@ -15,7 +15,7 @@ const lesson: LessonSpec = {
       id: "title",
       kind: "text",
       text: "LUMEN IN REACT",
-      textRole: "heading",
+      textRole: "body",
       placement: { mode: "zone", zone: "main" }
     }],
     beats: [{

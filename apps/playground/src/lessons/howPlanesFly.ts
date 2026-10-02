@@ -25,11 +25,9 @@ export const howPlanesFlyLessonSpec: LessonSpec = {
         "A fully loaded jumbo jet weighs around four hundred tonnes. That is heavier than a hundred cars stacked together. So how on earth does something that heavy climb into the sky and stay there? The answer is not magic, and it is not just the engines. It is the shape of the wing.",
       objects: [
         { id: "plane", kind: "svg-artwork", svg: PLANE, size: "medium", placement: { mode: "zone", zone: "main" } },
-        { id: "hook-title", kind: "text", text: "How does 400 tonnes stay up?", textRole: "heading", role: "hero", placement: { mode: "zone", zone: "title" } },
       ],
       beats: [
         { id: "hook-b1", pace: "slow", actions: [{ do: "show", targets: ["plane"], entrance: "fade" }] },
-        { id: "hook-b2", actions: [{ do: "show", targets: ["hook-title"], entrance: "word-by-word" }] },
       ],
     },
     {
@@ -38,12 +36,10 @@ export const howPlanesFlyLessonSpec: LessonSpec = {
       narration:
         "Every airplane, in every moment of flight, is caught in a tug of war between four forces. Lift pulls it up. Weight, which is gravity, pulls it down. Thrust from the engines pushes it forward. And drag, the resistance of the air, holds it back. To fly level, lift must balance weight. To climb, lift has to win.",
       objects: [
-        { id: "f-title", kind: "text", text: "Four forces on every plane", textRole: "title", role: "annotation", placement: { mode: "zone", zone: "title" } },
         { id: "forces", kind: "svg-artwork", svg: FORCES, size: "medium", placement: { mode: "zone", zone: "main" } },
         { id: "f-cap", kind: "text", text: "Lift up, weight down, thrust forward, drag back.", textRole: "body", role: "support", size: "small", placement: { mode: "zone", zone: "footer" } },
       ],
       beats: [
-        { id: "f-b1", actions: [{ do: "show", targets: ["f-title"], entrance: "fade" }] },
         { id: "f-b2", pace: "slow", actions: [{ do: "show", targets: ["forces"], entrance: "draw" }] },
         { id: "f-b3", actions: [{ do: "attention", target: "forces.lift", verb: "callout", title: "Lift beats weight", text: "= you fly", side: "east", route: "elbow", style: "pill" }] },
         { id: "f-b4", actions: [{ do: "show", targets: ["f-cap"], entrance: "word-by-word" }] },
@@ -55,12 +51,10 @@ export const howPlanesFlyLessonSpec: LessonSpec = {
       narration:
         "So where does lift actually come from? Look closely at the cross-section of a wing. It is not a flat plank. The top surface is curved and longer, while the bottom is flatter and shorter. That subtle shape is the whole secret. Everything about flight comes from what the air does as it flows around this curve.",
       objects: [
-        { id: "w-title", kind: "text", text: "The secret is the wing's shape", textRole: "title", role: "annotation", placement: { mode: "zone", zone: "title" } },
         { id: "airfoil", kind: "svg-artwork", svg: AIRFOIL, size: "medium", placement: { mode: "zone", zone: "main" } },
         { id: "w-cap", kind: "text", text: "Curved and long on top, flatter underneath.", textRole: "body", role: "support", size: "small", placement: { mode: "zone", zone: "footer" } },
       ],
       beats: [
-        { id: "w-b1", actions: [{ do: "show", targets: ["w-title"], entrance: "fade" }] },
         { id: "w-b2", pace: "slow", actions: [{ do: "show", targets: ["airfoil"], entrance: "draw" }] },
         { id: "w-b3", actions: [{ do: "show", targets: ["w-cap"], entrance: "word-by-word" }] },
       ],
@@ -71,12 +65,10 @@ export const howPlanesFlyLessonSpec: LessonSpec = {
       narration:
         "As the wing slices through the air, the flow splits at the leading edge. Some air travels underneath, and some travels over the top. Because the top of the wing is curved and longer, the air going over it has farther to travel in the same amount of time. So it speeds up, and races across the top of the wing.",
       objects: [
-        { id: "af-title", kind: "text", text: "Air races over the top", textRole: "title", role: "annotation", placement: { mode: "zone", zone: "title" } },
         { id: "airflow", kind: "svg-artwork", svg: AIRFLOW, size: "medium", placement: { mode: "zone", zone: "main" } },
         { id: "af-cap", kind: "text", text: "The flow splits; the top must move faster.", textRole: "body", role: "support", size: "small", placement: { mode: "zone", zone: "footer" } },
       ],
       beats: [
-        { id: "af-b1", actions: [{ do: "show", targets: ["af-title"], entrance: "fade" }] },
         { id: "af-b2", pace: "slow", actions: [{ do: "show", targets: ["airflow"], entrance: "draw" }] },
         { id: "af-b3", actions: [{ do: "attention", target: "airflow.topflow", verb: "callout", title: "Faster on top", text: "longer path", side: "north", route: "elbow", style: "pill" }] },
         { id: "af-b4", actions: [{ do: "show", targets: ["af-cap"], entrance: "word-by-word" }] },
@@ -88,12 +80,10 @@ export const howPlanesFlyLessonSpec: LessonSpec = {
       narration:
         "And here is the key idea of the whole lesson. Faster moving air has lower pressure. So above the wing, where the air is racing, the pressure drops. Below the wing, the slower air keeps a higher pressure. Higher pressure pushing up from below, lower pressure above — and the wing gets squeezed upward. That upward push is lift.",
       objects: [
-        { id: "p-title", kind: "text", text: "Faster air, lower pressure", textRole: "title", role: "annotation", placement: { mode: "zone", zone: "title" } },
         { id: "pressure", kind: "svg-artwork", svg: PRESSURE, size: "medium", placement: { mode: "zone", zone: "main" } },
         { id: "p-cap", kind: "text", text: "Low pressure above, high below — a net push up = lift.", textRole: "body", role: "support", size: "small", placement: { mode: "zone", zone: "footer" } },
       ],
       beats: [
-        { id: "p-b1", actions: [{ do: "show", targets: ["p-title"], entrance: "fade" }] },
         { id: "p-b2", pace: "slow", actions: [{ do: "show", targets: ["pressure"], entrance: "draw" }] },
         { id: "p-b3", actions: [{ do: "attention", target: "pressure.high", verb: "callout", title: "LIFT", text: "net push upward", side: "south", route: "elbow", style: "pill" }] },
         { id: "p-b4", actions: [{ do: "show", targets: ["p-cap"], entrance: "word-by-word" }] },
@@ -105,12 +95,10 @@ export const howPlanesFlyLessonSpec: LessonSpec = {
       narration:
         "There is a second way a wing makes lift, and it is just as important. Tilt the wing slightly into the oncoming air. Now the underside deflects the air downward. And Newton's third law tells us that every action has an equal and opposite reaction. The wing pushes the air down, so the air pushes the wing up.",
       objects: [
-        { id: "a-title", kind: "text", text: "Tilt the wing, push air down", textRole: "title", role: "annotation", placement: { mode: "zone", zone: "title" } },
         { id: "angle", kind: "svg-artwork", svg: ANGLE, size: "medium", placement: { mode: "zone", zone: "main" } },
         { id: "a-cap", kind: "text", text: "Push air down → the air pushes the wing up (Newton).", textRole: "body", role: "support", size: "small", placement: { mode: "zone", zone: "footer" } },
       ],
       beats: [
-        { id: "a-b1", actions: [{ do: "show", targets: ["a-title"], entrance: "fade" }] },
         { id: "a-b2", pace: "slow", actions: [{ do: "show", targets: ["angle"], entrance: "draw" }] },
         { id: "a-b3", actions: [{ do: "attention", target: "angle.downwash", verb: "callout", title: "Downwash", text: "air flung downward", side: "north", route: "elbow", style: "pill" }] },
         { id: "a-b4", actions: [{ do: "show", targets: ["a-cap"], entrance: "word-by-word" }] },
@@ -122,12 +110,10 @@ export const howPlanesFlyLessonSpec: LessonSpec = {
       narration:
         "Now, how much lift you get depends dramatically on speed. And lift does not grow evenly. It grows with the square of the speed. Double your speed, and you get four times the lift. That is exactly why a plane has to accelerate down a long runway before its wings can finally carry the weight of the aircraft.",
       objects: [
-        { id: "s-title", kind: "text", text: "More speed, much more lift", textRole: "title", role: "annotation", placement: { mode: "zone", zone: "title" } },
         { id: "speed-chart", kind: "chart", chart: "function", function: "x^2", xDomain: [0, 10], yDomain: [0, 105], axes: true, xLabel: "Speed", yLabel: "Lift", size: "medium", placement: { mode: "zone", zone: "main" } },
         { id: "s-cap", kind: "text", text: "Lift grows with speed squared — double the speed, 4× the lift.", textRole: "body", role: "support", size: "small", placement: { mode: "zone", zone: "footer" } },
       ],
       beats: [
-        { id: "s-b1", actions: [{ do: "show", targets: ["s-title"], entrance: "fade" }] },
         { id: "s-b2", pace: "slow", actions: [{ do: "show", targets: ["speed-chart"], entrance: "draw" }] },
         { id: "s-b3", actions: [{ do: "attention", target: "speed-chart.last", verb: "callout", title: "steep", text: "fast = far more lift", side: "west", route: "elbow", style: "pill" }] },
         { id: "s-b4", actions: [{ do: "show", targets: ["s-cap"], entrance: "word-by-word" }] },
@@ -139,12 +125,10 @@ export const howPlanesFlyLessonSpec: LessonSpec = {
       narration:
         "But you cannot simply keep tilting the wing to get more and more lift. Increase the angle too far, and the smooth airflow over the top suddenly breaks away and becomes turbulent. Lift does not just stop growing — it collapses. This is called a stall, and it is one of the most important limits every pilot learns to respect.",
       objects: [
-        { id: "st-title", kind: "text", text: "Too much angle: the stall", textRole: "title", role: "annotation", placement: { mode: "zone", zone: "title" } },
         { id: "stall-chart", kind: "chart", chart: "line", series: [[0, 0], [4, 22], [8, 42], [12, 58], [15, 66], [17, 52], [20, 28]], xDomain: [0, 20], yDomain: [0, 72], axes: true, xLabel: "Angle (°)", yLabel: "Lift", size: "medium", placement: { mode: "zone", zone: "main" } },
         { id: "st-cap", kind: "text", text: "Tilt too far and the flow breaks — lift collapses.", textRole: "body", role: "support", size: "small", placement: { mode: "zone", zone: "footer" } },
       ],
       beats: [
-        { id: "st-b1", actions: [{ do: "show", targets: ["st-title"], entrance: "fade" }] },
         { id: "st-b2", pace: "slow", actions: [{ do: "show", targets: ["stall-chart"], entrance: "draw" }] },
         { id: "st-b3", actions: [{ do: "attention", target: "stall-chart.peak", verb: "callout", title: "Stall!", text: "past here, lift drops", side: "north", route: "elbow", style: "pill" }] },
         { id: "st-b4", actions: [{ do: "show", targets: ["st-cap"], entrance: "word-by-word" }] },

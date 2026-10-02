@@ -51,8 +51,8 @@ assert.doesNotMatch(
 );
 assert.match(
   SIMPLE_JSON_AUTHOR_SYSTEM_PROMPT,
-  /along.+visible.+line.+form.+straight or curved/is,
-  "the author must define along paths as visible line objects",
+  /along.+visible line, span, curve or path.+walks exactly the route it draws/is,
+  "the author must define along routes as the drawn line, span, curve or path the traveller walks",
 );
 assert.match(
   SIMPLE_JSON_AUTHOR_SYSTEM_PROMPT,
@@ -86,13 +86,42 @@ assert.doesNotMatch(
 );
 assert.match(
   bundler,
-  /bundledLumen\.SIMPLE_JSON_PLANNER_SYSTEM_PROMPT/,
-  "planner snapshots must come from the fresh source bundle",
+  /bundledLumen\.getSimpleJsonCapabilities\(\)/,
+  "the film contract must come from the fresh source bundle",
 );
 assert.match(
   bundler,
-  /bundledLumen\.SIMPLE_JSON_AUTHOR_SYSTEM_PROMPT/,
-  "author snapshots must come from the fresh source bundle",
+  /WITHHELD_KINDS = new Set\(\[[^\]]*"svg-artwork"[^\]]*\]\)/,
+  "films are drawn as pictures and paths, so the contract withholds svg-artwork",
+);
+assert.match(
+  bundler,
+  /WITHHELD_KINDS = new Set\(\[[^\]]*"question"[^\]]*\]\)/,
+  "a film's words name things, so the contract withholds the question chip",
+);
+const catalog = fs.readFileSync(
+  new URL("../packages/core/src/simple-json/catalog.ts", import.meta.url),
+  "utf8",
+);
+assert.match(
+  catalog,
+  /Only when the step asks for a timeline/,
+  "the catalog offers a timeline only to a step that asks for one",
+);
+assert.match(
+  bundler,
+  /WITHHELD_VERBS = new Set\(\[[^\]]*"tour"[^\]]*\]\)/,
+  "a tour's stops escape the backend's name check, so the contract withholds it",
+);
+assert.match(
+  bundler,
+  /renderCatalog\(contract\)/,
+  "the writer reads the catalog rendered from the filtered contract, not the raw schema",
+);
+assert.doesNotMatch(
+  SIMPLE_JSON_AUTHOR_SYSTEM_PROMPT,
+  /svg-composite|"turns": "many"/,
+  "the author prompt must not teach kinds or values the schema no longer accepts",
 );
 
 console.log("prompt contract passed");

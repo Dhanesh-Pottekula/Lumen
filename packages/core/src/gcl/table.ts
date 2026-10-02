@@ -8,6 +8,7 @@
  * paints from that same geometry, deterministic in `style.p`.
  */
 import { clamp01 } from "../slides/anim";
+import { MIN_TEXT } from "./viewport";
 
 export interface TableStyle {
   header?: boolean;
@@ -116,7 +117,7 @@ export function drawTable(
   }
 
   // Cell text.
-  ctx.font = "500 14px -apple-system, sans-serif";
+  ctx.font = `500 ${MIN_TEXT}px -apple-system, sans-serif`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
   for (const cell of cells) {
@@ -129,7 +130,7 @@ export function drawTable(
     if (text === undefined) continue;
     ctx.save();
     ctx.globalAlpha *= alpha;
-    ctx.font = header && cell.r === 0 ? "700 14px -apple-system, sans-serif" : "500 14px -apple-system, sans-serif";
+    ctx.font = header && cell.r === 0 ? `700 ${MIN_TEXT}px -apple-system, sans-serif` : `500 ${MIN_TEXT}px -apple-system, sans-serif`;
     ctx.fillStyle = ink;
     ctx.fillText(text, cell.x + cell.w / 2, cell.y + cell.h / 2);
     ctx.restore();

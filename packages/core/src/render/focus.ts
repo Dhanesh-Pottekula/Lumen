@@ -27,12 +27,14 @@ const ACCENT = "#ffd24a";
 
 export type Hole =
   | { cx: number; cy: number; r: number }
-  | { x: number; y: number; w: number; h: number; corner?: number };
+  | { x: number; y: number; w: number; h: number; corner?: number }
+  | { points: Array<[number, number]> };
 
 export interface DimOptions {
   intensity?: number; // scrim darkness 0..1 (default 0.6)
   color?: string; // scrim color (default near-black)
   feather?: number; // soft hole edge in view units (default 24)
+  within?: { x: number; y: number; w: number; h: number }; // darken only this region (default the whole view)
 }
 
 /**
@@ -48,7 +50,8 @@ export function dimExcept(ctx: CanvasRenderingContext2D, holes: Hole[], opts: Di
   ctx.save();
   ctx.globalAlpha = clamp01(intensity);
   ctx.fillStyle = opts.color ?? "#0b0f14";
-  ctx.fillRect(-1e5, -1e5, 2e5, 2e5);
+  if (opts.within) ctx.fillRect(opts.within.x, opts.within.y, opts.within.w, opts.within.h);
+  else ctx.fillRect(-1e5, -1e5, 2e5, 2e5);
   ctx.globalCompositeOperation = "destination-out";
   for (const hole of holes) {
     if ("r" in hole) {
@@ -59,6 +62,21 @@ export function dimExcept(ctx: CanvasRenderingContext2D, holes: Hole[], opts: Di
       ctx.beginPath();
       ctx.arc(hole.cx, hole.cy, hole.r, 0, 7);
       ctx.fill();
+    } else if ("points" in hole) {
+      // A blurred cut thins out even at its middle, so the part is cut clean first and feathered after.
+      const outline = () => {
+        ctx.beginPath();
+        hole.points.forEach(([x, y], index) => (index === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
+        ctx.closePath();
+      };
+      ctx.save();
+      ctx.fillStyle = "#000";
+      outline();
+      ctx.fill();
+      if (feather) ctx.filter = `blur(${feather * dpr * 0.2}px)`;
+      outline();
+      ctx.fill();
+      ctx.restore();
     } else {
       ctx.save();
       if (feather) ctx.filter = `blur(${feather * dpr * 0.4}px)`;

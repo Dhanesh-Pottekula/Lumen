@@ -8,7 +8,7 @@
  * parameterization here rather than a new function.
  */
 import { clamp01, fadeText } from "../slides/anim";
-import type { FrameCtx } from "./frame";
+import type { FrameCtx, LayerName } from "./frame";
 import { pointAt, type Pt, strokeOn } from "./strokes";
 import { arrowhead } from "./strokeVerbs";
 
@@ -31,7 +31,17 @@ export interface CalloutOptions {
   subject?: Subject; // marker drawn AROUND the target
   subjectR?: number;
   fontPx?: number;
+  avoid?: Rect[]; // writing already on screen, which the label is never set over
+  within?: [number, number][]; // the named part's border: a label that fits inside it is written there, with no leader
+  near?: Rect; // the named thing's box: a label that is not written inside it is set right beside it
+  along?: Pt[]; // the stroke it names: the label is set beside the stroke's middle, never across it
+  clear?: Pt[][]; // closed outlines the label is never set over: the figure whose corner or side it names
   maxWidth?: number; // wrap width in view units
+  spot?: [number, number]; // the box centre, decided by the caller: no search is made
+  point?: [number, number]; // where the leader ends on the target, when not the target point itself
+  leader?: boolean; // false: written on the target with no line (default: a line unless inside it)
+  subdued?: boolean; // blended onto what it names: no plate, no markers, no pop, a thin quiet line
+  layer?: LayerName; // the layer it is painted on (default annotation, above everything it names)
   curveBend?: number; // perpendicular control offset for route "curve"
   // staging (all 0..1, derive from t)
   leaderP?: number; // leader + subject draw-on
@@ -46,7 +56,16 @@ export interface CalloutOptions {
   seed?: number;
 }
 
-const PAD = 9;
+export const PAD = 9;
+// The margin a name carried with its thing keeps from the screen's edge.
+const SPOT_INSET = 8;
+export const PLAIN_PAD = 2;
+export const WRAP_WIDTH = 180;
+
+/** How wide a note's lines run before they break: wider for larger writing, so a name keeps to a line or two. */
+export function wrapWidth(fontPx: number): number {
+  return Math.max(WRAP_WIDTH, fontPx * 9);
+}
 
 function wrap(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
   if (!text) return [];
@@ -121,6 +140,16 @@ function boxEdgePoint(box: { x: number; y: number; w: number; h: number }, to: [
   const sy = dy !== 0 ? hh / Math.abs(dy) : Infinity;
   const s = Math.min(sx, sy);
   return [cx + dx * s, cy + dy * s];
+}
+
+/** A thin straight line from the edge of a box of writing to the point on the thing it names. */
+export function pointerLine(ctx: CanvasRenderingContext2D, box: { x: number; y: number; w: number; h: number }, point: [number, number], alpha: number, color: string) {
+  if (alpha <= 0) return;
+  const start = boxEdgePoint(box, point);
+  ctx.save();
+  ctx.globalAlpha *= alpha;
+  strokeOn(ctx, [start, [point[0], point[1]]], 1, { color, width: 1 });
+  ctx.restore();
 }
 
 function leaderPath(start: Pt, target: [number, number], route: LeaderRoute, bend: number): Pt[] {
@@ -233,6 +262,77 @@ function overlaps(a: Rect, b: Rect): boolean {
  * draws exactly as it did. Only a label with nowhere else to go returns to its first choice and
  * overlaps.
  */
+export function insidePolygon(point: [number, number], polygon: [number, number][]): boolean {
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const [xi, yi] = polygon[i];
+    const [xj, yj] = polygon[j];
+    if (yi > point[1] !== yj > point[1] && point[0] < ((xj - xi) * (point[1] - yi)) / (yj - yi) + xi) inside = !inside;
+  }
+  return inside;
+}
+
+/**
+ * Where a label fits wholly inside the part it names, or undefined when it does not: on a map every
+ * country touches the next, so a label stepping round the other parts was pushed off the map entirely.
+ */
+export function insideSpot(within: [number, number][], target: [number, number], w: number, h: number, taken: Rect[]): [number, number] | undefined {
+  if (within.length < 3) return undefined;
+  const centroid: [number, number] = [within.reduce((sum, p) => sum + p[0], 0) / within.length, within.reduce((sum, p) => sum + p[1], 0) / within.length];
+  // Off its middle, too: France's name did not fit across the dent of Brittany at its centroid.
+  const [xs, ys] = [within.map(([x]) => x), within.map(([, y]) => y)];
+  const step = Math.max(4, h / 2);
+  const grid: [number, number][] = [];
+  for (let y = Math.min(...ys) + h / 2; y <= Math.max(...ys) - h / 2; y += step) for (let x = Math.min(...xs) + w / 2; x <= Math.max(...xs) - w / 2; x += step) grid.push([x, y]);
+  grid.sort((a, b) => Math.hypot(a[0] - centroid[0], a[1] - centroid[1]) - Math.hypot(b[0] - centroid[0], b[1] - centroid[1]));
+  for (const [cx, cy] of [target, centroid, ...grid]) {
+    const box = { x: cx - w / 2 - 4, y: cy - h / 2 - 4, w: w + 8, h: h + 8 };
+    const corners: [number, number][] = [[box.x, box.y], [box.x + box.w, box.y], [box.x, box.y + box.h], [box.x + box.w, box.y + box.h], [cx, cy]];
+    if (corners.every((corner) => insidePolygon(corner, within)) && !taken.some((one) => overlaps(one, box))) return [cx, cy];
+  }
+  return undefined;
+}
+
+/** A box centre just outside `near` on `side`, `gap` clear of it and level with the target. */
+function besideBox(side: Exclude<Side, "auto">, near: Rect, target: [number, number], gap: number, w: number, h: number): [number, number] {
+  const east = near.x + near.w + gap + w / 2;
+  const west = near.x - gap - w / 2;
+  const north = near.y - gap - h / 2;
+  const south = near.y + near.h + gap + h / 2;
+  const x = side.includes("e") ? east : side.includes("w") ? west : target[0];
+  const y = side.includes("n") ? north : side.includes("s") ? south : target[1];
+  return [x, y];
+}
+
+/** Whether a stroke runs through a box: each segment walked in steps finer than any label. */
+export function crosses(stroke: Pt[], box: Rect): boolean {
+  for (let i = 1; i < stroke.length; i++) {
+    const [[x0, y0], [x1, y1]] = [stroke[i - 1], stroke[i]];
+    const steps = Math.max(1, Math.ceil(Math.hypot(x1 - x0, y1 - y0) / 3));
+    for (let k = 0; k <= steps; k++) {
+      const [x, y] = [x0 + ((x1 - x0) * k) / steps, y0 + ((y1 - y0) * k) / steps];
+      if (x > box.x && x < box.x + box.w && y > box.y && y < box.y + box.h) return true;
+    }
+  }
+  return false;
+}
+
+// Beside a named thing the nearest free spot wins, so a part's name sits on its edge; a label measured
+// from the target's centre at a fixed reach landed a limb away from a small part.
+const BESIDE_GAPS = Array.from({ length: 13 }, (_, ring) => 6 + ring * 12);
+
+/** Box centres all round `near`, ring after ring `gaps` out from it, nearest to the target first. */
+export function besideSpots(near: Rect, target: [number, number], w: number, h: number, gaps: number[] = BESIDE_GAPS, order: Exclude<Side, "auto">[] = SIDES): [number, number][] {
+  const reach = ([x, y]: [number, number]) => Math.hypot(x - target[0], y - target[1]);
+  return gaps.flatMap((gap) => order.map((candidate) => besideBox(candidate, near, target, gap, w, h))).sort((one, other) => reach(one) - reach(other));
+}
+
+/** Whether any of a box lies inside a closed outline or on its border. */
+export function polygonMeetsBox(polygon: [number, number][], box: Rect): boolean {
+  const corners: [number, number][] = [[box.x, box.y], [box.x + box.w, box.y], [box.x, box.y + box.h], [box.x + box.w, box.y + box.h], [box.x + box.w / 2, box.y + box.h / 2]];
+  return corners.some((corner) => insidePolygon(corner, polygon)) || crosses([...polygon, polygon[0]], box);
+}
+
 function freeBox(
   taken: Rect[],
   side: Exclude<Side, "auto">,
@@ -242,23 +342,29 @@ function freeBox(
   h: number,
   viewW: number,
   viewH: number,
+  near?: Rect,
+  along?: Pt[],
+  clear: Pt[][] = [],
 ): [number, number] {
   const order = [side, ...SIDES.filter((one) => one !== side)];
   const rings = [offset, offset + 46, offset + 92];
   let offFrame: [number, number] | undefined;
+  const hugged = along ? { x: target[0], y: target[1], w: 0, h: 0 } : near;
+  const spots = hugged ? besideSpots(hugged, target, w, h, BESIDE_GAPS, order) : rings.flatMap((ring) => order.map((candidate) => boxCenter(candidate, target, ring, w, h)));
 
-  for (const ring of rings) {
-    for (const candidate of order) {
-      const [cx, cy] = boxCenter(candidate, target, ring, w, h);
-      const box = { x: cx - w / 2, y: cy - h / 2, w, h };
-      if (taken.some((one) => overlaps(one, box))) continue;
-      const inside =
-        box.x >= 0 && box.y >= 0 && box.x + w <= viewW && box.y + h <= viewH;
-      if (inside) return [cx, cy];
-      offFrame = offFrame ?? [cx, cy];
-    }
+  for (const [cx, cy] of spots) {
+    const box = { x: cx - w / 2, y: cy - h / 2, w, h };
+    if (taken.some((one) => overlaps(one, box))) continue;
+    if (along && crosses(along, box)) continue;
+    if (clear.some((outline) => polygonMeetsBox(outline, box))) continue;
+    const inside =
+      box.x >= 0 && box.y >= 0 && box.x + w <= viewW && box.y + h <= viewH;
+    if (inside) return [cx, cy];
+    offFrame = offFrame ?? [cx, cy];
   }
-  return offFrame ?? boxCenter(side, target, offset, w, h);
+  // Crowded all round, a name beside its thing is better over a neighbour than cut off at the frame.
+  const framed = hugged && spots.find(([cx, cy]) => cx - w / 2 >= 0 && cy - h / 2 >= 0 && cx + w / 2 <= viewW && cy + h / 2 <= viewH);
+  return framed || offFrame || boxCenter(side, target, offset, w, h);
 }
 
 
@@ -274,9 +380,11 @@ function calloutBoxes(frame: FrameCtx): Rect[] {
 }
 
 export function callout(frame: FrameCtx, o: CalloutOptions) {
-  const ctx = frame.layer.ctx("annotation");
+  const middle = o.along && o.along.length > 1 ? pointAt(o.along, 0.5) : undefined;
+  const target: [number, number] = middle ? [middle.x, middle.y] : o.target;
+  const ctx = frame.layer.ctx(o.layer ?? "annotation");
   const th = frame.theme;
-  const fontPx = o.fontPx ?? 14;
+  const fontPx = o.fontPx ?? 18;
   const container = o.container ?? "pill";
   const route = o.route ?? "straight";
   const color = o.color ?? th.palette.muted;
@@ -285,8 +393,8 @@ export function callout(frame: FrameCtx, o: CalloutOptions) {
   const accent = o.accent ?? th.palette.accent;
   const leaderP = clamp01(o.leaderP ?? 1);
   const labelP = clamp01(o.labelP ?? 1);
-  const maxWidth = o.maxWidth ?? 180;
-  const side = resolveSide(o.side ?? "auto", o.target, frame.viewW, frame.viewH);
+  const maxWidth = o.maxWidth ?? wrapWidth(fontPx);
+  const side = resolveSide(o.side ?? "auto", target, frame.viewW, frame.viewH);
 
   // measure text (title + wrapped body)
   ctx.save();
@@ -304,38 +412,49 @@ export function callout(frame: FrameCtx, o: CalloutOptions) {
   }
   ctx.restore();
 
-  const isText = container === "text";
+  const isText = container === "text" || o.subdued === true;
   const lineH = fontPx * 1.32;
-  const w = container === "badge" ? Math.max(fontPx + PAD * 2, textW + PAD * 2) : textW + PAD * 2;
-  const h = container === "badge" ? Math.max(fontPx + PAD * 2, lineH + PAD) : lines.length * lineH + PAD * 2 - (lineH - fontPx);
+  // Words with no plate are measured as the words alone: padded like a plate, a name that fits was refused.
+  const pad = isText ? PLAIN_PAD : PAD;
+  const w = container === "badge" ? Math.max(fontPx + PAD * 2, textW + PAD * 2) : textW + pad * 2;
+  const h = container === "badge" ? Math.max(fontPx + PAD * 2, lineH + PAD) : lines.length * lineH + pad * 2 - (lineH - fontPx);
   const placed = calloutBoxes(frame);
-  const [bcx, bcy] = freeBox(placed, side, o.target, o.offset ?? 90, w, h, frame.viewW, frame.viewH);
+  const spot = o.spot ?? (o.within ? insideSpot(o.within, target, w, h, placed) : undefined);
+  // A name laid out for its thing at rest rides with it; carried toward an edge it stops at the edge, whole, its pointer reaching on.
+  const kept: [number, number] | undefined = spot && [
+    Math.max(SPOT_INSET + w / 2, Math.min(frame.viewW - SPOT_INSET - w / 2, spot[0])),
+    Math.max(SPOT_INSET + h / 2, Math.min(frame.viewH - SPOT_INSET - h / 2, spot[1])),
+  ];
+  const [bcx, bcy] = kept ?? freeBox([...placed, ...(o.avoid ?? [])], side, target, o.offset ?? 90, w, h, frame.viewW, frame.viewH, o.near, o.along, o.clear);
   const box = { x: bcx - w / 2, y: bcy - h / 2, w, h };
   placed.push(box);
 
   // subject marker around the target (draws on with the leader)
-  drawSubject(ctx, o.target, o.subject ?? "none", o.subjectR ?? 22, leaderP, accent);
+  drawSubject(ctx, target, o.subject ?? "none", o.subjectR ?? 22, leaderP, accent);
 
   // leader line
-  const start = boxEdgePoint(box, o.target);
-  const path = leaderPath(start, o.target, route, o.curveBend ?? 34);
+  const end = o.point ?? target;
+  const start = boxEdgePoint(box, end);
+  const path = (o.leader ?? !spot) ? leaderPath(start, end, route, o.curveBend ?? 34) : [];
   if (path.length >= 2 && leaderP > 0) {
-    strokeOn(ctx, path, leaderP, { color, width: 1.5, roughness: th.lineStyle.roughness, seed: o.seed ?? Math.round(o.target[0]), dash: o.dash });
+    strokeOn(ctx, path, leaderP, { color, width: o.subdued ? 1 : 1.5, roughness: th.lineStyle.roughness, seed: o.seed ?? Math.round(target[0]), dash: o.dash });
     // endpoint markers, revealed as the leader lands
     const tip = pointAt(path, leaderP);
-    drawMarker(ctx, [o.target[0], o.target[1]], tip.angle, o.targetMarker ?? "dot", accent, clamp01((leaderP - 0.85) / 0.15));
-    drawMarker(ctx, start, tip.angle + Math.PI, o.labelMarker ?? "none", accent, leaderP);
+    if (!o.subdued) {
+      drawMarker(ctx, [end[0], end[1]], tip.angle, o.targetMarker ?? "none", accent, clamp01((leaderP - 0.85) / 0.15));
+      drawMarker(ctx, start, tip.angle + Math.PI, o.labelMarker ?? "none", accent, leaderP);
+    }
   }
 
   // container + text
   if (labelP <= 0) return;
   ctx.save();
   ctx.globalAlpha *= labelP;
-  const pop = 0.94 + 0.06 * labelP; // subtle pop-in
+  const pop = o.subdued ? 1 : 0.94 + 0.06 * labelP; // subtle pop-in
   ctx.translate(bcx, bcy);
   ctx.scale(pop, pop);
   ctx.translate(-bcx, -bcy);
-  if (!isText) {
+  if (!isText && !o.subdued) {
     ctx.fillStyle = bg;
     ctx.strokeStyle = color;
     ctx.lineWidth = 1;
@@ -347,15 +466,15 @@ export function callout(frame: FrameCtx, o: CalloutOptions) {
     if (container === "bubble") {
       // a little pointer tail toward the target
       ctx.beginPath();
-      const tailBase = boxEdgePoint(box, o.target);
-      let nx = o.target[1] - tailBase[1];
-      let ny = -(o.target[0] - tailBase[0]);
+      const tailBase = boxEdgePoint(box, target);
+      let nx = target[1] - tailBase[1];
+      let ny = -(target[0] - tailBase[0]);
       const nl = Math.hypot(nx, ny) || 1;
       nx = (nx / nl) * 6;
       ny = (ny / nl) * 6;
       ctx.moveTo(tailBase[0] + nx, tailBase[1] + ny);
       ctx.lineTo(tailBase[0] - nx, tailBase[1] - ny);
-      ctx.lineTo(tailBase[0] + (o.target[0] - tailBase[0]) * 0.28, tailBase[1] + (o.target[1] - tailBase[1]) * 0.28);
+      ctx.lineTo(tailBase[0] + (target[0] - tailBase[0]) * 0.28, tailBase[1] + (target[1] - tailBase[1]) * 0.28);
       ctx.closePath();
       ctx.fillStyle = bg;
       ctx.fill();
@@ -365,7 +484,7 @@ export function callout(frame: FrameCtx, o: CalloutOptions) {
 
   // text lines (title bold, body typed)
   const typeP = clamp01(o.typeP ?? 1);
-  let ty = box.y + PAD + fontPx * 0.85;
+  let ty = box.y + pad + fontPx * 0.85;
   lines.forEach((l, i) => {
     let text = l.text;
     if (!l.bold && typeP < 1) {
@@ -373,6 +492,6 @@ export function callout(frame: FrameCtx, o: CalloutOptions) {
       text = text.slice(0, shown);
     }
     const font = l.bold ? `700 ${fontPx}px ${th.type.body}` : `${fontPx}px ${th.type.body}`;
-    fadeText(ctx, text, box.x + box.w / 2, ty + i * lineH, labelP, font, ink);
+    fadeText(ctx, text, box.x + box.w / 2, ty + i * lineH, labelP, font, ink, "center", isText && !o.subdued ? th.palette.bg : undefined);
   });
 }

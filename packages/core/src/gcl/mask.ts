@@ -42,12 +42,14 @@ export function maskRects(kind: MaskKind, box: Box, p: number, opts: MaskOpts = 
   switch (kind) {
     case "wipe": {
       const dir = opts.dir ?? "left";
-      if (dir === "left") return [[box.x, box.y, box.w * P, box.h]];
-      if (dir === "right") return [[box.x + box.w * (1 - P), box.y, box.w * P, box.h]];
+      // Only the travelling edge cuts; across it the reveal reaches past the box, so ink that overhangs an estimated box is never sliced off.
+      const reach = Math.max(box.w, box.h);
+      if (dir === "left") return [[box.x, box.y - reach, box.w * P, box.h + reach * 2]];
+      if (dir === "right") return [[box.x + box.w * (1 - P), box.y - reach, box.w * P, box.h + reach * 2]];
       // The direction names where the revealed edge TRAVELS, matching revealRect in render/reveal.ts:
       // "up" grows from the base upward, which is what a thing filling up looks like.
-      if (dir === "up") return [[box.x, box.y + box.h * (1 - P), box.w, box.h * P]];
-      return [[box.x, box.y, box.w, box.h * P]]; // down
+      if (dir === "up") return [[box.x - reach, box.y + box.h * (1 - P), box.w + reach * 2, box.h * P]];
+      return [[box.x - reach, box.y, box.w + reach * 2, box.h * P]]; // down
     }
     case "blinds": {
       const count = Math.max(1, opts.count ?? 6);
@@ -100,6 +102,14 @@ export function maskRects(kind: MaskKind, box: Box, p: number, opts: MaskOpts = 
   }
 }
 
+/** Nothing revealed: a `destination-in` composite with nothing drawn keeps the content, so it is cleared instead. */
+function concealAll(c: CanvasRenderingContext2D): void {
+  c.save();
+  c.setTransform(1, 0, 0, 1, 0, 0);
+  c.clearRect(0, 0, c.canvas.width, c.canvas.height);
+  c.restore();
+}
+
 /** Paints the revealed region for `kind` as solid white onto `c` (the mask buffer). Pure given inputs. */
 export function paintMask(c: CanvasRenderingContext2D, kind: MaskKind, box: Box, p: number, opts: MaskOpts = {}): void {
   const P = clamp01(p);
@@ -108,7 +118,7 @@ export function paintMask(c: CanvasRenderingContext2D, kind: MaskKind, box: Box,
     const cy = box.y + box.h / 2;
     const maxR = Math.hypot(box.w, box.h) / 2;
     const r = P * maxR;
-    if (r <= 0) return;
+    if (r <= 0) return concealAll(c);
     const shape = opts.shape ?? "circle";
     c.beginPath();
     if (shape === "circle") {
@@ -132,7 +142,7 @@ export function paintMask(c: CanvasRenderingContext2D, kind: MaskKind, box: Box,
     const cx = box.x + box.w / 2;
     const cy = box.y + box.h / 2;
     const radius = Math.hypot(box.w, box.h) / 2;
-    if (P <= 0) return;
+    if (P <= 0) return concealAll(c);
     const start = -Math.PI / 2;
     const sweep = Math.min(Math.PI * 2 - 1e-4, Math.PI * 2 * P);
     c.beginPath();
@@ -162,7 +172,9 @@ export function paintMask(c: CanvasRenderingContext2D, kind: MaskKind, box: Box,
     return;
   }
   // rect-based kinds: paint every revealed rect
+  const rects = maskRects(kind, box, P, opts).filter(([, , w, h]) => w > 0 && h > 0);
+  if (rects.length === 0) return concealAll(c);
   c.beginPath();
-  for (const [x, y, w, h] of maskRects(kind, box, P, opts)) c.rect(x, y, w, h);
+  for (const [x, y, w, h] of rects) c.rect(x, y, w, h);
   c.fill();
 }

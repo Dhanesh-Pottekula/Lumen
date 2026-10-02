@@ -38,7 +38,7 @@ const ZZZ =
 
 const BASE: ObjectSpec[] = [
   { id: "meadow", kind: "svg-artwork", svg: MEADOW, size: "large", role: "background", placement: { mode: "zone", zone: "background" } },
-  { id: "sun", kind: "svg-artwork", svg: SUN, size: "small", role: "support", placement: { mode: "zone", zone: "title" } },
+  { id: "sun", kind: "svg-artwork", svg: SUN, size: "small", role: "support", placement: { mode: "zone", zone: "hud" } },
 ];
 const bg = (extra: ObjectSpec[] = []): ObjectSpec[] => [...BASE, ...extra];
 
@@ -53,13 +53,11 @@ export const tortoiseAndHareLessonSpec: LessonSpec = {
       narration:
         "Once upon a time, in a green and sunny meadow, there lived a hare who was very, very fast — and who knew it. In that same meadow lived a tortoise. Slow, steady, and in no hurry at all. And this is the story of the strangest race they ever ran.",
       objects: bg([
-        { id: "title", kind: "text", text: "The Tortoise and the Hare", textRole: "title", role: "annotation", placement: { mode: "zone", zone: "title" } },
         { id: "tortoise", kind: "svg-artwork", svg: TORTOISE, size: "small", placement: { mode: "zone", zone: "main-right" } },
         { id: "hare", kind: "svg-artwork", svg: HARE, size: "small", placement: { mode: "zone", zone: "main-left" } },
       ]),
       beats: [
         { id: "m-b1", actions: [{ do: "show", targets: ["meadow", "sun"], entrance: "fade" }] },
-        { id: "m-b2", actions: [{ do: "show", targets: ["title"], entrance: "word-by-word" }] },
         { id: "m-b3", pace: "slow", actions: [{ do: "show", targets: ["tortoise"], entrance: "fade" }, { do: "emphasize", target: "tortoise", emphasis: "pulse" }] },
         { id: "m-b4", pace: "quick", actions: [{ do: "show", targets: ["hare"], entrance: "fade" }, { do: "motion", target: "hare", motion: "move", to: "tortoise", gait: "run" }] },
       ],
@@ -103,8 +101,8 @@ export const tortoiseAndHareLessonSpec: LessonSpec = {
         { id: "oak", kind: "svg-artwork", svg: TREE, size: "medium", placement: { mode: "zone", zone: "main-right" } },
         { id: "hare", kind: "svg-artwork", svg: HARE, size: "small", placement: { mode: "zone", zone: "main-left" } },
         { id: "tortoise", kind: "svg-artwork", svg: TORTOISE, size: "small", placement: { mode: "relative", target: "hare", relation: "below" } },
-        { id: "owl", kind: "svg-artwork", svg: OWL, size: "small", role: "annotation", placement: { mode: "zone", zone: "title" } },
-        { id: "go", kind: "text", text: "3 · 2 · 1 · GO!", textRole: "heading", role: "hero", placement: { mode: "zone", zone: "overlay" } },
+        { id: "owl", kind: "svg-artwork", svg: OWL, size: "small", role: "annotation", placement: { mode: "zone", zone: "support" } },
+        { id: "go", kind: "text", text: "3 · 2 · 1 · GO!", role: "hero", placement: { mode: "zone", zone: "overlay" } },
       ]),
       beats: [
         { id: "k-b1", actions: [{ do: "show", targets: ["meadow", "sun", "oak"], entrance: "fade" }] },
@@ -238,7 +236,7 @@ export const tortoiseAndHareLessonSpec: LessonSpec = {
       objects: bg([
         { id: "tortoise", kind: "svg-artwork", svg: TORTOISE, size: "small", placement: { mode: "zone", zone: "main-left" } },
         { id: "hare", kind: "svg-artwork", svg: HARE, size: "small", placement: { mode: "zone", zone: "main-right" } },
-        { id: "moral", kind: "text", text: "Slow and steady wins the race.", textRole: "heading", role: "hero", placement: { mode: "zone", zone: "overlay" } },
+        { id: "moral", kind: "text", text: "Slow and steady wins the race.", role: "hero", placement: { mode: "zone", zone: "overlay" } },
       ]),
       beats: [
         { id: "r-b1", actions: [{ do: "show", targets: ["meadow", "sun", "tortoise", "hare"], entrance: "fade" }] },

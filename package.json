@@ -30,9 +30,11 @@
     "pack:audit": "node scripts/audit-package-contents.mjs",
     "smoke:install": "node scripts/smoke-local-install.mjs",
     "security:audit": "npm audit --omit=dev",
-    "preview": "npm run preview --workspace @aira/lumen-playground"
+    "preview": "npm run preview --workspace @aira/lumen-playground",
+    "test": "npm run build --workspace @aira/lumen && node scripts/test-render-fidelity.mjs && node scripts/test-screen-background.mjs && node scripts/test-prompts.mjs && node scripts/test-paths.mjs"
   },
   "devDependencies": {
+    "@napi-rs/canvas": "^1.0.9",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
     "@vitejs/plugin-react": "^5.0.0",

@@ -64,13 +64,20 @@ export function fadeText(
   font: string,
   color: string,
   align: CanvasTextAlign = "center",
+  halo?: string,
 ) {
   if (alpha <= 0) return;
   ctx.save();
   ctx.globalAlpha = clamp01(alpha);
   ctx.font = font;
-  ctx.fillStyle = color;
   ctx.textAlign = align;
+  if (halo) {
+    ctx.strokeStyle = halo;
+    ctx.lineWidth = 7;
+    ctx.lineJoin = "round";
+    ctx.strokeText(text, x, y);
+  }
+  ctx.fillStyle = color;
   ctx.fillText(text, x, y);
   ctx.restore();
 }

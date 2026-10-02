@@ -39,13 +39,6 @@ export const lesson: LessonSpec = {
     narration: "Watch the ball move downward as gravity changes its velocity.",
     objects: [
       {
-        id: "heading",
-        kind: "text",
-        text: "GRAVITY CHANGES VELOCITY",
-        textRole: "heading",
-        placement: { mode: "zone", zone: "title" }
-      },
-      {
         id: "ball",
         kind: "shape",
         shape: "circle",
@@ -58,7 +51,7 @@ export const lesson: LessonSpec = {
       pace: "slow",
       actions: [{
         do: "show",
-        targets: ["heading", "ball"],
+        targets: ["ball"],
         entrance: "fade"
       }]
     }]

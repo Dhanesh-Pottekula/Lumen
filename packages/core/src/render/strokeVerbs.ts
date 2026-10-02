@@ -9,6 +9,7 @@
  */
 import { clamp01, stagger } from "./motion";
 import { arcTable, pointAt, type Pt, type StrokeStyle, strokeWindow } from "./strokes";
+import { polylineLengths, sampleAtLength } from "../geometry/path";
 import type { Theme } from "./theme";
 
 export type StrokeFrom = "start" | "end" | "center" | "both";
@@ -118,42 +119,84 @@ export function tracedPath(
 }
 
 export interface CircumscribeOptions {
-  shape?: "rect" | "ellipse";
-  buff?: number; // padding around the box (default 8)
+  buff?: number; // padding around the box (default 6)
   style?: StrokeStyle;
   theme?: Theme;
 }
 
-/** A temporary highlight loop that draws around a box then fades — "circle the answer". `p` 0→1. */
+const LOOP_SAMPLES = 72;
+const LOOP_OVERSHOOT = 0.45;
+const LOOP_TILT = -0.1;
+
+/** A pen loop drawn around a box then faded — "circle the answer". `p` 0→1. */
 export function circumscribe(
   ctx: CanvasRenderingContext2D,
   box: { x: number; y: number; w: number; h: number },
   p: number,
   opts: CircumscribeOptions = {},
 ) {
-  const buff = opts.buff ?? 8;
-  const x = box.x - buff;
-  const y = box.y - buff;
-  const w = box.w + buff * 2;
-  const h = box.h + buff * 2;
-  const pts: Pt[] = [];
-  if (opts.shape === "ellipse") {
-    const cx = x + w / 2;
-    const cy = y + h / 2;
-    for (let i = 0; i <= 48; i++) {
-      const a = (i / 48) * Math.PI * 2 - Math.PI / 2;
-      pts.push([cx + Math.cos(a) * (w / 2), cy + Math.sin(a) * (h / 2)]);
-    }
-  } else {
-    pts.push([x, y], [x + w, y], [x + w, y + h], [x, y + h], [x, y]);
-  }
-  const draw = clamp01(p / 0.5); // first half draws the loop on
-  const fade = p > 0.5 ? 1 - clamp01((p - 0.5) / 0.5) : 1; // second half fades it out
+  const buff = opts.buff ?? 6;
+  const cx = box.x + box.w / 2;
+  const cy = box.y + box.h / 2;
+  const rx = (box.w / 2 + buff) * 1.3;
+  const ry = (box.h / 2 + buff) * 1.3;
+  const cos = Math.cos(LOOP_TILT);
+  const sin = Math.sin(LOOP_TILT);
+  // The pen overshoots its start and drifts outward a little, so the loop never closes on itself.
+  const pts: Pt[] = Array.from({ length: LOOP_SAMPLES + 1 }, (_, i) => {
+    const turn = i / LOOP_SAMPLES;
+    const a = -1.9 + turn * (Math.PI * 2 + LOOP_OVERSHOOT);
+    const grow = 1 + 0.06 * turn;
+    const x = Math.cos(a) * rx * grow;
+    const y = Math.sin(a) * ry * grow;
+    return [cx + x * cos - y * sin, cy + x * sin + y * cos];
+  });
+  const draw = clamp01(p / 0.5);
+  const fade = p > 0.5 ? 1 - clamp01((p - 0.5) / 0.5) : 1;
   const style: StrokeStyle = { ...opts.style, alpha: (opts.style?.alpha ?? 1) * fade };
   strokeWindow(ctx, pts, 0, draw, style, opts.theme);
 }
 
+/** Trace a closed outline on, hold it, then fade it — "this exact part". `p` 0→1. */
+export function traceOutline(ctx: CanvasRenderingContext2D, outline: Pt[], p: number, opts: { color?: string; halo?: string } = {}) {
+  const closed: Pt[] = [...outline, outline[0]];
+  const draw = clamp01(p / 0.35);
+  // Held while the part is spoken of: fading from three quarters in, a 3px line was gone before it was seen.
+  const fade = p > 0.92 ? 1 - clamp01((p - 0.92) / 0.08) : 1;
+  // A light halo under the line keeps it readable on a part of its own colour (a red chamber, a red line).
+  if (opts.halo) strokeWindow(ctx, closed, 0, draw, { color: opts.halo, width: 9, alpha: fade * 0.85 });
+  strokeWindow(ctx, closed, 0, draw, { color: opts.color, width: 4.5, alpha: fade });
+}
+
 // ── Markers & followers ──────────────────────────────────────────────────────────────────────────
+
+/** Arrowheads at a drawn polyline's ends, each aimed along the path's own tangent where it ends. */
+export function pathArrowheads(
+  ctx: CanvasRenderingContext2D,
+  pts: Pt[],
+  p: number,
+  arrow: "start" | "end" | "both",
+  opts: { color?: string; width?: number } = {},
+) {
+  if (pts.length < 2) return;
+  const lengths = polylineLengths(pts);
+  const total = lengths[lengths.length - 1];
+  if (total <= 0) return;
+  const size = arrowheadSize(opts.width);
+  const back = Math.min(total / 2, size * 0.6);
+  const tip = (at: number, from: number) => {
+    const end = sampleAtLength(pts, lengths, at);
+    const base = sampleAtLength(pts, lengths, from);
+    return { x: end.x, y: end.y, angle: Math.atan2(end.y - base.y, end.x - base.x) };
+  };
+  if (arrow !== "start") arrowhead(ctx, tip(total, total - back), { size, color: opts.color, alpha: (p - 0.85) / 0.15 });
+  if (arrow !== "end") arrowhead(ctx, tip(0, back), { size, color: opts.color, alpha: p / 0.15 });
+}
+
+/** An arrowhead's length for a stroke `width` wide: in proportion to its line, never a blot on it. */
+export function arrowheadSize(width = 2): number {
+  return 6 + 2.5 * width;
+}
 
 /** Draw a filled arrowhead at a sampled point, rotated to its tangent. Reveal `alpha` on arrival. */
 export function arrowhead(
@@ -240,4 +283,84 @@ export function strokeSequence(ctx: CanvasRenderingContext2D, paths: Pt[][], t: 
     const p = stagger(t, i, { start: opts.start ?? 0, step: opts.step, dur: opts.dur });
     if (p > 0) drawOn(ctx, points, p, { from: opts.from, style: opts.style, theme: opts.theme });
   });
+}
+
+// ── Border glow ──────────────────────────────────────────────────────────────────────────────────
+
+// The spacing a border is resampled at before it is smoothed, in view units.
+const BORDER_STEP = 3;
+
+/** A closed outline's points every `step` units along it, corners kept: its points then stand for equal lengths. */
+function evenlyClosed(points: Pt[], step: number): Pt[] {
+  const out: Pt[] = [];
+  points.forEach(([x, y], i) => {
+    const [nx, ny] = points[(i + 1) % points.length];
+    const parts = Math.max(1, Math.ceil(Math.hypot(nx - x, ny - y) / step));
+    for (let k = 0; k < parts; k++) out.push([x + ((nx - x) * k) / parts, y + ((ny - y) * k) / parts]);
+  });
+  return out;
+}
+
+/**
+ * Average each point with its two neighbours, twice: a traced pixel border without its stair steps.
+ * Resampled first, so a border given by a few far-apart corners keeps its shape instead of being cut across.
+ */
+function smoothClosed(outline: Pt[], rounds = 2): Pt[] {
+  let current = evenlyClosed(outline, BORDER_STEP);
+  for (let round = 0; round < rounds; round++) {
+    const n = current.length;
+    current = current.map(([x, y], i) => {
+      const [px, py] = current[(i - 1 + n) % n];
+      const [nx, ny] = current[(i + 1) % n];
+      return [(px + 2 * x + nx) / 4, (py + 2 * y + ny) / 4] as Pt;
+    });
+  }
+  return current;
+}
+
+/** A closed outline pushed outward by `gap`, each point along the mean normal of its two edges. */
+export function inflateOutline(outline: Pt[], gap: number): Pt[] {
+  const n = outline.length;
+  if (n < 3) return outline;
+  let area = 0;
+  for (let i = 0; i < n; i++) {
+    const [x1, y1] = outline[i];
+    const [x2, y2] = outline[(i + 1) % n];
+    area += x1 * y2 - x2 * y1;
+  }
+  const outward = area >= 0 ? 1 : -1;
+  const normal = (dx: number, dy: number): Pt => {
+    const length = Math.hypot(dx, dy) || 1;
+    return [dy / length, -dx / length];
+  };
+  return outline.map(([x, y], i) => {
+    const [px, py] = outline[(i - 1 + n) % n];
+    const [nx, ny] = outline[(i + 1) % n];
+    const a = normal(x - px, y - py);
+    const b = normal(nx - x, ny - y);
+    const length = Math.hypot(a[0] + b[0], a[1] + b[1]) || 1;
+    return [x + (outward * gap * (a[0] + b[0])) / length, y + (outward * gap * (a[1] + b[1])) / length] as Pt;
+  });
+}
+
+/**
+ * A soft glow and a crisp line round a thing's own border, set a small gap outside it so it never
+ * touches the thing, drawn on round the border over the first third of the beat and then held still.
+ */
+export function glowBorder(ctx: CanvasRenderingContext2D, outline: Pt[], p: number, opts: { color?: string; gap?: number } = {}) {
+  if (outline.length < 3) return;
+  const ring = inflateOutline(smoothClosed(outline), opts.gap ?? 6);
+  const closed: Pt[] = [...ring, ring[0]];
+  const draw = clamp01(p / 0.3);
+  if (draw <= 0) return;
+  strokeWindow(ctx, closed, 0, draw, { color: opts.color, width: 10, alpha: 0.3, shadow: { blur: 14, color: opts.color ?? "#000" } });
+  strokeWindow(ctx, closed, 0, draw, { color: opts.color, width: 3, alpha: 1 });
+}
+
+/** A line lit along itself: a soft wide band under a firm, thicker core in the line's own colour — one series of a chart singled out. */
+export function glowLine(ctx: CanvasRenderingContext2D, points: Pt[], p: number, opts: { color?: string } = {}) {
+  const draw = clamp01(p / 0.3);
+  if (draw <= 0 || points.length < 2) return;
+  strokeWindow(ctx, points, 0, draw, { color: opts.color, width: 12, alpha: 0.3, shadow: { blur: 12, color: opts.color ?? "#000" } });
+  strokeWindow(ctx, points, 0, draw, { color: opts.color, width: 5, alpha: 1 });
 }

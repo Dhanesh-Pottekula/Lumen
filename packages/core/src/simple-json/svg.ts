@@ -1,3 +1,4 @@
+import { parsePath, pathBounds, type PathSeg } from "../geometry/path";
 import type { SvgCompositePartSpec } from "./types";
 
 export const SIMPLE_JSON_SVG_TAGS = [
@@ -253,12 +254,6 @@ interface Box {
   maxX: number;
   maxY: number;
 }
-interface InferredBox {
-  box: Box;
-  precision: "exact" | "conservative";
-  reason?: string;
-}
-
 function union(boxes: Box[]): Box | undefined {
   if (!boxes.length) return undefined;
   return {
@@ -269,213 +264,43 @@ function union(boxes: Box[]): Box | undefined {
   };
 }
 
-function pathBox(d: string): InferredBox | undefined {
-  const tokens = d.match(
-    /[AaCcHhLlMmQqSsTtVvZz]|[-+]?(?:\d*\.\d+|\d+\.?\d*)(?:e[-+]?\d+)?/g,
-  );
-  if (!tokens?.length) return undefined;
-  const points: Array<[number, number]> = [];
-  let index = 0;
-  let command = "";
-  let x = 0;
-  let y = 0;
-  let sx = 0;
-  let sy = 0;
-  let conservative = false;
-  let lastQCtrl: [number, number] | null = null; // previous quadratic control point, for smooth 't'
-  let lastCCtrl: [number, number] | null = null; // previous cubic second control point, for smooth 's'
-  const isCommand = (value: string) => /^[A-Za-z]$/.test(value);
-  const read = () => {
-    const value = Number(tokens[index++]);
-    if (!Number.isFinite(value)) throw new Error("invalid path number");
-    return value;
-  };
-  const point = (px: number, py: number) => {
-    points.push([px, py]);
-  };
-  const endpoint = (px: number, py: number, relative: boolean) =>
-    relative
-      ? ([x + px, y + py] as [number, number])
-      : ([px, py] as [number, number]);
-  try {
-    while (index < tokens.length) {
-      if (isCommand(tokens[index])) command = tokens[index++];
-      if (!command) return undefined;
-      const lower = command.toLowerCase();
-      const relative = command === lower;
-      if (lower === "z") {
-        x = sx;
-        y = sy;
-        point(x, y);
-        command = "";
-        lastQCtrl = null;
-        lastCCtrl = null;
-        continue;
-      }
-      if (lower === "h") {
-        x = relative ? x + read() : read();
-        point(x, y);
-        lastQCtrl = null;
-        lastCCtrl = null;
-        continue;
-      }
-      if (lower === "v") {
-        y = relative ? y + read() : read();
-        point(x, y);
-        lastQCtrl = null;
-        lastCCtrl = null;
-        continue;
-      }
-      if (lower === "m" || lower === "l") {
-        const [nx, ny] = endpoint(read(), read(), relative);
-        x = nx;
-        y = ny;
-        point(x, y);
-        if (lower === "m") {
-          sx = x;
-          sy = y;
-          command = relative ? "l" : "L";
-        }
-        lastQCtrl = null;
-        lastCCtrl = null;
-        continue;
-      }
-      if (lower === "t") {
-        // Smooth quadratic: the control point is the reflection of the previous quadratic control about
-        // the current point (or the current point itself if the previous command was not a q/t). Capturing
-        // it is what keeps a wave's troughs inside the computed bounds instead of being cropped.
-        const ctrl: [number, number] = lastQCtrl
-          ? [2 * x - lastQCtrl[0], 2 * y - lastQCtrl[1]]
-          : [x, y];
-        const end = endpoint(read(), read(), relative);
-        point(...ctrl);
-        point(...end);
-        lastQCtrl = ctrl;
-        lastCCtrl = null;
-        [x, y] = end;
-        conservative = true;
-        continue;
-      }
-      if (lower === "q") {
-        const control = endpoint(read(), read(), relative);
-        const end = endpoint(read(), read(), relative);
-        point(...control);
-        point(...end);
-        lastQCtrl = control;
-        lastCCtrl = null;
-        [x, y] = end;
-        conservative = true;
-        continue;
-      }
-      if (lower === "c") {
-        const c1 = endpoint(read(), read(), relative);
-        const c2 = endpoint(read(), read(), relative);
-        const end = endpoint(read(), read(), relative);
-        point(...c1);
-        point(...c2);
-        point(...end);
-        lastCCtrl = c2;
-        lastQCtrl = null;
-        [x, y] = end;
-        conservative = true;
-        continue;
-      }
-      if (lower === "s") {
-        // Smooth cubic: the first control is the reflection of the previous cubic second control.
-        const c1: [number, number] = lastCCtrl
-          ? [2 * x - lastCCtrl[0], 2 * y - lastCCtrl[1]]
-          : [x, y];
-        const c2 = endpoint(read(), read(), relative);
-        const end = endpoint(read(), read(), relative);
-        point(...c1);
-        point(...c2);
-        point(...end);
-        lastCCtrl = c2;
-        lastQCtrl = null;
-        [x, y] = end;
-        conservative = true;
-        continue;
-      }
-      if (lower === "a") {
-        const rx = Math.abs(read());
-        const ry = Math.abs(read());
-        read();
-        read();
-        read();
-        const end = endpoint(read(), read(), relative);
-        point(x - rx, y - ry);
-        point(x + rx, y + ry);
-        point(end[0] - rx, end[1] - ry);
-        point(end[0] + rx, end[1] + ry);
-        point(...end);
-        [x, y] = end;
-        conservative = true;
-        lastQCtrl = null;
-        lastCCtrl = null;
-        continue;
-      }
-      return undefined;
-    }
-  } catch {
-    return undefined;
-  }
-  if (!points.length) return undefined;
-  const xs = points.map(([px]) => px);
-  const ys = points.map(([, py]) => py);
-  return {
-    box: {
-      minX: Math.min(...xs),
-      minY: Math.min(...ys),
-      maxX: Math.max(...xs),
-      maxY: Math.max(...ys),
-    },
-    precision: conservative ? "conservative" : "exact",
-    reason: conservative
-      ? "curve or arc bounds use a conservative control envelope"
-      : undefined,
-  };
+function pathBox(d: string): Box | undefined {
+  const parsed = parsePath(d);
+  const bounds = parsed.issue ? null : pathBounds(parsed.segs);
+  return bounds ? { minX: bounds.x, minY: bounds.y, maxX: bounds.x + bounds.w, maxY: bounds.y + bounds.h } : undefined;
 }
 
 /** `null` marks an element skipped for unreadable numbers; `undefined` one whose shape is unknown. */
-function primitiveBox(tag: string, markup: string): InferredBox | null | undefined {
+function primitiveBox(tag: string, markup: string): Box | null | undefined {
   const box = primitiveGeometry(tag, markup);
   // A geometry attribute written as a word (`r=" thirty"`) measures as NaN; the element is left out
   // of the part's box rather than poisoning every anchor and refusing the whole film.
-  if (box && !Object.values(box.box).every(Number.isFinite)) return null;
+  if (box && !Object.values(box).every(Number.isFinite)) return null;
   return box;
 }
 
-function primitiveGeometry(tag: string, markup: string): InferredBox | undefined {
+function primitiveGeometry(tag: string, markup: string): Box | undefined {
   const n = (name: string, fallback = 0) =>
     Number(attribute(markup, name) ?? fallback);
   if (tag === "circle") {
     const cx = n("cx");
     const cy = n("cy");
     const r = n("r");
-    return {
-      box: { minX: cx - r, minY: cy - r, maxX: cx + r, maxY: cy + r },
-      precision: "exact",
-    };
+    return { minX: cx - r, minY: cy - r, maxX: cx + r, maxY: cy + r };
   }
   if (tag === "ellipse") {
     const cx = n("cx");
     const cy = n("cy");
     const rx = n("rx");
     const ry = n("ry");
-    return {
-      box: { minX: cx - rx, minY: cy - ry, maxX: cx + rx, maxY: cy + ry },
-      precision: "exact",
-    };
+    return { minX: cx - rx, minY: cy - ry, maxX: cx + rx, maxY: cy + ry };
   }
   if (tag === "rect") {
     const x = n("x");
     const y = n("y");
     const width = n("width");
     const height = n("height");
-    return {
-      box: { minX: x, minY: y, maxX: x + width, maxY: y + height },
-      precision: "exact",
-    };
+    return { minX: x, minY: y, maxX: x + width, maxY: y + height };
   }
   if (tag === "line") {
     const x1 = n("x1");
@@ -483,14 +308,11 @@ function primitiveGeometry(tag: string, markup: string): InferredBox | undefined
     const x2 = n("x2");
     const y2 = n("y2");
     return {
-      box: {
         minX: Math.min(x1, x2),
         minY: Math.min(y1, y2),
         maxX: Math.max(x1, x2),
         maxY: Math.max(y1, y2),
-      },
-      precision: "exact",
-    };
+      };
   }
   if (tag === "polyline" || tag === "polygon") {
     const values = numbers(attribute(markup, "points"));
@@ -498,14 +320,11 @@ function primitiveGeometry(tag: string, markup: string): InferredBox | undefined
     const xs = values.filter((_value, index) => index % 2 === 0);
     const ys = values.filter((_value, index) => index % 2 === 1);
     return {
-      box: {
         minX: Math.min(...xs),
         minY: Math.min(...ys),
         maxX: Math.max(...xs),
         maxY: Math.max(...ys),
-      },
-      precision: "exact",
-    };
+      };
   }
   if (tag === "path") return pathBox(attribute(markup, "d") ?? "");
   return undefined;
@@ -524,16 +343,13 @@ function inferredBounds(
   }
   const withoutDefs = markup.replace(/<defs\b[^>]*>[\s\S]*?<\/defs>/gi, "");
   const boxes: Box[] = [];
-  let conservative = false;
   let uncertain = false;
   for (const match of withoutDefs.matchAll(
     /<\s*(path|circle|ellipse|rect|line|polyline|polygon)\b([^>]*)>/gi,
   )) {
     const box = primitiveBox(match[1].toLowerCase(), match[0]);
-    if (box) {
-      boxes.push(box.box);
-      conservative ||= box.precision === "conservative";
-    } else if (box === undefined) uncertain = true;
+    if (box) boxes.push(box);
+    else if (box === undefined) uncertain = true;
   }
   const combined = uncertain ? undefined : union(boxes);
   if (!combined)
@@ -556,10 +372,7 @@ function inferredBounds(
   const maxY = Math.min(vy + vh, combined.maxY + padding);
   return {
     bounds: [minX, minY, Math.max(1, maxX - minX), Math.max(1, maxY - minY)],
-    boundsPrecision: conservative ? "conservative" : "exact",
-    boundsReason: conservative
-      ? "curve or arc bounds use a conservative control envelope"
-      : undefined,
+    boundsPrecision: "exact",
   };
 }
 
@@ -658,6 +471,34 @@ export function svgArtworkError(svg: string): string | undefined {
 
 function escapeAttribute(value: string): string {
   return value.replaceAll("&", "&amp;").replaceAll('"', "&quot;");
+}
+
+/** The path data one SVG element draws, in its own coordinates, or undefined for an element with no outline. */
+function elementPath(tag: string, markup: string): string | undefined {
+  const n = (name: string) => Number(attribute(markup, name) ?? 0);
+  if (tag === "path") return attribute(markup, "d");
+  if (tag === "circle" || tag === "ellipse") {
+    const [cx, cy] = [n("cx"), n("cy")];
+    const [rx, ry] = tag === "circle" ? [n("r"), n("r")] : [n("rx"), n("ry")];
+    return `M${cx - rx} ${cy} A${rx} ${ry} 0 1 0 ${cx + rx} ${cy} A${rx} ${ry} 0 1 0 ${cx - rx} ${cy} Z`;
+  }
+  if (tag === "rect") return `M${n("x")} ${n("y")} h${n("width")} v${n("height")} h${-n("width")} Z`;
+  if (tag === "line") return `M${n("x1")} ${n("y1")} L${n("x2")} ${n("y2")}`;
+  const points = numbers(attribute(markup, "points"));
+  if (points.length < 4) return undefined;
+  const pairs = Array.from({ length: points.length >> 1 }, (_, i) => `${points[2 * i]} ${points[2 * i + 1]}`);
+  return `M${pairs.join(" L")}${tag === "polygon" ? " Z" : ""}`;
+}
+
+/** Every outline an SVG fragment draws, as one path in its own coordinates; empty when a transform hides where they are. */
+export function svgStrokeSegs(fragment: string): PathSeg[] {
+  if (/\btransform\s*=/i.test(fragment)) return [];
+  const body = fragment.replace(/<defs\b[^>]*>[\s\S]*?<\/defs>/gi, "");
+  return [...body.matchAll(/<\s*(path|circle|ellipse|rect|line|polyline|polygon)\b([^>]*)>/gi)].flatMap((match) => {
+    const d = elementPath(match[1].toLowerCase(), match[0]);
+    const parsed = d ? parsePath(d) : undefined;
+    return parsed && !parsed.issue ? parsed.segs : [];
+  });
 }
 
 export function svgPartMarkup(part: SvgCompositePartSpec): string {

@@ -84,7 +84,7 @@ const lesson = {
       id: "title",
       kind: "text",
       text: "LOCAL PACKAGE WORKS",
-      textRole: "heading",
+      textRole: "body",
       placement: { mode: "zone", zone: "main" }
     }],
     beats: [{

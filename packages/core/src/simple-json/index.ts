@@ -1,13 +1,12 @@
 import type { CanvasSlideDefinition } from "../slides/types";
-import { renderFilm } from "../gcl";
 import type { Film } from "../gcl/schema";
-import { compileResolvedLesson } from "./compile";
-import { validateCanonicalFilm } from "./canonical";
-import { analyzeResolvedLesson, type Diagnostic } from "./diagnostics";
-import { validateResolvedKeyframes } from "./keyframes";
-import { resolveLesson, type ResolvedLesson } from "./resolve";
+import type { Diagnostic } from "./diagnostics";
+import { filmBuilder, floorOf, sceneSteps, screenHeader, type KeptScene, type NarrationTiming, type RenderLessonOptions } from "./film";
+import type { ResolvedLesson } from "./resolve";
 import type { LessonSpec } from "./types";
-import { validateLessonSpec } from "./validate";
+import { notAFilm } from "./validate";
+import { sceneImageSources } from "./image";
+import { preloadImages, releaseImages } from "../gcl/images";
 
 export interface CompiledLesson {
   valid: true;
@@ -47,109 +46,83 @@ function decodeInput(
   }
 }
 
-/** Optional narration timing/audio: per-scene minimum durations (from the audio) and the audio to play. */
-export interface NarrationTiming {
-  /** Minimum on-screen seconds, either keyed by scene id or ordered like the LessonSpec scenes. */
-  sceneFloors?: Map<string, number> | number[];
-  /** Object URL for the synthesized narration WAV, attached to the rendered slide for synced playback. */
-  audioUrl?: string;
-}
-
-export interface RenderLessonOptions extends NarrationTiming {
-  /** Solid host background used instead of Lumen's automatic full-frame backdrop. */
-  backgroundColor?: string;
-  /** Host appearance used to select a readable palette over the supplied background. */
-  colorScheme?: "light" | "dark";
-}
-
-function withScreenPalette(
-  input: unknown,
-  colorScheme?: "light" | "dark",
-): unknown {
-  if (!colorScheme) return input;
-  const decoded = decodeInput(input);
-  if (
-    !decoded.ok ||
-    decoded.value === null ||
-    typeof decoded.value !== "object" ||
-    Array.isArray(decoded.value)
-  ) {
-    return input;
-  }
-  return {
-    ...decoded.value,
-    theme: colorScheme === "dark" ? "textbook" : "parchment",
-  };
-}
-
-export function compileLessonSpec(
-  input: unknown,
-  timing?: NarrationTiming,
-): CompileLessonResult {
+/** A whole film split into its header and its scenes, or why it is not a film at all. */
+function filmParts(input: unknown): { header: Omit<LessonSpec, "scenes">; scenes: unknown[] } | LessonFailure {
   const decoded = decodeInput(input);
   if (!decoded.ok) return { valid: false, errors: [decoded.error] };
-  const validated = validateLessonSpec(decoded.value);
-  if (!validated.valid) return validated;
-  const resolved = resolveLesson(validated.value, timing?.sceneFloors);
-  const keyframes = validateResolvedKeyframes(resolved);
-  if (!keyframes.valid) return keyframes;
-  const resolvedWarnings = analyzeResolvedLesson(resolved);
-  const gcl = compileResolvedLesson(resolved);
-  const canonical = validateCanonicalFilm(gcl);
-  if (!canonical.valid) return canonical;
+  const errors = notAFilm(decoded.value);
+  if (errors) return { valid: false, errors };
+  const { scenes, ...header } = decoded.value as LessonSpec;
+  return { header, scenes };
+}
+
+/** The scenes' floors as given, unless an ordered list does not describe every scene with a usable duration. */
+function wholeFloors(floors: NarrationTiming["sceneFloors"], scenes: number): NarrationTiming["sceneFloors"] {
+  // Ordered timing is one atomic wire value: partially applying a truncated/corrupt array pads some
+  // scenes while the client switches the whole film to direct audio seconds.
+  if (!Array.isArray(floors)) return floors;
+  return floors.length === scenes && floors.every((floor) => Number.isFinite(floor) && floor >= 0) ? floors : undefined;
+}
+
+/** The compiled film made of the scenes that were kept, every dropped scene's reasons among its warnings. */
+function compiledFilm(header: Omit<LessonSpec, "scenes">, kept: KeptScene[], warnings: Diagnostic[], dropped: Diagnostic[][], total: number): CompiledLesson | LessonFailure {
+  const reasons = dropped.flat().map((error) => ({ ...error, code: "DROPPED_SCENE" as const }));
+  if (kept.length === 0) return { valid: false, errors: [noSceneLeft(total), ...dropped.flat()] };
   return {
     valid: true,
-    lesson: validated.value,
-    resolved,
-    gcl,
-    warnings: [...validated.warnings, ...resolvedWarnings],
+    lesson: { ...header, scenes: kept.map((scene) => scene.lesson) },
+    resolved: { version: header.version, title: header.title, ...(header.categories ? { categories: header.categories } : {}), scenes: kept.map((scene) => scene.resolved) },
+    gcl: kept.flatMap((scene) => scene.gcl),
+    warnings: [...warnings, ...reasons],
   };
 }
 
-// Cosmetic layout diagnostics the engine already auto-corrects (objects are auto-fit and clamped to the
-// safe frame, overlaps are auto-separated, callouts are auto-flipped/clamped). A few stray pixels of
-// clip or overlap must never blank the whole video — these stay as advisory warnings but do NOT block
-// rendering. Everything else (lifecycle, references, motion geometry, schema) still blocks.
-const NON_BLOCKING_CODES = new Set([
-  "LAYOUT_OVERFLOW",
-  "LAYOUT_COLLISION",
-  "CALLOUT_OVERFLOW",
-  // The resolver has already added the lead-in segment this one reports, so the motion plays
-  // correctly; blocking on it blanked every film that used `along` over a half-unit of slack.
-  "MOTION_PATH_ADJUSTED",
-  // The part falls back to whole-viewBox bounds, so the film plays and one label points at the whole
-  // drawing instead of the piece. A coarser arrow is worth far more to the reader than a blank card.
-  "IMPRECISE_SVG_BOUNDS",
-  // The object plays from the scene's first frame, which is what a writer who forgot its `show` meant.
-  "ASSUMED_VISIBLE",
-  // The thing sits on its owner's centre instead of the part that was never exposed; the film plays.
-  "ANCHOR_FALLBACK",
-]);
+function noSceneLeft(total: number): Diagnostic {
+  return { code: "NO_DRAWABLE_SCENE", path: "/scenes", message: `Every one of the ${total} scenes was dropped`, received: total };
+}
 
-export function renderLessonSpec(
-  input: unknown,
-  options?: RenderLessonOptions,
-): RenderLessonResult {
-  const compiled = compileLessonSpec(
-    withScreenPalette(input, options?.colorScheme),
-    options,
-  );
-  if (!compiled.valid) return compiled;
-  // Rendering is strict about anything that would break the lesson — but tolerant of cosmetic layout
-  // issues, which the resolver already adjusts (see resolve.ts). This is what keeps a lesson from
-  // failing entirely over a handful of overflow/overlap pixels.
-  const blocking = compiled.warnings.filter(
-    (warning) => !NON_BLOCKING_CODES.has(warning.code),
-  );
-  if (blocking.length > 0) return { valid: false, errors: blocking };
-  const slide = renderFilm(compiled.gcl, {
-    backgroundColor: options?.backgroundColor,
+/** Validate, lay out and compile a whole film; a scene that cannot be drawn is dropped and reported. */
+export function compileLessonSpec(input: unknown, timing?: NarrationTiming): CompileLessonResult {
+  const film = filmParts(input);
+  if ("valid" in film) return film;
+  const step = sceneSteps(film.header, false);
+  const floors = wholeFloors(timing?.sceneFloors, film.scenes.length);
+  const kept: KeptScene[] = [];
+  const warnings: Diagnostic[] = [];
+  const dropped: Diagnostic[][] = [];
+  film.scenes.forEach((scene, index) => {
+    const outcome = step(scene, index, floorOf(floors, index, scene));
+    if ("errors" in outcome) {
+      dropped.push(outcome.errors);
+      return;
+    }
+    kept.push(outcome.kept);
+    warnings.push(...outcome.warnings);
   });
-  return {
-    ...compiled,
-    slide: options?.audioUrl ? { ...slide, audioUrl: options.audioUrl } : slide,
-  };
+  return compiledFilm(film.header, kept, warnings, dropped, film.scenes.length);
 }
+
+/**
+ * Compile and draw a whole film: the same as adding its scenes one by one to `createFilmCompiler`, so
+ * a film reloaded whole draws exactly as it did when its scenes arrived one at a time.
+ */
+export function renderLessonSpec(input: unknown, options?: RenderLessonOptions): RenderLessonResult {
+  const film = filmParts(input);
+  if ("valid" in film) return film;
+  const { compiler, kept } = filmBuilder(film.header, { ...options, sceneFloors: wholeFloors(options?.sceneFloors, film.scenes.length) });
+  const added = film.scenes.map((scene) => compiler.add(scene));
+  const compiled = compiledFilm(
+    screenHeader(film.header, options?.colorScheme),
+    kept,
+    added.flatMap((result) => result.warnings),
+    added.flatMap((result) => (result.errors ? [result.errors] : [])),
+    film.scenes.length,
+  );
+  return compiled.valid ? { ...compiled, slide: compiler.slide() } : compiled;
+}
+
+export { createFilmCompiler } from "./film";
+export type { AddResult, FilmCompiler, NarrationTiming, RenderLessonOptions } from "./film";
 
 export {
   LESSON_INPUT_SCHEMA,
@@ -157,6 +130,31 @@ export {
   SIMPLE_JSON_MAP_ICONS,
 } from "./schema";
 export { getSimpleJsonCapabilities } from "./capabilities";
+
+/**
+ * Every image source (`kind: "image"` src) a lesson draws, deduplicated in first-use order. Works on
+ * any parsed spec, valid or not, with no DOM.
+ */
+export function lessonImageSources(spec: Pick<LessonSpec, "scenes"> | unknown): string[] {
+  const scenes = (spec as { scenes?: unknown } | null)?.scenes;
+  return Array.isArray(scenes) ? sceneImageSources(scenes as LessonSpec["scenes"]) : [];
+}
+
+/**
+ * Load and decode every picture a lesson draws before it plays, so no frame ever shows a
+ * half-loaded image. Rejects when a picture cannot be decoded. Without a DOM it resolves at once.
+ */
+export function preloadLessonImages(spec: Pick<LessonSpec, "scenes"> | unknown): Promise<void> {
+  return preloadImages(lessonImageSources(spec));
+}
+
+/**
+ * Free the decoded pictures of lessons that will not be drawn again. Only call it once nothing still
+ * playing uses them: a released picture is decoded again on its next preload.
+ */
+export function releaseLessonImages(...specs: Array<Pick<LessonSpec, "scenes"> | unknown>): void {
+  releaseImages(specs.flatMap((spec) => lessonImageSources(spec)));
+}
 export type { SimpleJsonCapabilities } from "./capabilities";
 export {
   CLAUDE_VIDEO_AUTHORING_PROMPT,

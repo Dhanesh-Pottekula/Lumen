@@ -1,5 +1,6 @@
 import type { Component, Film, Position } from "../gcl/schema";
 import type { Diagnostic, ValidationResult } from "./diagnostics";
+import { polylineLengths, sampleAtLength } from "../geometry/path";
 
 const SLOTS = new Set(["top-left", "top", "top-right", "left", "center", "right", "bottom-left", "bottom", "bottom-right", "ground", "sky"]);
 
@@ -56,9 +57,11 @@ function validateScene(components: Component[], offset: number): Diagnostic[] {
       }
     }
 
-    // Later journeys start where the one before left the thing, so only the first can jump from rest.
-    const resting = component.id ? positions.get(component.id) : undefined;
-    const journey = (component.motions ?? []).find((motion) => motion.kind !== "spin");
+    // Later journeys start where the one before left the thing, so only the first can jump from rest;
+    // a thing carried in another's frame (`pin`) starts it wherever that frame has taken it.
+    const resting = component.id && !component.pin ? positions.get(component.id) : undefined;
+    const journeyIndex = (component.motions ?? []).findIndex((motion) => motion.kind !== "spin");
+    const journey = journeyIndex < 0 ? undefined : component.motions![journeyIndex];
     if (resting && journey?.kind === "orbit" && typeof journey.center === "string") {
       const center = positions.get(journey.center);
       if (center) {
@@ -70,7 +73,7 @@ function validateScene(components: Component[], offset: number): Diagnostic[] {
         if (jump > 0.5) {
           errors.push({
             code: "CANONICAL_ERROR",
-            path: `/${offset + index}/motions/0`,
+            path: `/${offset + index}/motions/${journeyIndex}`,
             message: `Orbit motion would jump ${jump.toFixed(1)} view units on its first frame`,
             received: journey,
           });
@@ -82,12 +85,14 @@ function validateScene(components: Component[], offset: number): Diagnostic[] {
       // the first frame is measured against, not the path's first sample.
       const path = journey.path;
       const entry = Math.min(1, Math.max(0, journey.startAt ?? 0));
-      const first = path[Math.round(entry * (path.length - 1))];
+      const lengths = polylineLengths(path);
+      const at = sampleAtLength(path, lengths, entry * lengths[lengths.length - 1]);
+      const first = [at.x, at.y];
       const jump = Math.hypot(resting[0] - first[0], resting[1] - first[1]);
       if (jump > 0.5) {
         errors.push({
           code: "CANONICAL_ERROR",
-          path: `/${offset + index}/motions/0/path/0`,
+          path: `/${offset + index}/motions/${journeyIndex}/path/0`,
           message: `Along-path motion would jump ${jump.toFixed(1)} view units on its first frame`,
           received: first,
         });
@@ -116,4 +121,42 @@ export function validateCanonicalFilm(film: Film): ValidationResult<Film> {
     }
   }
   return errors.length ? { valid: false, errors } : { valid: true, value: film, warnings: [] };
+}
+
+// What a canonical error names that can be taken out on its own: one motion of a component, or a
+// camera, pointer or flow aimed at nothing. Anything else breaks the scene as a whole.
+const MOTION_AT = /^\/(\d+)\/motions\/(\d+)(?:\/|$)/;
+const LOOSE_TARGETS: ReadonlySet<Component["type"]> = new Set(["camera", "attention", "flow"]);
+
+/**
+ * The film with every recoverable canonical error taken out where it lies — the motion that would jump
+ * or names nothing, the camera, pointer or flow aimed at nothing — each reported as a warning, and the
+ * errors that still break it. One bad motion used to refuse the whole scene.
+ */
+export function repairCanonicalFilm(film: Film, errors: Diagnostic[]): { film: Film; warnings: Diagnostic[]; errors: Diagnostic[] } {
+  const motions = new Map<number, Set<number>>();
+  const components = new Set<number>();
+  const warnings: Diagnostic[] = [];
+  const fatal: Diagnostic[] = [];
+  for (const error of errors) {
+    const motion = MOTION_AT.exec(error.path);
+    const item = Number(/^\/(\d+)\//.exec(error.path)?.[1]);
+    const component = Number.isInteger(item) ? (film[item] as Component | undefined) : undefined;
+    if (motion && component?.motions?.[Number(motion[2])]) {
+      motions.set(item, new Set([...(motions.get(item) ?? []), Number(motion[2])]));
+      warnings.push({ ...error, code: "MOTION_REFUSED", message: `${error.message}; the motion is not played` });
+    } else if (component && LOOSE_TARGETS.has(component.type) && error.message.startsWith("Unknown generated canonical target")) {
+      components.add(item);
+      warnings.push({ ...error, code: "DROPPED_ACTION", message: `${error.message}; it is not played` });
+    } else fatal.push(error);
+  }
+  if (fatal.length > 0 || warnings.length === 0) return { film, warnings: [], errors };
+  const repaired = film.flatMap((item, index): Film => {
+    if (components.has(index)) return [];
+    const dropped = motions.get(index);
+    const component = item as Component;
+    return dropped ? [{ ...component, motions: component.motions!.filter((_, at) => !dropped.has(at)) } as Component] : [item];
+  });
+  const again = validateCanonicalFilm(repaired);
+  return again.valid ? { film: repaired, warnings, errors: [] } : { film, warnings: [], errors: again.errors };
 }

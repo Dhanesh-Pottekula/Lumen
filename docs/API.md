@@ -25,9 +25,37 @@ type CompileLessonResult =
 ### `renderLessonSpec(input, timing?)`
 
 Runs the compiler and returns a `CanvasSlideDefinition` ready to draw.
-Schema, reference, lifecycle, motion, and safety findings block rendering.
-Layout overflow/collision findings remain advisory because the resolver
-auto-fits those cases.
+Schema, reference, lifecycle, motion, and safety findings block the scene
+they are in; the rest of the film still draws. Layout overflow/collision
+findings remain advisory because the resolver auto-fits those cases. It is
+the same as adding every scene, in order, to `createFilmCompiler`.
+
+### `createFilmCompiler(header, options?)`
+
+Builds a film one scene at a time, as scenes arrive. `header` is the
+`LessonSpec` without `scenes`; `options` are those of `renderLessonSpec`.
+
+```ts
+interface FilmCompiler {
+  add(scene: SceneSpec, floor?: number): AddResult;
+  slide(): CanvasSlideDefinition; // .scenes holds a timing for every added scene
+  count(): number;
+}
+type AddResult = SceneTiming & {
+  valid: boolean;
+  index: number;
+  warnings: Diagnostic[];
+  errors?: Diagnostic[];
+};
+```
+
+`add` compiles only the new scene, from what the scene before it left on
+screen (the end poses of the pictures it declares again, and the category
+colours), and appends it to the timeline. No scene already added ever
+changes; only the progress dots along the top edge, which count the scenes
+so far, are redrawn. A scene that cannot be drawn returns `valid: false`
+and still takes its index, with a zero-length `dropped` timing, so scene
+indices always match the order scenes were sent in.
 
 ### `drawSlideFrame(context, slide, seconds, theme)`
 

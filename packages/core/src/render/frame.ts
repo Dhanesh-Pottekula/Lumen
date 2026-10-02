@@ -109,12 +109,13 @@ export function createFrame(
     target.translate(-w / 2, -h / 2);
   }
 
-  // Apply the frame camera in device space (zoom/rotate about frame center, pan to cam.x/cam.y).
+  // Apply the frame camera in device space (zoom/rotate about the view's center, pan to cam.x/cam.y).
+  // The view sits inside the target at the transform's offset (a host's gutter): without it, every shot was pushed off by the gutter times the zoom.
   function applyCamera(c: Camera) {
-    target.translate(w / 2, h / 2);
+    target.translate(xform.e + (viewW / 2) * xform.a, xform.f + (viewH / 2) * xform.d);
     target.rotate(c.rot);
     target.scale(c.zoom, c.zoom);
-    target.translate(-c.x * xform.a, -c.y * xform.d);
+    target.translate(-(c.x * xform.a + xform.e), -(c.y * xform.d + xform.f));
   }
 
   function finish() {

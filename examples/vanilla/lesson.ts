@@ -11,7 +11,7 @@ export const lesson: LessonSpec = {
       id: "title",
       kind: "text",
       text: "SIMPLE JSON → CANVAS",
-      textRole: "heading",
+      textRole: "body",
       placement: { mode: "zone", zone: "main" }
     }],
     beats: [{

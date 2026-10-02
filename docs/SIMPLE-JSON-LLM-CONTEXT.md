@@ -63,8 +63,7 @@ Hard rules (these are enforced by the compiler; violating them fails the lesson)
     particles, sparks, fire, confetti, or repeated glow.
 15. **One scene teaches one claim.** Show the evidence first, then label or summarize it. Prefer
     visual change over sentences describing change.
-16. **Keep text concise:** headings under 8 words, labels under 12 words, callout bodies under 18
-    words.
+16. **Keep text concise:** labels under 12 words, callout bodies under 18 words.
 
 ---
 
@@ -106,7 +105,7 @@ over time; the labels; the facts (with units); and the source URLs (only URLs su
 request — never invent citations). Then:
 
 - Prefer diagrams, position, comparison, motion, charts, maps, and timelines over paragraphs.
-- Use text only for titles, concise labels, equations, values, and conclusions you cannot read
+- Use text only for concise labels, equations, values, and conclusions you cannot read
   directly from the visual.
 - One focal relationship per scene, plus at most two simultaneous supporting relationships.
 - Distinguish permanent subject matter from temporary teaching marks (arrows, projections, traces,
@@ -138,13 +137,10 @@ Minimal complete lesson (compiler-verified — valid, zero warnings):
       "id": "intro",
       "composition": "equation-plot",
       "objects": [
-        { "id": "title", "kind": "text", "text": "Area under a curve", "textRole": "heading", "role": "hero",
-          "placement": { "mode": "zone", "zone": "title" } },
         { "id": "curve", "kind": "chart", "chart": "function", "function": "x^2", "xDomain": [0, 3],
           "yDomain": [0, 9], "axes": true, "placement": { "mode": "zone", "zone": "main" } }
       ],
       "beats": [
-        { "id": "show-title", "actions": [ { "do": "show", "targets": ["title"] } ] },
         { "id": "draw-curve", "pace": "slow", "actions": [ { "do": "show", "targets": ["curve"], "entrance": "draw" } ] }
       ]
     }
@@ -248,14 +244,14 @@ legal tokens. Part II explains how each behaves.
 | **Object kinds** | `text`, `equation`, `stat`, `visual`, `vector`, `svg-artwork`, `svg-composite`, `line`, `shape`, `curve`, `chart`, `legend`, `map`, `timeline`, `table`, `group` |
 | **Actions (`do`)** | `show`, `hide`, `camera`, `label`, `tour`, `motion`, `emphasize`, `attention`, `effect` |
 | **Placement modes** | `zone`, `relative`, `anchor` |
-| **Zones** | `title`, `main`, `main-left`, `main-right`, `support`, `footer`, `background`, `overlay`, `hud` |
+| **Zones** | `main`, `main-left`, `main-right`, `support`, `footer`, `background`, `overlay`, `hud` |
 | **Relative relations** | `above`, `below`, `left-of`, `right-of`, `near` |
 | **Roles** | `background`, `support`, `primary`, `hero`, `annotation`, `hud` |
 | **Sizes** | `tiny`, `small`, `medium`, `large`, `hero`, `fill` |
 | **Initial state** | `hidden`, `visible` |
 | **Spaces** | `world`, `screen` |
 | **Paces** | `instant`, `quick`, `normal`, `slow`, `dramatic` |
-| **Entrances** | `instant`, `fade`, `draw`, `wipe`, `iris`, `slam`, `word-by-word`, `typewriter`, `scramble` |
+| **Entrances** | `instant`, `fade`, `draw`, `wipe`, `iris`, `slam`, `word-by-word`, `typewriter`, `scramble`, `rise` |
 | **Exits** | `instant`, `fade`, `erase`, `wipe`, `iris`, `dissolve`, `slide`, `shrink` |
 | **Camera shots** | `overview`, `wide`, `medium`, `close`, `detail` |
 | **Camera movement** | `cut`, `move`, `push` |
@@ -309,7 +305,7 @@ them; e.g. `\frac`, `\sqrt`, `\sum`, `\int`, Greek letters — full list in the 
 - **A sentence on a `role: "hero"` (or `primary`/`support`) object** → `role` sets the DEFAULT SIZE
   (`hero → hero size` = 72px), which **overrides `textRole`** — so a long sentence renders huge and
   overflows. For any sentence, set an explicit `size` (`"body"`-length → `"small"`), or keep it off
-  hero-role objects. Titles ≤ 8 words; sentences `body`/`small`.
+  hero-role objects. Sentences `body`/`small`.
 - **Long text in a half-width zone** (`main-left`/`main-right` in `split`/`comparison`) → overflow: a
   half-zone has ~360px of width, so a ~40-char sentence at `small` already spills. Keep half-zone text
   short, or move the sentence to `footer` (full width).
@@ -357,7 +353,7 @@ lesson.
       remember it's ~4× a `visual`. A `medium` svg is ~437px wide.
 - [ ] Want a *small* object → use a **`visual`** asset (≈90px base), not svg-artwork.
 - [ ] **No sentence on a `hero`-role object** (role forces size). Sentences → explicit `size:"small"` +
-      `body`/`caption`; titles ≤ 8 words.
+      `body`/`caption`.
 - [ ] Text in a **half-zone** (`main-left`/`main-right`) is short (≤ ~30 chars); long sentences go in
       `footer`.
 - [ ] Only a compact readout in `hud`. One main object per zone + a short caption; don't stack big boxes.
@@ -431,8 +427,8 @@ This is the smallest useful generative lesson:
           "id": "title",
           "kind": "text",
           "text": "HELLO, SIMPLE JSON",
-          "textRole": "heading",
-          "placement": { "mode": "zone", "zone": "title" }
+          "textRole": "body",
+          "placement": { "mode": "zone", "zone": "main" }
         }
       ],
       "beats": [
@@ -452,7 +448,7 @@ This is the smallest useful generative lesson:
 What happens:
 
 1. The `hero` composition selects a layout template.
-2. The title is assigned to the `title` zone.
+2. The text is assigned to the `main` zone.
 3. Its exact position, font size, color, and layer are derived automatically.
 4. The first beat fades it in at the `normal` pace.
 
@@ -537,7 +533,7 @@ Beats run in array order. All actions inside the same beat start together. Put a
           "id": "title",
           "kind": "text",
           "text": "Lesson title",
-          "textRole": "heading",
+          "textRole": "body",
           "initial": "visible"
         }
       ],
@@ -623,7 +619,7 @@ All compositions provide the same named zones, but move their centers to suit th
 | Composition | Intended structure |
 |---|---|
 | `hero` | One dominant central idea or object |
-| `hero-diagram` | One large diagram with a title and supporting labels |
+| `hero-diagram` | One large diagram with supporting labels |
 | `equation` | A formula-led scene |
 | `overview-detail` | Broad subject on one side, detailed explanation on the other |
 | `split` | Two balanced sides |
@@ -659,7 +655,6 @@ Use one of the composition's predefined regions. `mode` selects the placement st
 
 | Zone | Meaning |
 |---|---|
-| `title` | Top heading region |
 | `main` | Primary subject region |
 | `main-left` | Left half's primary region |
 | `main-right` | Right half's primary region |
@@ -675,7 +670,6 @@ Layout budget for the 920×430 safe frame:
 
 | Region | Recommended budget | Authoring guidance |
 |---|---:|---|
-| `title` | up to 800×58 | One heading, normally under eight words. |
 | `main` | up to 700×280 | One primary diagram, map, chart, table, or SVG. |
 | `main-left` / `main-right` | about 360×260 each | Use for a real comparison or cause/effect pair. |
 | `support` / `footer` | up to 700×60 | A concise label, conclusion, or small timeline—not a paragraph. |
@@ -727,8 +721,7 @@ The compiler chooses a zone using these rules, in order:
 2. `role: "support"` → `support`
 3. `role: "annotation"` → `overlay`
 4. `role: "hud"` or `space: "screen"` → `hud`
-5. heading/title text → `title`
-6. everything else → `main`
+5. everything else → `main`
 
 Explicit placement is recommended when a scene contains more than one or two objects.
 
@@ -866,7 +859,6 @@ Every object has `id` and `kind`. The following fields are shared and optional.
 
 - `role: "hero"` → `hero`
 - `role: "support"` or `role: "annotation"` → `small`
-- heading/title text → `large`
 - line → `small`
 - everything else → `medium`
 
@@ -889,17 +881,17 @@ JSON object kinds.
   "id": "title",
   "kind": "text",
   "text": "THE AREA UNDER A CURVE",
-  "textRole": "heading",
-  "placement": { "mode": "zone", "zone": "title" }
+  "textRole": "body",
+  "placement": { "mode": "zone", "zone": "main" }
 }
 ```
 
 | Field | Required | Options / type | Meaning |
 |---|---:|---|---|
-| `text` | yes | non-empty string | Text to display. |
-| `textRole` | no | `heading`, `title`, `body`, `bullet`, `caption` | Typography and semantic hierarchy. |
+| `text` | yes | non-empty string | Text to display. Writing wider than the screen breaks into lines at whole words, and `\n` starts a line; it is never shrunk to fit on one. |
+| `textRole` | no | `body`, `bullet`, `caption` | Typography and semantic hierarchy. |
 
-`heading` uses the dedicated heading renderer. `title` is prominent text. `body`, `bullet`, and `caption` use normal text rendering with their semantic role.
+`body`, `bullet`, and `caption` use normal text rendering with their semantic role.
 
 ### 9.2 `equation`
 
@@ -923,6 +915,7 @@ balanced `{...}` groups, superscript `^`, and subscript `_` are supported. Comma
 - arithmetic/relations: `\times`, `\cdot`, `\div`, `\pm`, `\mp`, `\leq`, `\geq`, `\neq`, `\approx`, `\equiv`, `\propto`, `\in`, `\forall`, `\exists`, `\angle`, `\perp`, `\cup`, `\cap`;
 - arrows/calculus: `\to`, `\rightarrow`, `\Rightarrow`, `\leftarrow`, `\leftrightarrow`, `\infty`, `\partial`, `\nabla`, `\int`, `\sum`, `\prod`, `\lim`, `\ln`;
 - structure/text: `\frac{...}{...}`, `\sqrt{...}`, `\text{...}`, `\cdots`, `\ldots`, `\deg` and the spacing commands `\,`, `\;`, `\ `.
+- escaped characters, written as themselves: `\%`, `\$`, `\#`, `\&`, `\_`, `\{`, `\}`.
 
 Unsupported commands or unbalanced groups produce `UNSUPPORTED_MATH_COMMAND` before rendering.
 
@@ -1036,7 +1029,7 @@ The LLM writes one ordinary SVG. Every root-level named group becomes a part aut
 Shared `<defs>` may stay once at the root; the compiler copies them into each generated layer. Paint
 order follows the order of the named groups. The compiler derives display width and height from
 `size` and infers focused bounds for ordinary SVG geometry and absolute or relative
-`M/L/H/V/C/S/Q/T/A/Z` path commands. Curve and arc bounds are conservative envelopes. Transformed or
+`M/L/H/V/C/S/Q/T/A/Z` path commands. Curve and arc bounds are exact. Transformed or
 otherwise unmeasurable groups fall back to the complete viewBox. Authors do not provide `parts`,
 `bounds`, `width`, or `height`.
 
@@ -1116,7 +1109,7 @@ beats, not native SVG animation. Use `vector` when stroke draw-on or runtime rec
 `svg-composite` for multi-color, gradient, clipped, or independently addressable authored artwork.
 
 Named SVG-part bounds are also used for anchors, labels, attention, and motion. The parser records
-whether each inferred box is exact, conservative, or a whole-viewBox fallback. A fallback is allowed
+whether each inferred box is exact or a whole-viewBox fallback. A fallback is allowed
 for paint-only decoration, but targeting or spatially placing that part produces
 `IMPRECISE_SVG_BOUNDS`. Remove the transform/special geometry, wrap a simpler target group around the
 part, or declare an explicit `svg-composite` part with accurate `bounds`.
@@ -1208,7 +1201,8 @@ Use `curve` for free parametric geometry. Use a `chart` with `chart: "function"`
 |---|---:|---|---|
 | `chart` | yes | `bar`, `line`, `area`, `scatter`, `pie`, `donut`, `function`, `riemann` | Chart renderer. |
 | `data` | yes for `bar`/`pie`/`donut` | non-empty category-data array | Bar/pie/donut-style values. Forbidden on other chart variants. |
-| `series` | yes for `line`/`area`/`scatter` | at least two `[x, y]` pairs | Sampled data. Forbidden on other chart variants. |
+| `series` | yes for `line`/`area`/`scatter` | at least two `[x, y]` pairs, or up to four such lists | Sampled data: one line, or several drawn together on one pair of axes, each in its own colour and read left to right. Forbidden on other chart variants. |
+| `names` | no | up to four strings | Each line's name, written at its end. |
 | `function` | yes for `function`/`riemann` | expression string | Equation in variable `x`. Forbidden on data/series variants. |
 | `rectangles` | no | `few`, `several`, `many`, `dense` | Riemann rectangle density. |
 | `xDomain` | no | exactly two numbers | Horizontal domain. |
@@ -1608,7 +1602,7 @@ There are 11 action forms.
 |---|---:|---|
 | `do` | yes | exactly `show` |
 | `targets` | yes | non-empty unique array of object IDs |
-| `entrance` | no | `instant`, `fade`, `draw`, `wipe`, `iris`, `slam`, `word-by-word`, `typewriter`, `scramble` |
+| `entrance` | no | `instant`, `fade`, `draw`, `wipe`, `iris`, `slam`, `word-by-word`, `typewriter`, `scramble`, `rise` |
 
 Targets must be whole object IDs, not anchors. Default entrance is `draw` for a line and `fade` for other objects.
 
@@ -1625,6 +1619,7 @@ Entrance guidance:
 | `word-by-word` | Sentence or phrase |
 | `typewriter` | Label or technical text |
 | `scramble` | Data/code-like reveal; use sparingly |
+| `rise` | Revealed from its base upward: mountains pushed up, a plant growing, a level filling |
 
 ### 12.2 `hide`
 
@@ -1978,13 +1973,6 @@ Objects solve the visual structure; beats solve the reveal order.
       "composition": "equation-plot",
       "objects": [
         {
-          "id": "title",
-          "kind": "text",
-          "text": "ONE LINE, ONE EQUATION",
-          "textRole": "heading",
-          "placement": { "mode": "zone", "zone": "title" }
-        },
-        {
           "id": "plot",
           "kind": "chart",
           "chart": "function",
@@ -2018,7 +2006,7 @@ Objects solve the visual structure; beats solve the reveal order.
           "id": "draw",
           "pace": "slow",
           "actions": [
-            { "do": "show", "targets": ["title", "plot"], "entrance": "draw" }
+            { "do": "show", "targets": ["plot"], "entrance": "draw" }
           ]
         },
         {
@@ -2062,13 +2050,6 @@ The cannon is one semantic visual asset with useful anchors. Combine it with sha
       "composition": "hero-diagram",
       "objects": [
         {
-          "id": "title",
-          "kind": "text",
-          "text": "NEWTON'S CANNON",
-          "textRole": "heading",
-          "placement": { "mode": "zone", "zone": "title" }
-        },
-        {
           "id": "cannon",
           "kind": "visual",
           "asset": "physics.cannon",
@@ -2104,7 +2085,7 @@ The cannon is one semantic visual asset with useful anchors. Combine it with sha
           "id": "question",
           "kind": "text",
           "text": "Can falling become orbit?",
-          "textRole": "title",
+          "textRole": "body",
           "placement": { "mode": "zone", "zone": "support" }
         }
       ],
@@ -2113,7 +2094,7 @@ The cannon is one semantic visual asset with useful anchors. Combine it with sha
           "id": "establish",
           "pace": "normal",
           "actions": [
-            { "do": "show", "targets": ["title", "cannon", "earth"], "entrance": "fade" }
+            { "do": "show", "targets": ["cannon", "earth"], "entrance": "fade" }
           ]
         },
         {
@@ -2251,10 +2232,9 @@ forward and backward.
 
 Simple JSON removes coordinates, but it cannot infer the pedagogical priority of an overcrowded scene. These guidelines produce cleaner results.
 
-- Use one heading per scene.
 - Prefer one major visual plus one supporting explanation.
 - In `equation-plot`, keep the chart in `main-left` and equation in `main-right`.
-- Avoid placing a heading, chart, and footer text all into `main`.
+- Avoid placing a label, chart, and footer text all into `main`.
 - If two large objects share a zone, move one to another zone instead of relying on stacking.
 - Use `support` and `footer` for short text, not paragraphs.
 - Use a `tour` when several labels would otherwise remain visible together.
@@ -2275,7 +2255,7 @@ This is a quick lookup; the earlier sections explain how each option behaves.
 | Themes | `textbook`, `parchment`, `blueprint`, `chalkboard` |
 | Compositions | `hero`, `hero-diagram`, `equation`, `overview-detail`, `split`, `comparison`, `process`, `equation-plot`, `data`, `map`, `timeline`, `table`, `custom-relational` |
 | Placement modes | `zone`, `relative`, `anchor` |
-| Zones | `title`, `main`, `main-left`, `main-right`, `support`, `footer`, `background`, `overlay`, `hud` |
+| Zones | `main`, `main-left`, `main-right`, `support`, `footer`, `background`, `overlay`, `hud` |
 | Relative relations | `above`, `below`, `left-of`, `right-of`, `near` |
 | Roles | `background`, `support`, `primary`, `hero`, `annotation`, `hud` |
 | Sizes | `tiny`, `small`, `medium`, `large`, `hero`, `fill` |
@@ -2283,7 +2263,7 @@ This is a quick lookup; the earlier sections explain how each option behaves.
 | Spaces | `world`, `screen` |
 | Object kinds | `text`, `equation`, `stat`, `visual`, `vector`, `svg-artwork`, `svg-composite`, `line`, `shape`, `curve`, `chart`, `legend`, `map`, `timeline`, `table`, `group` |
 | Paces | `instant`, `quick`, `normal`, `slow`, `dramatic` |
-| Entrances | `instant`, `fade`, `draw`, `wipe`, `iris`, `slam`, `word-by-word`, `typewriter`, `scramble` |
+| Entrances | `instant`, `fade`, `draw`, `wipe`, `iris`, `slam`, `word-by-word`, `typewriter`, `scramble`, `rise` |
 | Exits | `instant`, `fade`, `erase`, `wipe`, `iris`, `dissolve`, `slide`, `shrink` |
 | Shots | `overview`, `wide`, `medium`, `close`, `detail` |
 | Camera movement | `cut`, `move`, `push` |
@@ -2357,7 +2337,7 @@ Want a *small* on-screen object? Use a `visual` asset, not an svg-artwork.
 ### `stat` · `chart` · `text`
 - **stat** `[max(100, s×3.4) × s×1.8]`: small ≈ 102×54 · medium ≈ 143×76 · large ≈ 190×101 · hero ≈ 245×130.
 - **chart** `[340×min(s,1.65) × 220×min(s,1.65)]`: small ≈ 272×176 · medium ≈ 391×253 · large+ ≈ 561×363 (capped).
-- **text** height = font×1.35; width = `characters × font × 0.55`. Per role: caption(18px)≈char×10 · body(24px)≈char×13 · title(32px)≈char×18 · **heading/hero(72px)≈char×40**. A 40-char sentence is ~396px at caption but **~1,600px at hero** → **never put a full sentence at `title`/`hero`/`heading` size.** Titles ≤ 8 words; sentences use `body`/`caption`.
+- **text** height = font×1.35; width = `characters × font × 0.55`. Per role: caption(18px)≈char×10 · body(24px)≈char×13 · **hero(72px)≈char×40**. A 40-char sentence is ~396px at caption but **~1,600px at hero** → **never put a full sentence at `hero` size.** Sentences use `body`/`caption`.
 
 ### Placement budget
 Same-zone objects stack down (24px gap). A `relative` object (above/below/left-of a target) is offset by
@@ -2381,7 +2361,7 @@ Each object gets a scalar from its `size` token and `kind` family:
 timeline, table, group`.
 
 **Default size** (when `size` is omitted): `role:"hero"`→`hero`; `role:"support"`/`"annotation"`→
-`small`; heading/title text→`large`; `line`→`small`; everything else→`medium`.
+`small`; `line`→`small`; everything else→`medium`.
 
 ## Step 2 — the box `[w, h]` from `s`
 | kind | width | height |
@@ -2493,7 +2473,6 @@ unions.
                     "zone": {
                       "type": "string",
                       "enum": [
-                        "title",
                         "main",
                         "main-left",
                         "main-right",
@@ -2591,8 +2570,6 @@ unions.
             "textRole": {
               "type": "string",
               "enum": [
-                "heading",
-                "title",
                 "body",
                 "bullet",
                 "caption"
@@ -2640,7 +2617,6 @@ unions.
                     "zone": {
                       "type": "string",
                       "enum": [
-                        "title",
                         "main",
                         "main-left",
                         "main-right",
@@ -2777,7 +2753,6 @@ unions.
                     "zone": {
                       "type": "string",
                       "enum": [
-                        "title",
                         "main",
                         "main-left",
                         "main-right",
@@ -2933,7 +2908,6 @@ unions.
                     "zone": {
                       "type": "string",
                       "enum": [
-                        "title",
                         "main",
                         "main-left",
                         "main-right",
@@ -3083,7 +3057,6 @@ unions.
                     "zone": {
                       "type": "string",
                       "enum": [
-                        "title",
                         "main",
                         "main-left",
                         "main-right",
@@ -3257,7 +3230,6 @@ unions.
                     "zone": {
                       "type": "string",
                       "enum": [
-                        "title",
                         "main",
                         "main-left",
                         "main-right",
@@ -3478,7 +3450,6 @@ unions.
                     "zone": {
                       "type": "string",
                       "enum": [
-                        "title",
                         "main",
                         "main-left",
                         "main-right",
@@ -3628,7 +3599,6 @@ unions.
                     "zone": {
                       "type": "string",
                       "enum": [
-                        "title",
                         "main",
                         "main-left",
                         "main-right",
@@ -3779,7 +3749,6 @@ unions.
                     "zone": {
                       "type": "string",
                       "enum": [
-                        "title",
                         "main",
                         "main-left",
                         "main-right",
@@ -3936,7 +3905,6 @@ unions.
                     "zone": {
                       "type": "string",
                       "enum": [
-                        "title",
                         "main",
                         "main-left",
                         "main-right",
@@ -4098,7 +4066,6 @@ unions.
                     "zone": {
                       "type": "string",
                       "enum": [
-                        "title",
                         "main",
                         "main-left",
                         "main-right",
@@ -4300,7 +4267,6 @@ unions.
                     "zone": {
                       "type": "string",
                       "enum": [
-                        "title",
                         "main",
                         "main-left",
                         "main-right",
@@ -4494,7 +4460,6 @@ unions.
                     "zone": {
                       "type": "string",
                       "enum": [
-                        "title",
                         "main",
                         "main-left",
                         "main-right",
@@ -4670,7 +4635,6 @@ unions.
                     "zone": {
                       "type": "string",
                       "enum": [
-                        "title",
                         "main",
                         "main-left",
                         "main-right",
@@ -4854,7 +4818,6 @@ unions.
                     "zone": {
                       "type": "string",
                       "enum": [
-                        "title",
                         "main",
                         "main-left",
                         "main-right",
@@ -4996,7 +4959,6 @@ unions.
                     "zone": {
                       "type": "string",
                       "enum": [
-                        "title",
                         "main",
                         "main-left",
                         "main-right",
@@ -5419,7 +5381,6 @@ unions.
                     "zone": {
                       "type": "string",
                       "enum": [
-                        "title",
                         "main",
                         "main-left",
                         "main-right",
@@ -5645,7 +5606,6 @@ unions.
                     "zone": {
                       "type": "string",
                       "enum": [
-                        "title",
                         "main",
                         "main-left",
                         "main-right",
@@ -5792,7 +5752,6 @@ unions.
                     "zone": {
                       "type": "string",
                       "enum": [
-                        "title",
                         "main",
                         "main-left",
                         "main-right",
@@ -6048,7 +6007,8 @@ unions.
                               "slam",
                               "word-by-word",
                               "typewriter",
-                              "scramble"
+                              "scramble",
+                              "rise"
                             ]
                           }
                         }

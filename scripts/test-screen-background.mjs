@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { renderLessonSpec } from "../packages/core/dist/index.js";
 
 // Mirrors the engine view space (see gcl/viewport.ts); test-render-fidelity pins it to the slide.
-const VIEW = { width: 960, height: 540 };
+const VIEW = { width: 540, height: 960 };
 
 const SCREEN_BACKGROUND = "#0e0d0c";
 const SPEC = {
@@ -165,7 +165,7 @@ function progressDotColors(options, time = 0) {
   return renderRecords(options, PROGRESS_SPEC, time)
     .records.filter(
       (record) =>
-        record.y === VIEW.height - 8 &&
+        record.y === 5 &&
         (record.radius === 3.4 || record.radius === 2.2),
     )
     .map((record) => record.fillStyle);
@@ -243,7 +243,7 @@ assert.deepEqual(
 );
 assert.deepEqual(
   progressDotColors({ backgroundColor: "#f2ede6", colorScheme: "light" }),
-  ["#9a3b2e", "#8a7048"],
+  ["#1d4f8f", "#735c3a"],
   "light screen progress dots must use the selected high-contrast theme",
 );
 assert.deepEqual(

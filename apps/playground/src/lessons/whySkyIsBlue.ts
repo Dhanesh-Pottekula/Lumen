@@ -3,7 +3,7 @@ import type { LessonSpec } from "@aira/lumen";
 /**
  * Science — "Why the Sky Is Blue (and Sunsets Red)". Authored ONE-SHOT from the visual script
  * (docs/skills/scripts/why-the-sky-is-blue.md) and SIMPLE-JSON-LLM-CONTEXT.md.
- * Anchor: a ray of sunlight and the sky it paints. One custom diagram + title + caption per scene, each
+ * Anchor: a ray of sunlight and the sky it paints. One custom diagram + caption per scene, each
  * with its own spoken narration (scene-level `narration`) that rides the beats.
  * Every drawn SVG child sits in a named <g> so callouts can target it. Flat fills only (no gradients).
  */
@@ -52,12 +52,10 @@ export const whySkyIsBlueLessonSpec: LessonSpec = {
       narration:
         "Look up on a clear day, and the sky is blue — a deep, endless blue, everywhere you look. But watch that same sky at sunset, and it burns orange and red. Same sun. Same sky. So why do we see two completely different colors? The answer is hiding inside the light itself.",
       objects: [
-        { id: "h-title", kind: "text", text: "Same sun — why two colors?", textRole: "title", role: "annotation", placement: { mode: "zone", zone: "title" } },
         { id: "skies", kind: "svg-artwork", svg: SKIES, size: "medium", placement: { mode: "zone", zone: "main" } },
         { id: "h-cap", kind: "text", text: "Blue by day, red at sunset — same sun.", textRole: "body", role: "support", size: "small", placement: { mode: "zone", zone: "footer" } },
       ],
       beats: [
-        { id: "h-b1", actions: [{ do: "show", targets: ["h-title"], entrance: "fade" }] },
         { id: "h-b2", pace: "slow", actions: [{ do: "show", targets: ["skies"], entrance: "fade" }] },
         { id: "h-b3", actions: [{ do: "show", targets: ["h-cap"], entrance: "word-by-word" }] },
       ],
@@ -68,12 +66,10 @@ export const whySkyIsBlueLessonSpec: LessonSpec = {
       narration:
         "Start with one ray of sunlight. It looks plain and white. But send it through a prism and it splits apart — because white light is really every color layered together. Long, lazy red waves at one end, and short, tight violet waves at the other. Hold onto that — red is long, blue and violet are short. It is about to matter.",
       objects: [
-        { id: "p-title", kind: "text", text: "White light is every color", textRole: "title", role: "annotation", placement: { mode: "zone", zone: "title" } },
         { id: "prism", kind: "svg-artwork", svg: PRISM, size: "medium", placement: { mode: "zone", zone: "main" } },
         { id: "p-cap", kind: "text", text: "White light = every color. Red long, blue short.", textRole: "body", role: "support", size: "small", placement: { mode: "zone", zone: "footer" } },
       ],
       beats: [
-        { id: "p-b1", actions: [{ do: "show", targets: ["p-title"], entrance: "fade" }] },
         { id: "p-b2", pace: "slow", actions: [{ do: "show", targets: ["prism"], entrance: "draw" }] },
         { id: "p-b3", actions: [{ do: "attention", target: "prism.spectrum", verb: "callout", title: "Every color", text: "hidden in white light", side: "south", route: "elbow", style: "pill" }] },
         { id: "p-b4", actions: [{ do: "show", targets: ["p-cap"], entrance: "word-by-word" }] },
@@ -85,12 +81,10 @@ export const whySkyIsBlueLessonSpec: LessonSpec = {
       narration:
         "Now, the air between you and space looks completely empty. It isn't. Zoom in far enough and it is packed — trillions of tiny molecules of nitrogen and oxygen, drifting everywhere. And sunlight can't reach your eyes without crashing straight through all of them.",
       objects: [
-        { id: "a-title", kind: "text", text: "The air isn't empty", textRole: "title", role: "annotation", placement: { mode: "zone", zone: "title" } },
         { id: "air", kind: "svg-artwork", svg: AIR, size: "medium", placement: { mode: "zone", zone: "main" } },
         { id: "a-cap", kind: "text", text: "Air is packed with tiny molecules.", textRole: "body", role: "support", size: "small", placement: { mode: "zone", zone: "footer" } },
       ],
       beats: [
-        { id: "a-b1", actions: [{ do: "show", targets: ["a-title"], entrance: "fade" }] },
         { id: "a-b2", pace: "slow", actions: [{ do: "show", targets: ["air"], entrance: "fade" }] },
         { id: "a-b3", actions: [{ do: "attention", target: "air.molecules", verb: "callout", title: "Nitrogen + oxygen", text: "trillions of them", side: "east", route: "elbow", style: "pill" }] },
         { id: "a-b4", actions: [{ do: "show", targets: ["a-cap"], entrance: "word-by-word" }] },
@@ -102,12 +96,10 @@ export const whySkyIsBlueLessonSpec: LessonSpec = {
       narration:
         "Here is the key moment — what happens when light meets one of those molecules. The molecule grabs the light for a split second, then flings it back out — in every direction at once. That spray of light has a name: scattering. This one idea explains the whole sky.",
       objects: [
-        { id: "s-title", kind: "text", text: "Light scatters off molecules", textRole: "title", role: "annotation", placement: { mode: "zone", zone: "title" } },
         { id: "scatter", kind: "svg-artwork", svg: SCATTER, size: "medium", placement: { mode: "zone", zone: "main" } },
         { id: "s-cap", kind: "text", text: "Scattering: a molecule sprays light everywhere.", textRole: "body", role: "support", size: "small", placement: { mode: "zone", zone: "footer" } },
       ],
       beats: [
-        { id: "s-b1", actions: [{ do: "show", targets: ["s-title"], entrance: "fade" }] },
         { id: "s-b2", pace: "slow", actions: [{ do: "show", targets: ["scatter"], entrance: "draw" }] },
         { id: "s-b3", actions: [{ do: "attention", target: "scatter.arrows", verb: "callout", title: "Scattering", text: "sprayed everywhere", side: "east", route: "elbow", style: "pill" }] },
         { id: "s-b4", actions: [{ do: "show", targets: ["s-cap"], entrance: "word-by-word" }] },
@@ -119,13 +111,11 @@ export const whySkyIsBlueLessonSpec: LessonSpec = {
       narration:
         "Send a long red wave into the crowd, and it mostly slips straight past — barely bothered. But a short blue wave slams into molecule after molecule and sprays off in every direction. The shorter the wave, the more it scatters — and not by a little. Blue scatters about four times as much as red.",
       objects: [
-        { id: "b-title", kind: "text", text: "Blue scatters more than red", textRole: "title", role: "annotation", placement: { mode: "zone", zone: "title" } },
         { id: "waves", kind: "svg-artwork", svg: WAVES, size: "small", placement: { mode: "zone", zone: "main-left" } },
         { id: "scatter-curve", kind: "chart", chart: "function", function: "1/x^4", xDomain: [0.6, 1.8], yDomain: [0, 8], axes: true, xLabel: "wavelength", yLabel: "scattering", size: "small", placement: { mode: "zone", zone: "main-right" } },
         { id: "b-cap", kind: "text", text: "Short blue waves scatter far more than red.", textRole: "body", role: "support", size: "small", placement: { mode: "zone", zone: "footer" } },
       ],
       beats: [
-        { id: "b-b1", actions: [{ do: "show", targets: ["b-title"], entrance: "fade" }] },
         { id: "b-b2", pace: "slow", actions: [{ do: "show", targets: ["waves"], entrance: "draw" }] },
         { id: "b-b3", pace: "slow", actions: [{ do: "show", targets: ["scatter-curve"], entrance: "draw" }] },
         { id: "b-b4", actions: [{ do: "attention", target: "waves.bluewave", verb: "callout", title: "About 4x more", text: "blue scatters most", side: "north", route: "elbow", style: "pill" }] },
@@ -138,12 +128,10 @@ export const whySkyIsBlueLessonSpec: LessonSpec = {
       narration:
         "Now pull all the way back. Sunlight pours across the sky, and all that blue scatters out of the beam and bounces around the whole dome above you. So when you look up — at any patch of sky — blue light is arriving from every direction at once. The entire sky glows blue. There is your daytime answer.",
       objects: [
-        { id: "d-title", kind: "text", text: "Why the whole sky is blue", textRole: "title", role: "annotation", placement: { mode: "zone", zone: "title" } },
         { id: "dome", kind: "svg-artwork", svg: DOME, size: "medium", placement: { mode: "zone", zone: "main" } },
         { id: "d-cap", kind: "text", text: "Blue arrives from all directions — a blue sky.", textRole: "body", role: "support", size: "small", placement: { mode: "zone", zone: "footer" } },
       ],
       beats: [
-        { id: "d-b1", actions: [{ do: "show", targets: ["d-title"], entrance: "fade" }] },
         { id: "d-b2", pace: "slow", actions: [{ do: "show", targets: ["dome"], entrance: "fade" }] },
         { id: "d-b3", actions: [{ do: "attention", target: "dome.bluespray", verb: "callout", title: "From everywhere", text: "blue fills the dome", side: "south", route: "elbow", style: "pill" }] },
         { id: "d-b4", actions: [{ do: "show", targets: ["d-cap"], entrance: "word-by-word" }] },
@@ -155,12 +143,10 @@ export const whySkyIsBlueLessonSpec: LessonSpec = {
       narration:
         "Quick puzzle — violet waves are even shorter than blue, so they scatter even more. Shouldn't the sky be violet? Two reasons it isn't: the sun sends out less violet to begin with, and our eyes are far less sensitive to it. So the color that wins — the one that floods the sky — is blue.",
       objects: [
-        { id: "v-title", kind: "text", text: "Then why not violet?", textRole: "title", role: "annotation", placement: { mode: "zone", zone: "title" } },
         { id: "violet-band", kind: "svg-artwork", svg: VIOLET_BAND, size: "medium", placement: { mode: "zone", zone: "main" } },
         { id: "v-cap", kind: "text", text: "Less violet from the sun; eyes weak to it, so blue wins.", textRole: "body", role: "support", size: "small", placement: { mode: "zone", zone: "footer" } },
       ],
       beats: [
-        { id: "v-b1", actions: [{ do: "show", targets: ["v-title"], entrance: "fade" }] },
         { id: "v-b2", pace: "slow", actions: [{ do: "show", targets: ["violet-band"], entrance: "draw" }] },
         { id: "v-b3", actions: [{ do: "attention", target: "violet-band.violet", verb: "callout", title: "Even more!", text: "yet we still see blue", side: "north", route: "elbow", style: "pill" }] },
         { id: "v-b4", actions: [{ do: "show", targets: ["v-cap"], entrance: "word-by-word" }] },
@@ -172,12 +158,10 @@ export const whySkyIsBlueLessonSpec: LessonSpec = {
       narration:
         "So why does sunset flip to red? It comes down to how far the light has to travel through the air. At noon the sun is overhead — a short, direct path straight down to you. But at sunset the sun sits right on the horizon, and its light skims sideways through a huge, long stretch of atmosphere before it ever reaches your eyes.",
       objects: [
-        { id: "pa-title", kind: "text", text: "Sunset: a longer path", textRole: "title", role: "annotation", placement: { mode: "zone", zone: "title" } },
         { id: "paths", kind: "svg-artwork", svg: PATHS, size: "medium", placement: { mode: "zone", zone: "main" } },
         { id: "pa-cap", kind: "text", text: "At sunset, light crosses far more air.", textRole: "body", role: "support", size: "small", placement: { mode: "zone", zone: "footer" } },
       ],
       beats: [
-        { id: "pa-b1", actions: [{ do: "show", targets: ["pa-title"], entrance: "fade" }] },
         { id: "pa-b2", pace: "slow", actions: [{ do: "show", targets: ["paths"], entrance: "draw" }] },
         { id: "pa-b3", actions: [{ do: "attention", target: "paths.setpath", verb: "callout", title: "Long path", text: "more air to cross", side: "north", route: "elbow", style: "pill" }] },
         { id: "pa-b4", actions: [{ do: "show", targets: ["pa-cap"], entrance: "word-by-word" }] },
@@ -189,12 +173,10 @@ export const whySkyIsBlueLessonSpec: LessonSpec = {
       narration:
         "Across that long journey, the blue scatters away long before it reaches you — bounced off into other parts of the sky. What is left to travel straight through is the long-wavelength light: orange and red. And so the setting sun, and the whole sky around it, blaze red. Same scattering as the noon sky — just a much longer path.",
       objects: [
-        { id: "r-title", kind: "text", text: "Red is what's left", textRole: "title", role: "annotation", placement: { mode: "zone", zone: "title" } },
         { id: "sunset-ray", kind: "svg-artwork", svg: SUNSET_RAY, size: "medium", placement: { mode: "zone", zone: "main" } },
         { id: "r-cap", kind: "text", text: "Blue scattered away; red is what remains.", textRole: "body", role: "support", size: "small", placement: { mode: "zone", zone: "footer" } },
       ],
       beats: [
-        { id: "r-b1", actions: [{ do: "show", targets: ["r-title"], entrance: "fade" }] },
         { id: "r-b2", pace: "slow", actions: [{ do: "show", targets: ["sunset-ray"], entrance: "draw" }] },
         { id: "r-b3", actions: [{ do: "attention", target: "sunset-ray.blueleak", verb: "callout", title: "Blue leaks away", text: "scattered off", side: "north", route: "elbow", style: "pill" }] },
         { id: "r-b4", actions: [{ do: "show", targets: ["r-cap"], entrance: "word-by-word" }] },
@@ -206,12 +188,10 @@ export const whySkyIsBlueLessonSpec: LessonSpec = {
       narration:
         "So here is the whole picture. White sunlight, full of colors, meets a sky full of tiny molecules. By day, the short blue waves scatter across the entire dome — and you get a blue sky. At sunset, the light's long path scatters that blue away and leaves the red behind. One simple rule — small things scatter short waves the most — paints both the blue of noon and the red of evening.",
       objects: [
-        { id: "rc-title", kind: "text", text: "One rule, two skies", textRole: "title", role: "annotation", placement: { mode: "zone", zone: "title" } },
         { id: "recap", kind: "svg-artwork", svg: RECAP, size: "medium", placement: { mode: "zone", zone: "main" } },
         { id: "rc-take", kind: "text", text: "One scattering rule paints both skies.", textRole: "body", role: "primary", size: "small", placement: { mode: "zone", zone: "footer" } },
       ],
       beats: [
-        { id: "rc-b1", actions: [{ do: "show", targets: ["rc-title"], entrance: "fade" }] },
         { id: "rc-b2", pace: "slow", actions: [{ do: "show", targets: ["recap"], entrance: "fade" }] },
         { id: "rc-b3", pace: "dramatic", actions: [{ do: "show", targets: ["rc-take"], entrance: "word-by-word" }] },
       ],

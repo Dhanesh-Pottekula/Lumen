@@ -5,6 +5,7 @@
  * concept keeps its color across a whole lesson, and `legend()` renders the key.
  */
 import { clamp01 } from "../slides/anim";
+import { MIN_TEXT } from "../gcl/viewport";
 
 export type IconName =
   | "arrow" | "check" | "cross" | "plus" | "minus" | "star" | "heart" | "circle" | "square" | "triangle"
@@ -110,20 +111,29 @@ export function colorSemantics(palette: string[] = SEMANTIC_PALETTE) {
       return c;
     },
     /** Draw a swatch+label legend (vertical). */
-    legend(ctx: CanvasRenderingContext2D, categories: string[], x: number, y: number, opts: { rowH?: number; swatch?: number; font?: string; ink?: string; icon?: (cat: string) => IconName } = {}) {
+    legend(ctx: CanvasRenderingContext2D, categories: string[], x: number, y: number, opts: { rowH?: number; swatch?: number; font?: string; ink?: string; icon?: (cat: string) => IconName; colors?: string[]; swatchAlpha?: number } = {}) {
       const rowH = opts.rowH ?? 20;
       const sw = opts.swatch ?? 11;
       ctx.save();
-      ctx.font = opts.font ?? "12px -apple-system, sans-serif";
+      ctx.font = opts.font ?? `${MIN_TEXT}px -apple-system, sans-serif`;
       ctx.textAlign = "start";
       categories.forEach((cat, i) => {
         const cy = y + i * rowH;
-        const col = this.colorFor(cat);
+        // The colours the film painted its categories in, when it says; the registry's own otherwise.
+        const col = opts.colors?.[i] ?? this.colorFor(cat);
         if (opts.icon) {
           drawIcon(ctx, opts.icon(cat), x + sw / 2, cy, sw + 4, { color: col, filled: true });
         } else {
+          ctx.save();
+          ctx.globalAlpha *= opts.swatchAlpha ?? 1;
           ctx.fillStyle = col;
           ctx.fillRect(x, cy - sw / 2, sw, sw);
+          ctx.restore();
+          if ((opts.swatchAlpha ?? 1) < 1) {
+            ctx.strokeStyle = col;
+            ctx.lineWidth = 1.5;
+            ctx.strokeRect(x, cy - sw / 2, sw, sw);
+          }
         }
         ctx.fillStyle = opts.ink ?? "#cdd8e2";
         ctx.fillText(cat, x + sw + 8, cy + 4);

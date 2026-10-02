@@ -5,6 +5,7 @@
  * sequence (stagger), and type-motion (formatted labels).
  */
 import { clamp01, lerp } from "../slides/anim";
+import { MIN_TEXT } from "../gcl/viewport";
 import { strokeOn, type Pt } from "./strokes";
 import { formatNumber, type NumberFormat } from "./type-motion";
 
@@ -93,7 +94,7 @@ export function axes(
   const color = o.color ?? "#5b6b78";
   const gridColor = o.gridColor ?? "rgba(255,255,255,0.06)";
   const ink = o.ink ?? "#93a4b0";
-  const font = `${o.fontPx ?? 11}px -apple-system, sans-serif`;
+  const font = `${o.fontPx ?? MIN_TEXT}px -apple-system, sans-serif`;
   const p = clamp01(o.p ?? 1);
   const xTicks = o.xTicks ?? niceTicks(plot.xDomain);
   const yTicks = o.yTicks ?? niceTicks(plot.yDomain);
@@ -131,7 +132,7 @@ export function axes(
   const xFormat = o.fmt ?? { decimals: tickDecimals(xTicks) };
   const yFormat = o.fmt ?? { decimals: tickDecimals(yTicks) };
   for (const v of xTicks)
-    ctx.fillText(formatNumber(v, xFormat), plot.sx(v), plot.y + plot.h + 16);
+    ctx.fillText(formatNumber(v, xFormat), plot.sx(v), plot.y + plot.h + 20);
   ctx.textAlign = "right";
   for (const v of yTicks)
     ctx.fillText(formatNumber(v, yFormat), plot.x - 8, plot.sy(v) + 4);
@@ -139,15 +140,12 @@ export function axes(
   if (o.xLabel) {
     ctx.textAlign = "center";
     ctx.fillStyle = ink;
-    ctx.fillText(o.xLabel, plot.x + plot.w / 2, plot.y + plot.h + 34);
+    ctx.fillText(o.xLabel, plot.x + plot.w / 2, plot.y + plot.h + 42);
   }
+  // The up axis's name, its unit, is written level over its top, where a phone reads it without turning.
   if (o.yLabel) {
-    ctx.save();
-    ctx.translate(plot.x - 40, plot.y + plot.h / 2);
-    ctx.rotate(-Math.PI / 2);
-    ctx.textAlign = "center";
-    ctx.fillText(o.yLabel, 0, 0);
-    ctx.restore();
+    ctx.textAlign = "left";
+    ctx.fillText(o.yLabel, plot.x + 4, plot.y - 8);
   }
   ctx.restore();
 }
@@ -212,7 +210,7 @@ export function barChart(
   const dur = o.dur ?? 0.5;
   const base = plot.sy(plot.yDomain[0]);
   ctx.save();
-  ctx.font = "600 11px -apple-system, sans-serif";
+  ctx.font = `600 ${MIN_TEXT}px -apple-system, sans-serif`;
   ctx.textAlign = "center";
   data.forEach((d, i) => {
     const gp = clamp01((o.t - (o.start ?? 0) - i * step) / dur);
@@ -246,6 +244,12 @@ export interface LineOptions {
   areaColor?: string;
   markers?: boolean;
   markerColor?: string;
+}
+
+/** Every line a chart's `series` draws: one list of points is one line, a list of such lists is several. */
+export function seriesLines(series: [number, number][] | [number, number][][]): [number, number][][] {
+  if (series.length === 0) return [];
+  return Array.isArray(series[0][0]) ? (series as [number, number][][]) : [series as [number, number][]];
 }
 
 /** A line series bound to [x,y] data, drawing on to `p`, with optional area fill + markers. */
@@ -357,7 +361,7 @@ export function pie(
       const mid = a + sweep / 2;
       const lr = (r + inner) / 2;
       ctx.fillStyle = "#0e141a";
-      ctx.font = "600 11px -apple-system, sans-serif";
+      ctx.font = `600 ${MIN_TEXT}px -apple-system, sans-serif`;
       ctx.textAlign = "center";
       ctx.globalAlpha = clamp01((P - 0.7) / 0.3);
       ctx.fillText(

@@ -1,7 +1,7 @@
 import { BLUEPRINT, CHALKBOARD, PARCHMENT, TEXTBOOK } from "../render/theme";
 import type { ThemeName } from "../gcl/schema";
-import type { ObjectSpec, RoleToken } from "./types";
-import type { PaceToken, ShotToken, SizeToken, ThemeToken } from "./types";
+import type { ObjectSpec, PaintRole, RoleToken, ToneToken } from "./types";
+import type { PaceToken, ShotToken, SizeToken, TextSizeToken, ThemeToken } from "./types";
 import { availableVisualAssets, visualAssetAnchors } from "./visual-catalog";
 
 export interface PaceDefinition {
@@ -51,6 +51,8 @@ const sizeRow = (text: number, equation: number, measure: number, visual: number
   vector: visual,
   "svg-composite": visual,
   "svg-artwork": visual,
+  image: visual,
+  path: visual,
   shape: visual,
   curve: visual,
   chart: visual,
@@ -59,11 +61,18 @@ const sizeRow = (text: number, equation: number, measure: number, visual: number
   timeline: visual,
   table: visual,
   group: visual,
+  diagram: visual,
+  compare: visual,
+  scale: visual,
+  evidence: visual,
+  question: visual,
+  forces: visual,
+  working: visual,
 });
 
 const SIZES: Record<SizeToken, Record<ObjectSpec["kind"], number>> = {
-  tiny: sizeRow(14, 20, 22, 0.55, 2),
-  mini: sizeRow(16, 23, 26, 0.67, 2.25),
+  tiny: sizeRow(18, 20, 22, 0.55, 2),
+  mini: sizeRow(18, 23, 26, 0.67, 2.25),
   small: sizeRow(18, 26, 30, 0.8, 2.5),
   compact: sizeRow(21, 30, 36, 0.97, 2.75),
   medium: sizeRow(24, 34, 42, 1.15, 3),
@@ -71,6 +80,28 @@ const SIZES: Record<SizeToken, Record<ObjectSpec["kind"], number>> = {
   hero: sizeRow(42, 60, 72, 2.3, 5),
   fill: sizeRow(52, 72, 88, 3.2, 6),
 };
+
+/**
+ * Writing by importance, in view units on the 540-wide screen (one unit is about 0.68 pt on a phone):
+ * the size it is drawn at, and the floor no fitting or crowding ever takes it below.
+ */
+const TEXT_SIZES: Record<TextSizeToken, { px: number; floor: number }> = {
+  number: { px: 64, floor: 48 },
+  term: { px: 40, floor: 32 },
+  name: { px: 30, floor: 24 },
+  tag: { px: 26, floor: 22 },
+};
+
+/** The size writing takes when it names none: a name, never a caption too small to read on a phone. */
+export const DEFAULT_TEXT_SIZE: TextSizeToken = "name";
+
+export function isTextSize(token: unknown): token is TextSizeToken {
+  return typeof token === "string" && token in TEXT_SIZES;
+}
+
+export function resolveTextSize(token: TextSizeToken): { px: number; floor: number } {
+  return TEXT_SIZES[token];
+}
 
 export function resolveTheme(token: string) {
   return THEMES[token as ThemeToken];
@@ -112,11 +143,28 @@ export function resolveVisualStyle(theme: ThemeName, role: RoleToken = "primary"
   return { color, lineWidth: value.lineStyle.width, layer } as const;
 }
 
-/** Stable semantic category colors shared by charts, maps, legends, and timelines. */
-export function categoryColor(theme: ThemeName, category: string, index = 0): string {
+/** A path's colour by theme role; `none` paints nothing. */
+export function paletteColor(theme: ThemeName, role: PaintRole): string | undefined {
+  return role === "none" ? undefined : THEME_DATA[theme].palette[role];
+}
+
+/** The colour a tone gives by meaning: green for good, red for bad. */
+export function toneColor(theme: ThemeName, tone: ToneToken): string {
   const palette = THEME_DATA[theme].palette;
-  const colors = [palette.accent, palette.ink, palette.muted, palette.danger, palette.surface];
-  let hash = index;
-  for (let i = 0; i < category.length; i++) hash = (hash * 31 + category.charCodeAt(i)) >>> 0;
-  return colors[hash % colors.length];
+  return tone === "good" ? palette.good : palette.danger;
+}
+
+/** Whether an object is laid between two things and re-aimed as they move: a line, or a path with both ends. */
+export function joinsTwo(source: ObjectSpec): boolean {
+  return source.kind === "line" || (source.kind === "path" && source.from !== undefined && source.to !== undefined);
+}
+
+/**
+ * The colour of the category that comes `ordinal`-th in a film: the accent, its colour-blind-safe
+ * partner, then ink and muted. Red is never a category, since it means wrong.
+ */
+export function categoryColor(theme: ThemeName, ordinal: number): string {
+  const palette = THEME_DATA[theme].palette;
+  const colors = [palette.accent, palette.second, palette.ink, palette.muted];
+  return colors[((ordinal % colors.length) + colors.length) % colors.length];
 }
