@@ -589,8 +589,10 @@ const FILM_CATALOG = {
       family: "Lines and marks",
       summary: "A stroke joining two things. It re-aims every frame as either end moves.",
       use: [
-        "Rare: at most two in a film, each only to point from one thing to another.",
-        "A cause, a flow, a link, a demand or a name is never a line. The things themselves move or change: the cause acts, the effect grows, shrinks, fills or lights.",
+        "At most two arrows on a screen, each only for something that travels or passes from one thing to another.",
+        "A plain line with no `arrow` joins the members of a web. It is not an arrow.",
+        "A tree or a list is a `diagram`, never lines drawn by hand.",
+        "A cause, a demand or a name is never a line. The things themselves move or change: the cause acts, the effect grows, shrinks, fills or lights.",
         "A journey across a map is the traveller moving through its parts, with no line drawn.",
         "Use it for a force, drawn from what pushes to what is pushed.",
         "Label a force with its size, such as \"10 N\". Then the pushed thing moves the way it points.",
@@ -740,21 +742,18 @@ const FILM_CATALOG = {
     },
     shape: {
       family: "Lines and marks",
-      summary: "A plain shape, for a thing that is that shape.",
-      use: ["Never a stand-in for a thing that has a picture."],
+      summary: "A plain geometric shape, for geometry only.",
+      use: ["Never a stand-in for a thing that has a picture.", "A thing with a real shape, a star or a heart among them, is a picture."],
       fields: {
         shape: {
           values: {
             circle: "A circle.",
             polygon: "A regular polygon with `sides` sides.",
-            star: "A star.",
-            heart: "A heart.",
-            disc: "A shaded round body with a highlight.",
           },
         },
         sides: { lines: ["For a `polygon`."] },
         appearance: {
-          values: { solid: "Filled. Default.", outline: "Only its border.", shaded: "Filled, with shading." },
+          values: { solid: "Filled. Default.", outline: "Only its border." },
         },
       },
     },
@@ -809,6 +808,34 @@ const FILM_CATALOG = {
       },
     },
 
+    diagram: {
+      family: "Figures",
+      summary: "Boxes of words laid out as a structure, joined by lines the layout draws.",
+      use: [
+        "Use it for a structure: a hierarchy, a set of kinds, or a list of steps in order.",
+        "Its boxes hold words only. A member that needs a picture is a picture, never a node.",
+        "Pieces: each node is `<id>.<node>`, and each join is `<id>.<from>-<to>`.",
+        "Show one node per beat, on the words that name it. Its join draws in just before it.",
+        "Light a node with `trace` on it, one node among many with `dim`, and a group with `encircle`.",
+        "Its joins are not arrows, and never count toward a screen's two.",
+      ],
+      fields: {
+        layout: {
+          values: {
+            tree: "A hierarchy from one root down, each node joined to its parent by a plain line. A wide tree turns on its side.",
+            sequence: "Numbered stages top to bottom, each joined to the next by a short line with a small head.",
+          },
+        },
+        nodes: {
+          lines: [
+            "The boxes, in order.",
+            "`id` names the node's piece. `label` is its name, in one to three words.",
+            "`note` is one short line under the name, only where the name alone is not enough.",
+            "`parent`: in a `tree`, the id of the node it hangs from. The root has none.",
+          ],
+        },
+      },
+    },
     working: {
       family: "Figures",
       summary: "A worked solution line by line, aligned on `=`. Each line dims when the next is written.",
@@ -1280,7 +1307,7 @@ const FILM_CATALOG = {
         "Every end stays in frame.",
         "An action and its reaction move in the same beat, the reaction `opposite` the action.",
         "A bigger push or a lighter thing gets a quicker `pace` and a longer `by`.",
-        "Use it for a hand or tool acting on a part. Outline the part first, then move the hand `to` it.",
+        "Use it for a hand or tool acting on a part. Trace the part first, then move the hand `to` it.",
         "Move the hand `away` on the next beat.",
         "Add `\"trail\": \"ghosts\"` when the depth of the push matters.",
         "A repeated action is repeated beats at the rate's pace.",
@@ -1428,14 +1455,14 @@ const FILM_CATALOG = {
       family: "Motion",
       summary: "Changes the form of a thing drawn in code. It keeps the new form after the beat.",
       use: [
-        "Use it for a code-drawn piece that changes form, with `\"ghost\": true`.",
-        "A flap closing, a membrane and a figure transformed all change form this way.",
+        "Use it for a geometric figure that changes form, with `\"ghost\": true`.",
+        "A real thing that changes form is its next picture, never a morph.",
       ],
       fields: {
         target: { type: "Ref", lines: ["A `path` or a `shape`."] },
         ghost: { lines: ["`true`: a faded copy of the old form stays through the beat."] },
         d: { lines: ["For a `path`: its new `d`, on the same grid as its own.", "The path is laid out with room for every shape it takes, so it never grows over a neighbour."] },
-        shape: { lines: ["For a `shape`: its new shape."], values: { circle: "A circle.", polygon: "A polygon with `sides` sides.", star: "A star.", heart: "A heart." } },
+        shape: { lines: ["For a `shape`: its new shape."], values: { circle: "A circle.", polygon: "A polygon with `sides` sides." } },
         sides: { lines: ["For a `polygon`."] },
       },
     },

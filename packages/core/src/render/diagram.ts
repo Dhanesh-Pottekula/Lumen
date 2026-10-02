@@ -404,7 +404,7 @@ export function planDiagram(input: DiagramInput, w: number, h: number, palette: 
     if (!from || !to) continue;
     const pts = linkRoute(input, from, to, w, h, input.layout === "tree" && treeSideways(input, w));
     // The arrow draws in just before the thing it points at, so a stage arrives as the arrow reaches it.
-    pieces.push({ name: linkName(link), box: boundsOf(pts), ops: linkOps(link, pts, palette, input.layout !== "tree" || link.type !== undefined), order: to.order - 0.5, follows: to.node.id });
+    pieces.push({ name: linkName(link), box: boundsOf(pts), ops: linkOps(link, pts, palette, (input.layout !== "tree" && input.layout !== "sequence") || link.type !== undefined), order: to.order - 0.5, follows: to.node.id });
   }
   return { ops: [], pieces };
 }

@@ -243,7 +243,7 @@ assert.deepEqual(
 );
 assert.deepEqual(
   progressDotColors({ backgroundColor: "#f2ede6", colorScheme: "light" }),
-  ["#1d4f8f", "#735c3a"],
+  ["#8fb3d9", "#7a7368"],
   "light screen progress dots must use the selected high-contrast theme",
 );
 assert.deepEqual(
@@ -251,7 +251,7 @@ assert.deepEqual(
     { backgroundColor: "#f2ede6", colorScheme: "light" },
     "end",
   ),
-  ["#4a2f1a", "#4a2f1a"],
+  ["#38352f", "#38352f"],
   "completed light screen progress dots must remain readable",
 );
 assert.deepEqual(

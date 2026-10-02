@@ -1411,7 +1411,7 @@ assert.equal(component(captioned, "tag").plate, true, "writing printed across a 
   const captions = compiled(lessonOf([sceneOf("s1", [map("europe", parts, outlines), { id: "q", kind: "text", text: "Europe", emphasis: "quiet", placement: { mode: "anchor", target: "europe.germany" } }, { id: "a", kind: "text", text: "Europe", placement: { mode: "anchor", target: "europe.france" } }], [[{ do: "show", targets: ["europe", "q", "a"] }]])]));
   const [quietText, loudText] = [component(captions, "q"), component(captions, "a")];
   assert.ok(quietText.plate === undefined && loudText.plate === true && quietText.layer === "annotation", "quiet writing on a picture has no plate and is drawn over it");
-  assert.ok(contrast(quietText.color, page) < contrast(loudText.color ?? "#4a2f1a", page), "quiet writing is lower in contrast");
+  assert.ok(contrast(quietText.color, page) < contrast(loudText.color ?? "#38352f", page), "quiet writing is lower in contrast");
 
   // Pointer labels of one picture stack in a column beside it that never overlaps and stays in frame.
   for (let count = 2; count <= 12; count++) {
@@ -1460,7 +1460,7 @@ assert.equal(component(captioned, "tag").plate, true, "writing printed across a 
   const allies = tinted(one, "europe.france~tint").wash;
   const axis = tinted(one, "europe.germany~tint").wash;
   assert.ok(allies.alpha === 0.25 && axis.alpha === 0.25, "a part's category is a faint still wash by default");
-  assert.equal(axis.color, "#b42318", "a declared category colour is used as declared");
+  assert.equal(axis.color, "#e08a80", "a declared category colour is used as declared");
   assert.equal(one.find((item) => item.id === "t").color, allies.color, "writing in a category takes its colour");
   const chart = two.find((item) => item.id === "bars");
   assert.deepEqual(chart.data.map((d) => d.color), [axis.color, allies.color], "a chart's categories take the film's colours in a later scene");
@@ -2410,8 +2410,8 @@ assert.equal(component(captioned, "tag").plate, true, "writing printed across a 
     [[{ do: "show", targets: ["coin", "jobs", "loose"] }], [{ do: "trend", target: "coin", way: "up", tone: "bad" }]],
   ));
   const priced = toned.gcl.find((item) => item.type === "attention" && item.verb === "trend");
-  assert.ok(priced.color === "#b42318" && priced.settles === undefined, "a bad trend is red, and holds its tone past its beat");
-  assert.ok(component(toned, "jobs").color === "#2e7d32" && component(toned, "jobs").quiet === true, "a good measure is green, and a quiet one draws no number");
+  assert.ok(priced.color === "#e08a80" && priced.settles === undefined, "a bad trend is red, and holds its tone past its beat");
+  assert.ok(component(toned, "jobs").color === "#8cc49a" && component(toned, "jobs").quiet === true, "a good measure is green, and a quiet one draws no number");
   assert.ok(component(toned, "loose").quiet === undefined && diagnostics(toned).some((d) => d.code === "DROPPED_FIELD" && /no scale/.test(d.message)), "a quiet measure with no scale shows its number");
   const painted = renderLessonSpec(film([coin], [[{ do: "show", targets: ["coin"] }], [{ do: "trend", target: "coin", way: "down" }]]));
   const sheet = createCanvas(540, 960);

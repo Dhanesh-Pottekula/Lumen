@@ -67,8 +67,12 @@ const bundledLumen = new Function(`${iife}; return Lumen;`)();
 //   trend  — an amount that rises or falls is shown by the thing itself changing, never a mark beside it
 //   spark, vignette, rings — the three attention marks that exist only to sparkle
 //   question — a film's words on screen name things; a chip restating the user's question never earns its place
-//   diagram, compare, scale, evidence, forces — panels beside the lesson; the scene's own pictures, sized and
-//     placed against each other, moved or speaking, carry the same idea; `hero-diagram` only framed a diagram
+//   svg-artwork, visual, map, vector — a thing with a real shape is a picture from the image model, never code-drawn
+//   compare, scale, evidence, forces — panels beside the lesson; the scene's own pictures, sized and placed against
+//     each other, moved or speaking, carry the same idea; `hero-diagram` only framed a diagram
+//   diagram flow and cycle — they draw an arrow on every link, and a screen holds at most two arrows; a diagram
+//     keeps `tree` and `sequence` for structures, without `links`, whose types put heads on a tree's lines
+//   shape star, heart, disc, shaded — code draws only geometry; a star, a heart or a shaded ball is a picture
 //   slope, dumbbell, pyramid, stack, histogram, seats, riemann, sparkline — chart forms that a bar, hbar, pie,
 //     line, function or units chart says more plainly; `majority` only ever marked `seats`
 //   callout — a `label` names a thing, and one way to name it is clearer than two; `title`, `side`, `route`
@@ -78,8 +82,11 @@ const bundledLumen = new Function(`${iife}; return Lumen;`)();
 // A timeline stays in the contract: the planner asks for one only where a step needs it, and the backend
 // only lints how many steps did, never refusing one.
 const WITHHELD_KINDS = new Set([
-  "group", "vector", "svg-artwork", "map", "visual", "question", "diagram", "compare", "scale", "evidence", "forces",
+  "group", "vector", "svg-artwork", "map", "visual", "question", "compare", "scale", "evidence", "forces",
 ]);
+const WITHHELD_LAYOUTS = new Set(["flow", "cycle"]);
+const WITHHELD_DIAGRAM_KEYS = new Set(["links"]);
+const WITHHELD_SHAPES = new Set(["star", "heart", "disc", "shaded"]);
 const WITHHELD_VERBS = new Set(["effect", "tour", "trend"]);
 const WITHHELD_MARKS = new Set(["spark", "vignette", "rings", "map", "hero-diagram", "callout"]);
 const WITHHELD_ATTENTION_KEYS = new Set(["title", "side", "route", "style"]);
@@ -110,6 +117,18 @@ const withhold = (node) => {
   if (chartsOf(node.properties).some((chart) => WITHHELD_CHARTS.has(chart))) {
     node.properties.chart.enum = node.properties.chart.enum.filter((chart) => !WITHHELD_CHARTS.has(chart));
     for (const key of WITHHELD_CHART_KEYS) delete node.properties[key];
+    removed += 1;
+  }
+  if (node.properties?.kind?.const === "diagram") {
+    node.properties.layout.enum = node.properties.layout.enum.filter((layout) => !WITHHELD_LAYOUTS.has(layout));
+    for (const key of WITHHELD_DIAGRAM_KEYS) delete node.properties[key];
+    removed += 1;
+  }
+  if (node.properties?.kind?.const === "shape" || node.properties?.motion?.const === "morph") {
+    for (const key of ["shape", "appearance"]) {
+      const field = node.properties[key];
+      if (field?.enum) field.enum = field.enum.filter((one) => !WITHHELD_SHAPES.has(one));
+    }
     removed += 1;
   }
   const verb = node.properties?.do?.const === "attention" ? node.properties.verb : undefined;
@@ -153,7 +172,15 @@ const offeredCharts = new Set((contract.schema.$defs?.object?.oneOf ?? []).flatM
 for (const chart of WITHHELD_CHARTS) {
   if (offeredCharts.has(chart)) throw new Error(`the contract still offers the withheld chart ${chart}`);
 }
-const attentionVerbs = (contract.schema.properties?.scenes?.items?.properties?.beats?.items?.properties?.actions?.items?.oneOf ?? []).flatMap((variant) =>
+const actionVariants = contract.schema.properties?.scenes?.items?.properties?.beats?.items?.properties?.actions?.items?.oneOf ?? [];
+const variantsOf = (test) => [...(contract.schema.$defs?.object?.oneOf ?? []), ...actionVariants].filter((variant) => test(variant.properties ?? {}));
+for (const variant of variantsOf((props) => props.kind?.const === "diagram")) {
+  if (variant.properties.layout.enum.some((layout) => WITHHELD_LAYOUTS.has(layout)) || "links" in variant.properties) throw new Error("the contract still offers a diagram that draws arrows");
+}
+for (const variant of variantsOf((props) => props.kind?.const === "shape" || props.motion?.const === "morph")) {
+  if ([variant.properties.shape, variant.properties.appearance].some((field) => field?.enum?.some((one) => WITHHELD_SHAPES.has(one)))) throw new Error("the contract still offers a shape that is not geometry");
+}
+const attentionVerbs = actionVariants.flatMap((variant) =>
   variant.properties?.do?.const === "attention" ? (variant.properties.verb?.enum ?? [variant.properties.verb?.const]) : [],
 );
 for (const verb of WITHHELD_ATTENTION_VERBS) {

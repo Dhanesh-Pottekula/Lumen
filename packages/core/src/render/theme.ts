@@ -63,9 +63,9 @@ export const TEXTBOOK: Theme = {
 
 export const PARCHMENT: Theme = {
   name: "parchment",
-  // Blue marks the subject and orange what it is compared with; red stays for wrong. Every writing colour
-  // holds 4.5:1 on the page and on the white card the app lays it on.
-  palette: { bg: "#efe2c4", surface: "#e6d3a8", ink: "#4a2f1a", accent: "#1d4f8f", second: "#a8520f", muted: "#735c3a", danger: "#b42318", good: "#2e7d32" },
+  // A pencil drawing: graphite ink, soft pastel washes for the subject and its partner, soft red and green for
+  // bad and good. Pastels are washes, not writing: a figure's words are darkened until they read on the page.
+  palette: { bg: "#efe2c4", surface: "#e6d3a8", ink: "#38352f", accent: "#8fb3d9", second: "#f0c08f", muted: "#7a7368", danger: "#e08a80", good: "#8cc49a" },
   texture: "parchment",
   lineStyle: { width: 2.4, roughness: 1.6 },
   type: { display: "Georgia, 'Times New Roman', serif", body: "Georgia, serif", mono: "ui-monospace, monospace" },
