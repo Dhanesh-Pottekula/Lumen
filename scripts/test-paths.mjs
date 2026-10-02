@@ -2456,7 +2456,7 @@ assert.equal(component(captioned, "tag").plate, true, "writing printed across a 
   const canvas = createCanvas(540, 960);
   const ctx = canvas.getContext("2d");
   onLayers(() => rendered.slide.render(ctx, rendered.slide.duration - 0.05));
-  const accent = [0x1d, 0x4f, 0x8f];
+  const accent = [0x3f, 0x5d, 0x84];
   const near = (x, y) => Math.hypot(...Array.from(ctx.getImageData(Math.round(x), Math.round(y), 1, 1).data.slice(0, 3)).map((v, k) => v - accent[k])) < 60;
   const [left, width, middle, thickness] = [cx - size * 2.25, size * 4.5, cy + size * 0.28, Math.max(14, size * 0.4)];
   assert.ok(thickness >= 14, "a meter's track is thick, never a thin rule");
@@ -2476,7 +2476,7 @@ assert.equal(component(captioned, "tag").plate, true, "writing printed across a 
   onLayers(() => rendered.slide.render(recorded(ctx), rendered.slide.duration - 0.05));
   const written = writing.map((one) => one.text);
   writing = null;
-  const accent = [0x1d, 0x4f, 0x8f];
+  const accent = [0x3f, 0x5d, 0x84];
   const inked = (x, y) => Math.hypot(...Array.from(ctx.getImageData(Math.round(x), Math.round(y), 1, 1).data.slice(0, 3)).map((v, k) => v - accent[k])) < 70;
   const [sx, sy] = [(x) => cx - w / 2 + ((x - 2015) / 6) * w, (y) => cy + h / 2 - (y / 120) * h];
   const across = Array.from({ length: 40 }, (_, k) => sy(83.5) - 20 + k).filter((y) => inked(sx(2018.5), y)).length;

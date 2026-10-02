@@ -65,7 +65,7 @@ export const PARCHMENT: Theme = {
   name: "parchment",
   // A pencil drawing: graphite ink, soft pastel washes for the subject and its partner, soft red and green for
   // bad and good. Pastels are washes, not writing: a figure's words are darkened until they read on the page.
-  palette: { bg: "#efe2c4", surface: "#e6d3a8", ink: "#38352f", accent: "#8fb3d9", second: "#f0c08f", muted: "#7a7368", danger: "#e08a80", good: "#8cc49a" },
+  palette: { bg: "#efe2c4", surface: "#e6d3a8", ink: "#38352f", accent: "#5a86bf", second: "#d99a5b", muted: "#7a7368", danger: "#e08a80", good: "#8cc49a" },
   texture: "parchment",
   lineStyle: { width: 2.4, roughness: 1.6 },
   type: { display: "Georgia, 'Times New Roman', serif", body: "Georgia, serif", mono: "ui-monospace, monospace" },
