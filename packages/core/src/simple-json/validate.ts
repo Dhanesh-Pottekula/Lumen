@@ -5,7 +5,7 @@ import { seriesLines } from "../render/charts";
 import type { Diagnostic, ValidationResult } from "./diagnostics";
 import { formatAjvErrors } from "./diagnostics";
 import { LESSON_SPEC_SCHEMA, SCENE_CHECK_SCHEMA, ZONE_NAMES } from "./schema";
-import { assetAnchors, availableAssets, joinsTwo, resolveAsset } from "./registry";
+import { assetAnchors, availableAssets, joinsTwo, resolveAsset, STEPS_ASIDE, takesCentre } from "./registry";
 import { parseTarget } from "./target";
 import { analyzeLifecycle, lifecycleIds } from "./lifecycle";
 import type { ActionSpec, LessonSpec, ObjectSpec, SceneSpec } from "./types";
@@ -177,16 +177,6 @@ const SPEAKS: ReadonlySet<ObjectSpec["kind"]> = new Set(["image", "visual", "svg
 
 // A trend sits beside the thing whose amount rises or falls; writing is not that thing, and a connector joins two.
 const UNTRENDED: ReadonlySet<ObjectSpec["kind"]> = new Set(["text", "equation", "line", "span", "angle", "curve"]);
-
-// What steps aside is a whole picture: it has a size of its own to give up.
-const STEPS_ASIDE: ReadonlySet<ObjectSpec["kind"]> = new Set(["image", "visual", "svg-artwork", "svg-composite", "map", "chart", "diagram", "table", "timeline", "shape", "path", "curve"]);
-
-/** Whether a thing could take the centre a picture steps aside from: a stroke, an arrow or a connector never does. */
-function takesCentre(object: ObjectSpec | undefined): boolean {
-  if (!object || !STEPS_ASIDE.has(object.kind) || object.role === "annotation" || object.role === "background") return false;
-  if (object.kind !== "path") return true;
-  return !(object.from && object.to) && object.arrow === undefined && (/[zZ]/.test(object.d) || (object.d.match(/[Mm]/g)?.length ?? 0) >= 2);
-}
 
 /** What an object is placed, sized or attached against, each a target that must exist. */
 function placedAgainst(object: ObjectSpec): Array<{ target: string; suffix: string }> {

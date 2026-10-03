@@ -496,6 +496,8 @@ const FILM_CATALOG = {
         "Spacing does not matter. The first place a term is written is the one meant.",
         "Any `attention` verb lights a term in place, on the word that names it.",
         "`cancel` strikes a term through on the word \"cancels\".",
+        "One line of maths. A derivation over several lines is a `working`, one line per entry.",
+        "Never `\\begin`, an environment, or a line break inside `value`.",
         "Use it for an equation built in stages. Write one `equation` per stage, each `below` the one before.",
         "Show each stage with `rise` on its words.",
         "Beside a figure or pictures, `trace` the thing each term stands for as the term is said.",
@@ -840,6 +842,7 @@ const FILM_CATALOG = {
       family: "Figures",
       summary: "A worked solution line by line, aligned on `=`. Each line dims when the next is written.",
       use: [
+        "A move lights, underlines or strikes a whole line, `<id>.l<i>`. A term inside a line is never a target.",
         "Use it for a worked calculation. One move per line, one line per beat.",
         "Show each line after the voice gives its reason.",
         "As a move is named, `underline` the term it acts on in the line before: `<id>.l<i>`.",
@@ -1029,6 +1032,8 @@ const FILM_CATALOG = {
         "Build a drawing the film makes stroke by stroke as it is narrated, with `draw`.",
         "A figure, a force arrow and a route are drawings the film makes.",
         "Show one piece per beat. Never fade a drawing in finished.",
+        "A new `primary` picture takes the centre. The subject on screen steps aside by itself: smaller, greyed, still on screen.",
+        "To keep two subjects full size together, make them compared equals, or place the new one `right-of` or `left-of` the old.",
       ],
       fields: {
         targets: { type: "Ref[]", lines: ["Object ids, or pieces `<object>.<piece>`."] },
@@ -1071,21 +1076,6 @@ const FILM_CATALOG = {
             shrink: "Shrinks away. For something falling from power. Show the new one with `rise` in its place, in the same beat.",
           },
         },
-      },
-    },
-    aside: {
-      family: "Showing",
-      summary: "Steps a picture aside: it shrinks to companion size and greys back, so a new subject can take the centre.",
-      use: [
-        "It moves into the free band above or below what stays on screen.",
-        "It happens in one beat, and it stays aside until it is hidden.",
-        "Show the new subject in the same beat or the next one. It takes the old one's place.",
-        "Its parts, labels and the writing beside it go with it.",
-        "Use it when the old subject is still needed for context. Else `hide` it.",
-        "Once per picture in a scene.",
-      ],
-      fields: {
-        target: { type: "Ref", lines: ["A whole picture, chart or drawing. Never a part."] },
       },
     },
     label: {

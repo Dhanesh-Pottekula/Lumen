@@ -159,6 +159,16 @@ export function joinsTwo(source: ObjectSpec): boolean {
   return source.kind === "line" || (source.kind === "path" && source.from !== undefined && source.to !== undefined);
 }
 
+// What steps aside is a whole picture: it has a size of its own to give up.
+export const STEPS_ASIDE: ReadonlySet<ObjectSpec["kind"]> = new Set(["image", "visual", "svg-artwork", "svg-composite", "map", "chart", "diagram", "table", "timeline", "shape", "path", "curve"]);
+
+/** Whether a thing could take the centre a picture steps aside from: a stroke, an arrow or a connector never does. */
+export function takesCentre(object: ObjectSpec | undefined): boolean {
+  if (!object || !STEPS_ASIDE.has(object.kind) || object.role === "annotation" || object.role === "background") return false;
+  if (object.kind !== "path") return true;
+  return !(object.from && object.to) && object.arrow === undefined && (/[zZ]/.test(object.d) || (object.d.match(/[Mm]/g)?.length ?? 0) >= 2);
+}
+
 /**
  * The colour of the category that comes `ordinal`-th in a film: the accent, its colour-blind-safe
  * partner, then ink and muted. Red is never a category, since it means wrong.

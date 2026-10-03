@@ -2432,6 +2432,34 @@ assert.equal(component(captioned, "tag").plate, true, "writing printed across a 
   assert.ok(component(swapped, "old-name").motions.some((motion) => motion.kind === "aside" && motion.scale === 1), "the writing beside it goes with it at its own size");
   const refused = compileLessonSpec(film([picture("p")], [[{ do: "show", targets: ["p"] }], [{ do: "aside", target: "p.core" }]]));
   assert.ok(!refused.lesson?.scenes?.[0]?.beats?.some((beat) => beat.actions.some((action) => action.do === "aside")), "only a whole picture steps aside");
+
+  const stepsAside = (result, id) => (component(result, id).motions ?? []).find((motion) => motion.kind === "aside");
+  const turned = compiled(film(
+    [picture("old"), picture("new")],
+    [[{ do: "show", targets: ["old"] }], [{ do: "attention", target: "old.core", verb: "outline" }], [{ do: "show", targets: ["new"] }]],
+  ));
+  const [oldSlot, newSlot] = ["old", "new"].map((id) => resolvedObject(turned, id).box);
+  const unwritten = stepsAside(turned, "old");
+  assert.ok(unwritten && unwritten.scale < 0.6 && unwritten.mute < 1, "a subject a new primary picture takes the centre from steps aside by itself, smaller and greyed");
+  assert.ok(Math.abs(unwritten.at - turned.resolved.scenes[0].beats[2].start) < 1e-6, "it steps aside on the beat the new subject is shown");
+  assert.ok(Math.abs(oldSlot.x - newSlot.x) < 1 && Math.abs(oldSlot.w - newSlot.w) < 1 && stepsAside(turned, "new") === undefined, "the new subject holds the main slot");
+
+  const worked = compiled(film(
+    [picture("scale"), { id: "sum", kind: "working", lines: [{ tex: "2x + 3 = 11" }, { tex: "x = 4" }], placement: { mode: "relative", target: "scale", relation: "below" } }],
+    [[{ do: "show", targets: ["scale"] }], [{ do: "show", targets: ["sum"] }]],
+  ));
+  assert.equal(stepsAside(worked, "scale"), undefined, "a working shown under a picture leaves it the subject");
+  const beside = compiled(film(
+    [picture("old"), picture("new", { placement: { mode: "relative", target: "old", relation: "right-of" } })],
+    [[{ do: "show", targets: ["old"] }], [{ do: "show", targets: ["new"] }]],
+  ));
+  assert.equal(stepsAside(beside, "old"), undefined, "a new picture placed beside the old one leaves it full size");
+
+  const weighed = film([picture("before"), picture("after")], [[{ do: "show", targets: ["before"] }], [{ do: "show", targets: ["after"] }]]);
+  weighed.scenes[0].composition = "comparison";
+  const halves = film([picture("before", { placement: { mode: "zone", zone: "main-left" } }), picture("after", { placement: { mode: "zone", zone: "main-right" } })], [[{ do: "show", targets: ["before"] }], [{ do: "show", targets: ["after"] }]]);
+  for (const pair of [compiled(weighed), compiled(halves)])
+    assert.ok(["before", "after"].every((id) => stepsAside(pair, id) === undefined), "two compared pictures are co-leads, and neither steps aside");
 }
 
 // A meter reads as a level: a thick track, the filled share solid and the rest a hollow outline, its

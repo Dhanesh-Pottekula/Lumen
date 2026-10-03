@@ -11,6 +11,7 @@ import {
   resolveSize,
   resolveTextSize,
   resolveTheme,
+  takesCentre,
   type ShotDefinition,
 } from "./registry";
 import {
@@ -1106,6 +1107,43 @@ const STACKED_GAIN = 1.3;
 // Laid out in `main`, `support` or `footer` with the subject, these take room from it on the screen.
 const SHARES_SCREEN: ReadonlySet<ObjectSpec["kind"]> = new Set([...YIELDED_TO, "image", "visual", "svg-artwork", "svg-composite", "map", "timeline", "path"]);
 
+/** Whether a picture is set left or right of another. */
+function besideOf(a: ObjectSpec, b: ObjectSpec): boolean {
+  return a.placement?.mode === "relative" && (a.placement.relation === "left-of" || a.placement.relation === "right-of") && a.placement.target.split(".")[0] === b.id;
+}
+
+/** Whether two pictures stand side by side: in the two halves of the body, or one set beside the other. */
+function sideBySide(a: ObjectSpec, b: ObjectSpec): boolean {
+  const sides = ["main-left", "main-right"];
+  return (sides.includes(defaultZone(a)) && sides.includes(defaultZone(b)) && defaultZone(a) !== defaultZone(b)) || besideOf(a, b) || besideOf(b, a);
+}
+
+/** Whether two subjects are compared: in a comparison, side by side, or stacked as a pair. */
+function compared(scene: SceneSpec, a: ObjectSpec, b: ObjectSpec, overUnder: ReadonlySet<string> = new Set()): boolean {
+  return scene.composition === "comparison" || sideBySide(a, b) || (overUnder.has(a.id) && overUnder.has(b.id));
+}
+
+/**
+ * Whether a picture of the same shape and parts is set right against a subject, as that thing in another
+ * state shown with it to compare: sized as a helper, the pulled chest under the resting one was a speck.
+ */
+function otherState(a: ObjectSpec, b: ObjectSpec): boolean {
+  const placement = a.placement;
+  if (a.kind !== "image" || b.kind !== "image" || placement?.mode !== "relative" || placement.relation === "near" || placement.target !== b.id) return false;
+  const [mine, theirs] = [imageAspect(a), imageAspect(b)];
+  const parts = new Set(imageHotspots(b).map((part) => part.id));
+  const shared = imageHotspots(a).filter((part) => parts.has(part.id)).length;
+  return mine !== undefined && theirs !== undefined && mine / theirs >= SAME_SLOT[0] && mine / theirs <= SAME_SLOT[1] && shared >= 2 && shared * 2 >= parts.size;
+}
+
+/**
+ * Whether two figures that face a way are set side by side, as two actors in one exchange: sized as a
+ * helper, the relative beside the caller came out a third of his height.
+ */
+function actorsBeside(a: ObjectSpec, b: ObjectSpec): boolean {
+  return a.kind === "image" && b.kind === "image" && a.facing !== undefined && b.facing !== undefined && (besideOf(a, b) || besideOf(b, a));
+}
+
 /**
  * Each picture's rank and the extent it is drawn at. One subject leads while it is on screen; a
  * second declared subject beside it leads with it only when the two are compared, and otherwise helps it.
@@ -1137,27 +1175,6 @@ function pictureRanks(
       source.size === "tiny" ||
       source.size === "mini" ||
       (moving.has(source.id) && !stacked(source)));
-  const sides = ["main-left", "main-right"];
-  const besideOf = (a: ObjectSpec, b: ObjectSpec) =>
-    a.placement?.mode === "relative" && (a.placement.relation === "left-of" || a.placement.relation === "right-of") && a.placement.target.split(".")[0] === b.id;
-  const sideBySide = (a: ObjectSpec, b: ObjectSpec) =>
-    (sides.includes(defaultZone(a)) && sides.includes(defaultZone(b)) && defaultZone(a) !== defaultZone(b)) || besideOf(a, b) || besideOf(b, a);
-  const compared = (a: ObjectSpec, b: ObjectSpec) => scene.composition === "comparison" || sideBySide(a, b) || (overUnder.has(a.id) && overUnder.has(b.id));
-  // A picture of the same shape and parts set right against a subject is that thing in another state, shown
-  // with it to compare: sized as a helper, the pulled chest under the resting one was a speck.
-  const otherState = (a: ObjectSpec, b: ObjectSpec) => {
-    const placement = a.placement;
-    if (a.kind !== "image" || b.kind !== "image" || placement?.mode !== "relative" || placement.relation === "near" || placement.target !== b.id) return false;
-    const [mine, theirs] = [imageAspect(a), imageAspect(b)];
-    const parts = new Set(imageHotspots(b).map((part) => part.id));
-    const shared = imageHotspots(a).filter((part) => parts.has(part.id)).length;
-    return mine !== undefined && theirs !== undefined && mine / theirs >= SAME_SLOT[0] && mine / theirs <= SAME_SLOT[1] && shared >= 2 && shared * 2 >= parts.size;
-  };
-
-  // Two figures that face a way, set side by side, are two actors in one exchange: sized as a helper, the
-  // relative beside the caller came out a third of his height.
-  const actorsBeside = (a: ObjectSpec, b: ObjectSpec) => a.kind === "image" && b.kind === "image" && a.facing !== undefined && b.facing !== undefined && (besideOf(a, b) || besideOf(b, a));
-
   // A picture set on or inside another is drawn within it, so it never leads the picture that carries it:
   // ranked first, the sun set on the sky came out three times the sky, and the rays between them a speck.
   const hostOf = (source: ObjectSpec) =>
@@ -1182,7 +1199,7 @@ function pictureRanks(
     if (rivals.length === 0 && (declared(source) || !travels(source))) {
       leads.push(source);
       rank.set(source.id, "lead");
-    } else if ((declared(source) && rivals.every((rival) => declared(rival) && compared(rival, source))) || rivals.some((rival) => otherState(source, rival) || actorsBeside(source, rival))) {
+    } else if ((declared(source) && rivals.every((rival) => declared(rival) && compared(scene, rival, source, overUnder))) || rivals.some((rival) => otherState(source, rival) || actorsBeside(source, rival))) {
       leads.push(source);
       rank.set(source.id, "colead");
     } else rank.set(source.id, travels(source) ? "traveller" : "second");
@@ -4004,6 +4021,44 @@ function findWords(spoken: string[], wanted: string[], from: number): number | u
   return undefined;
 }
 
+/**
+ * The scene with a step aside written for every subject a new one takes the centre from: when a beat shows a
+ * primary or hero picture, each picture on screen before it steps aside on that beat, unless the two are
+ * compared, one is set against the other, or it leaves on that beat. A picture with an aside written keeps it.
+ */
+function steppedAside(scene: SceneSpec): SceneSpec {
+  const specs = new Map(scene.objects.map((source) => [source.id, source]));
+  const against = (source: ObjectSpec) =>
+    [source.placement?.mode === "relative" || source.placement?.mode === "anchor" ? source.placement.target : undefined, source.attach?.to, typeof source.size === "object" ? source.size.like : undefined, "in" in source && typeof source.in === "string" ? source.in : undefined].flatMap((target) => (target === undefined ? [] : [target.split(".")[0]]));
+  const setAgainst = (from: string, to: string, seen = new Set<string>()): boolean => {
+    const source = specs.get(from);
+    if (!source || seen.has(from)) return false;
+    seen.add(from);
+    return against(source).some((bearer) => bearer === to || setAgainst(bearer, to, seen));
+  };
+  const coleads = (a: ObjectSpec, b: ObjectSpec) => compared(scene, a, b) || otherState(a, b) || otherState(b, a) || actorsBeside(a, b);
+  const keeps = (old: ObjectSpec, next: ObjectSpec) => coleads(old, next) || setAgainst(next.id, old.id) || setAgainst(old.id, next.id);
+
+  const stepped = new Set(scene.beats.flatMap((beat) => beat.actions).flatMap((action) => (action.do === "aside" ? [action.target] : [])));
+  const shown = new Set(scene.objects.filter((source) => source.initial === "visible").map((source) => source.id));
+  let added = false;
+  const beats = scene.beats.map((beat) => {
+    const hidden = new Set(beat.actions.flatMap((action) => (action.do === "hide" ? action.targets : [])));
+    const arriving = [...new Set(beat.actions.flatMap((action) => (action.do === "show" ? action.targets : [])))].filter((id) => !shown.has(id)).flatMap((id) => specs.get(id) ?? []);
+    // An undeclared picture is laid as a helper beside the subject, so it takes no centre from it.
+    const subjects = arriving.filter((source) => takesCentre(source) && (source.role === "primary" || source.role === "hero"));
+    const leaving = [...shown].flatMap((id) => specs.get(id) ?? []).filter((old) => takesCentre(old) && !hidden.has(old.id) && !stepped.has(old.id) && subjects.some((next) => !keeps(old, next)));
+    arriving.forEach((source) => shown.add(source.id));
+    hidden.forEach((id) => shown.delete(id));
+    if (leaving.length === 0) return beat;
+
+    leaving.forEach((old) => stepped.add(old.id));
+    added = true;
+    return { ...beat, actions: [...beat.actions, ...leaving.map((old): ActionSpec => ({ do: "aside", target: old.id }))] };
+  });
+  return added ? { ...scene, beats } : scene;
+}
+
 /** The ids a hide or a step aside takes off the centre of the screen. */
 function departing(action: ActionSpec): string[] {
   return action.do === "hide" ? action.targets : action.do === "aside" ? [action.target] : [];
@@ -4054,7 +4109,7 @@ function resolveScene(
   shares: Shares,
   stripFloor: number | undefined,
 ): ResolvedScene {
-  const scene = handedOver(written);
+  const scene = handedOver(steppedAside(written));
   const spoken = narrationWords(scene.narration);
   let searchFrom = 0;
   const words = scene.beats.map((beat) => {

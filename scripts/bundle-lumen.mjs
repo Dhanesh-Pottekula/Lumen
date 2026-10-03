@@ -65,6 +65,7 @@ const bundledLumen = new Function(`${iife}; return Lumen;`)();
 //   effect — particles, glow and flow are decoration; a lesson moves something instead
 //   tour   — its stops' targets escape the backend's name check, and a camera move with a label does the same job
 //   trend  — an amount that rises or falls is shown by the thing itself changing, never a mark beside it
+//   aside  — the engine steps the old subject aside by itself when a new subject takes the centre
 //   spark, vignette, rings — the three attention marks that exist only to sparkle
 //   question — a film's words on screen name things; a chip restating the user's question never earns its place
 //   svg-artwork, visual, map, vector — a thing with a real shape is a picture from the image model, never code-drawn
@@ -87,7 +88,7 @@ const WITHHELD_KINDS = new Set([
 const WITHHELD_LAYOUTS = new Set(["flow", "cycle"]);
 const WITHHELD_DIAGRAM_KEYS = new Set(["links"]);
 const WITHHELD_SHAPES = new Set(["star", "heart", "disc", "shaded"]);
-const WITHHELD_VERBS = new Set(["effect", "tour", "trend"]);
+const WITHHELD_VERBS = new Set(["effect", "tour", "trend", "aside"]);
 const WITHHELD_MARKS = new Set(["spark", "vignette", "rings", "map", "hero-diagram", "callout"]);
 const WITHHELD_ATTENTION_KEYS = new Set(["title", "side", "route", "style"]);
 const WITHHELD_ATTENTION_VERBS = new Set(["outline", "spotlight", "box", "converge"]);

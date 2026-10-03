@@ -370,7 +370,14 @@ export function layoutLabels(requests: LabelRequest[], frame: Rect): Map<string,
     layouts.set(request.key, layout);
     written.push({ rect: rectAt(layout.centre, layout.size), window: request.window });
   }
-  for (const group of pointers.values()) {
+  // A picture's pointer names make room only for the names on screen with them: one later in time takes its own slot.
+  const groups = [...pointers.values()].flatMap((owned) =>
+    owned.reduce<LabelRequest[][]>((sets, request) => {
+      const meets = sets.filter((set) => set.some((other) => during(other.window, request.window)));
+      return [...sets.filter((set) => !meets.includes(set)), [...meets.flat(), request]];
+    }, []),
+  );
+  for (const group of groups) {
     const window: [number, number] = [Math.min(...group.map((request) => request.window[0])), Math.max(...group.map((request) => request.window[1]))];
     const taken = [...group.flatMap((request) => request.obstacles), ...written.filter((one) => during(one.window, window)).map((one): Drawn => ({ box: one.rect }))];
     for (const [key, layout] of pointerColumns(group, frame, taken)) {
