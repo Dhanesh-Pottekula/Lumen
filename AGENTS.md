@@ -75,6 +75,24 @@ runs/                      generated films (git-ignored): film.json, plan.json, 
 - Scenes join with hard cuts, so adding a scene never changes a frame that already existed.
 - Pictures are full film frames. Nothing is cut out and no background is removed.
 
+## Usage, cost and the prompt cache
+- Every model call reports what it consumed (`provider.report`). `server/usage.ts` adds the calls up by stage
+  and model, estimates cost from the list prices in `RATES`, and the total is sent as `film_usage` events and
+  saved in `film.json` under `usage`. The app shows it under the player.
+- Prices: the two text models are the rates AiRA's usage ledger records as verified. The image, voice and
+  transcription rates came from public pricing summaries on 2026-11-17 and are marked approximate. A model
+  with no rate is counted and shown as "no price", never guessed. Update `RATES` when prices change.
+- Cache, following AiRA: a `prompt_cache_key` per stage, fixed system prompts, and an explicit
+  `prompt_cache_breakpoint` on the stable start of each scene writer's request.
+- Two things Lumen adds: the scene writers' variable text always comes after the film's stable text
+  (`sceneStable` then `sceneContext`), and one small warm-up call writes the shared prompt to the cache before
+  the scene writers start. Without it the first four writers, which start together, would each pay the
+  cache-write rate for the same text and none could read it.
+- `FILM_CACHE_BREAKPOINT=0` turns the breakpoint off; it also turns itself off if the API refuses the field.
+  `FILM_CACHE_RETENTION` (for example `24h`) is passed as `prompt_cache_retention` when set.
+- Do not put anything that changes per step (ids, times, the step's text) before the stable text, and do not
+  reword `SCENE_SYSTEM` casually: either breaks every cache read.
+
 ## Notes / findings
 - AiRA's newer engine (`aira_canvas`, the `simple-json` and `gcl` layers) is not on this machine, only as a
   minified bundle. It is portrait and built around cut-out pictures, so this repo has its own small scene

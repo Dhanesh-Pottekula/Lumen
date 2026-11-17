@@ -380,11 +380,20 @@ A beat is one moment: a few changes that happen together when the narrator reach
   story, never as decoration.
 - Do not repeat the narration as text: subtitles already show it.`;
 
-export function sceneContext(skills: string, pictures: unknown[], step: unknown): string {
+/**
+ * The start of every scene writer's request in one film: the same text, word for word, in each call. Keeping
+ * it first and unchanged is what lets the prompt cache serve it to every scene writer after the first.
+ */
+export function sceneStable(skills: string): string {
   return `## The visual skills for this film
 ${skills || "none"}
 
-## This step's pictures
+`;
+}
+
+/** The part of a scene writer's request that belongs to one step alone. It always comes after the stable part. */
+export function sceneContext(pictures: unknown[], step: unknown): string {
+  return `## This step's pictures
 ${JSON.stringify(pictures)}
 
 ## This step

@@ -7,7 +7,7 @@
  */
 import { createFilmCompiler, type FilmCompiler } from "./compiler";
 import { loadPicture } from "./render";
-import type { FilmEvent, FilmFile, FilmHeader, FilmProgressEvent, FilmScene } from "./types";
+import type { FilmEvent, FilmFile, FilmHeader, FilmProgressEvent, FilmScene, FilmUsage } from "./types";
 import { validateScene, withPictures } from "./validate";
 import { floorOf } from "./words";
 
@@ -37,6 +37,8 @@ export interface FilmSnapshot {
   steps: StepProgress[];
   /** The latest line of progress, for the status bar. */
   note: string;
+  /** What making the film consumed so far. Null for a film made before usage was recorded. */
+  usage: FilmUsage | null;
   error: string | null;
 }
 
@@ -48,7 +50,7 @@ export interface ReadyScene {
   end: number;
 }
 
-const EMPTY: FilmSnapshot = { run: null, status: "idle", header: null, received: 0, playable: 0, pictures: [], steps: [], note: "", error: null };
+const EMPTY: FilmSnapshot = { run: null, status: "idle", header: null, received: 0, playable: 0, pictures: [], steps: [], note: "", usage: null, error: null };
 
 /** Load a scene's voice far enough to know its length. Resolves with null if it cannot be loaded. */
 function loadAudio(src: string): Promise<HTMLAudioElement | null> {
@@ -153,6 +155,7 @@ export class FilmStore {
       const film = (await res.json()) as FilmFile;
       if (take !== this.take) return;
       film.scenes.forEach((scene, index) => this.receive({ type: "film_scene", run, index, header: film.header, scene }));
+      if (film.usage) this.receive({ type: "film_usage", run, usage: film.usage });
       if (film.status !== "generating") this.receive({ type: "film_done", run, status: film.status, scenes: film.scenes.length });
       else this.set({ status: "failed", error: "the film was still being made when the connection was lost" });
     } catch (error) {
@@ -184,6 +187,9 @@ export class FilmStore {
         this.set({ header: event.header, received: next });
         break;
       }
+      case "film_usage":
+        this.set({ usage: event.usage });
+        break;
       case "film_done": {
         // "ready" only once every scene has loaded, so the player does not finish early.
         const take = this.take;

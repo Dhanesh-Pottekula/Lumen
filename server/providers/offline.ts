@@ -250,11 +250,12 @@ export function offlineProvider(options: OfflineOptions = {}): Provider {
   const wait = (ticks: number) => new Promise<void>((resolve) => setTimeout(resolve, ticks * tick));
   const replies = new Map<string, number>();
 
-  return {
+  const provider: Provider = {
     name: "offline",
 
     async plan(_system, _brief, onText) {
       const text = JSON.stringify(PLAN);
+      provider.report?.("plan", "offline-text", { input: 4200, cached: 0, output: Math.round(text.length / 4), reasoning: 600 });
       for (let at = 0; at < text.length; at += 90) {
         onText(text.slice(at, at + 90));
         await wait(0.3);
@@ -265,11 +266,13 @@ export function offlineProvider(options: OfflineOptions = {}): Provider {
       await wait(DRAW_TICKS[pictureId] ?? 20);
       const svg = FRAMES[pictureId]?.();
       if (!svg) throw new Error(`offline: the drawing of "${pictureId}" failed`);
+      provider.report?.("picture", "offline-image", { input: 300, output: 4160, images: 1 });
       return { bytes: new TextEncoder().encode(svg), type: "image/svg+xml" };
     },
 
     async findParts(_system, _context, _image, pictureId) {
       await wait(8);
+      provider.report?.("parts", "offline-text", { input: 900, output: 80 });
       return PARTS[pictureId] ?? { parts: [], missing: [] };
     },
 
@@ -278,7 +281,8 @@ export function offlineProvider(options: OfflineOptions = {}): Provider {
       replies.set(stepId, turn + 1);
       await wait(turn === 0 ? (WRITE_TICKS[stepId] ?? 10) : 6);
       const canned = SCENES[stepId] ?? [];
-      void messages;
+      // As with a real cache: the fixed prompt and the film's stable text are read, the step's own text is new.
+      provider.report?.("scene", "offline-text", { input: 3400 + messages.length * 250, cached: 3000, output: 420 });
       return canned[Math.min(turn, canned.length - 1)] ?? "{}";
     },
 
@@ -289,7 +293,12 @@ export function offlineProvider(options: OfflineOptions = {}): Provider {
     async hear() {
       return null;
     },
+
+    async warm() {
+      provider.report?.("warm-up", "offline-text", { input: 3010, cached: 0, cacheWrite: 3000, output: 4 });
+    },
   };
+  return provider;
 }
 
 // ── Drawn frames ─────────────────────────────────────────────────────────────────────────────────────────

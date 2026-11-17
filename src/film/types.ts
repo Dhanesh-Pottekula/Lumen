@@ -145,7 +145,52 @@ export interface FilmDoneEvent {
   error?: string;
 }
 
-export type FilmEvent = FilmProgressEvent | FilmSceneEvent | FilmDoneEvent;
+/** Which job of the pipeline a model call belonged to. */
+export type UsageStage = "plan" | "warm-up" | "scene" | "parts" | "picture" | "voice" | "timing";
+
+/** Every call of one stage with one model, added up. */
+export interface UsageLine {
+  stage: UsageStage;
+  model: string;
+  calls: number;
+  /** Input tokens, including the cached and cache-written ones. */
+  input: number;
+  /** Input tokens read from the prompt cache. */
+  cached: number;
+  /** Input tokens written to the prompt cache. */
+  cacheWrite: number;
+  /** Output tokens, including reasoning tokens. */
+  output: number;
+  reasoning: number;
+  images: number;
+  characters: number;
+  seconds: number;
+  /** Estimated US dollars at list price. 0 when the model is not priced. */
+  cost: number;
+  priced: boolean;
+  /** True when the price is a secondary-source or per-minute approximation. */
+  approximate: boolean;
+}
+
+export interface FilmUsage {
+  lines: UsageLine[];
+  input: number;
+  cached: number;
+  output: number;
+  images: number;
+  /** Cached input tokens over all input tokens, for the text models. 0 to 1. */
+  cacheHitRate: number;
+  cost: number;
+  unpriced: string[];
+}
+
+export interface FilmUsageEvent {
+  type: "film_usage";
+  run: string;
+  usage: FilmUsage;
+}
+
+export type FilmEvent = FilmProgressEvent | FilmSceneEvent | FilmDoneEvent | FilmUsageEvent;
 
 /** A saved film, as `GET /api/films/<run>` returns it. */
 export interface FilmFile {
@@ -155,4 +200,6 @@ export interface FilmFile {
   status: "generating" | "ready" | "failed";
   header: FilmHeader;
   scenes: FilmScene[];
+  /** What making the film consumed. Absent on films made before usage was recorded. */
+  usage?: FilmUsage;
 }

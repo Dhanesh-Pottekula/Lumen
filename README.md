@@ -111,6 +111,16 @@ OPENAI_API_KEY=sk-...
 
 A film takes two to four minutes to make and costs real money in model and image calls.
 
+### What a film cost
+
+Under the player, the app shows what making the film consumed: each stage's model, calls, input tokens, how
+many of those were read from the prompt cache, output tokens, pictures drawn, and an estimated cost at list
+price. The same numbers are saved in the film's `film.json`.
+
+The scene writers share one long fixed prompt. Lumen keeps that text first and unchanged in every request,
+marks it as a cache breakpoint, and writes it to the cache once before the writers start, so each of them
+reads it at a fraction of the normal input price.
+
 ### Export a film to video
 
 The films above were exported with this. A film is a pure function of time, so a video is that function

@@ -466,6 +466,107 @@ button {
   outline-offset: -1px;
 }
 
+/* ── Cost and usage ── */
+.usage {
+  border-top: 1px solid var(--edge);
+  margin-top: 40px;
+  padding-top: 28px;
+}
+
+.usage h2 {
+  color: var(--dim);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  margin-bottom: 14px;
+  text-transform: uppercase;
+}
+
+.stats {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  margin-bottom: 18px;
+}
+
+.stats div {
+  background: var(--surface);
+  border: 1px solid var(--edge);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
+
+.stats strong {
+  display: block;
+  font-size: 1.45rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.stats div:first-child strong {
+  color: var(--gold);
+}
+
+.stats div:nth-child(2) strong {
+  color: var(--teal);
+}
+
+.stats span {
+  color: var(--dim);
+  font-size: 0.78rem;
+}
+
+.usage .table {
+  border: 1px solid var(--edge);
+  border-radius: 12px;
+  overflow-x: auto;
+}
+
+.usage table {
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+  min-width: 720px;
+  width: 100%;
+}
+
+.usage th,
+.usage td {
+  border-bottom: 1px solid var(--edge);
+  padding: 9px 14px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.usage th:nth-child(-n + 2),
+.usage td:nth-child(-n + 2) {
+  text-align: left;
+}
+
+.usage th {
+  background: var(--surface);
+  color: var(--dim);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.usage tr:last-child td {
+  border-bottom: 0;
+}
+
+.usage td code {
+  background: var(--surface-2);
+  border-radius: 4px;
+  font-size: 0.78rem;
+  padding: 2px 6px;
+}
+
+.usage td small {
+  color: var(--dim);
+}
+
 /* ── Library ── */
 .library {
   border-top: 1px solid var(--edge);

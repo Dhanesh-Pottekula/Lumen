@@ -10,6 +10,7 @@ import { createExporter } from "../film/export";
 import { advance, type Cursor, type Phase } from "../film/playback";
 import { VIEW_H, VIEW_W } from "../film/render";
 import { FilmStore } from "../film/store";
+import type { FilmUsage, UsageStage } from "../film/types";
 
 interface SavedFilm {
   run: string;
@@ -51,6 +52,101 @@ function unlockSound() {
 if (import.meta.env.DEV) Object.assign(window, { lumenFilm: store, lumenVoice: voice, lumenExport: createExporter() });
 
 const EXAMPLES = ["What if the Sun went out for one day?", "How does a vaccine teach your body to fight?", "Why did the Roman Empire fall?"];
+
+const STAGES: Record<UsageStage, string> = {
+  plan: "Plan",
+  "warm-up": "Cache warm-up",
+  scene: "Scene writing",
+  parts: "Part finding",
+  picture: "Pictures",
+  voice: "Voice",
+  timing: "Word timing",
+};
+
+const count = (n: number) => n.toLocaleString("en-US");
+const dollars = (n: number) => (n > 0 && n < 0.01 ? "<$0.01" : `$${n.toFixed(2)}`);
+
+/** What making the film consumed: models, tokens, cache reads and an estimated cost, stage by stage. */
+function UsagePanel({ usage, live }: { usage: FilmUsage | null; live: boolean }) {
+  if (!usage) {
+    return (
+      <section className="usage" aria-label="Cost and usage">
+        <h2>Cost and usage</h2>
+        <p className="note">{live ? "Waiting for the first model call." : "Not recorded for this film: it was made before usage was measured."}</p>
+      </section>
+    );
+  }
+  const approximate = usage.lines.some((line) => line.approximate && line.priced);
+  const other = (line: FilmUsage["lines"][number]) =>
+    [line.images ? `${line.images} images` : "", line.seconds ? `${Math.round(line.seconds)} s audio` : "", line.characters ? `${count(line.characters)} chars` : ""].filter(Boolean).join(", ") || "–";
+  return (
+    <section className="usage" aria-label="Cost and usage">
+      <h2>Cost and usage{live ? " so far" : ""}</h2>
+      <div className="stats">
+        <div>
+          <strong>{dollars(usage.cost)}</strong>
+          <span>estimated cost</span>
+        </div>
+        <div>
+          <strong>{Math.round(usage.cacheHitRate * 100)}%</strong>
+          <span>prompt cache hit rate</span>
+        </div>
+        <div>
+          <strong>{count(usage.input)}</strong>
+          <span>input tokens ({count(usage.cached)} cached)</span>
+        </div>
+        <div>
+          <strong>{count(usage.output)}</strong>
+          <span>output tokens</span>
+        </div>
+        <div>
+          <strong>{usage.images}</strong>
+          <span>pictures drawn</span>
+        </div>
+      </div>
+      <div className="table">
+        <table>
+          <thead>
+            <tr>
+              <th>Stage</th>
+              <th>Model</th>
+              <th>Calls</th>
+              <th>Input</th>
+              <th>Cached</th>
+              <th>Output</th>
+              <th>Other</th>
+              <th>Cost</th>
+            </tr>
+          </thead>
+          <tbody>
+            {usage.lines.map((line) => (
+              <tr key={`${line.stage}|${line.model}`}>
+                <td>{STAGES[line.stage]}</td>
+                <td>
+                  <code>{line.model}</code>
+                </td>
+                <td>{line.calls}</td>
+                <td>{line.input ? count(line.input) : "–"}</td>
+                <td>{line.input && line.stage !== "picture" ? `${count(line.cached)} (${Math.round((line.cached / line.input) * 100)}%)` : "–"}</td>
+                <td>
+                  {line.output ? count(line.output) : "–"}
+                  {line.reasoning ? <small> ({count(line.reasoning)} reasoning)</small> : null}
+                </td>
+                <td>{other(line)}</td>
+                <td>{line.priced ? `${line.approximate ? "~" : ""}${dollars(line.cost)}` : "no price"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="note">
+        Costs are estimates at public list prices, not an invoice.{approximate ? " A ~ marks a rate taken from secondary sources or priced by the minute." : ""}
+        {usage.unpriced.length ? ` No price is known for ${[...new Set(usage.unpriced)].join(", ")}, so it is counted but not costed.` : ""} Cached input is billed at a
+        small fraction of the normal rate. The hit rate covers the text models only.
+      </p>
+    </section>
+  );
+}
 
 const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, "0")}`;
 
@@ -389,6 +485,8 @@ export function FilmStudio() {
           )}
         </aside>
       </div>
+
+      {film.status !== "idle" && <UsagePanel usage={film.usage} live={film.status === "generating" && openRun === null} />}
 
       {saved && saved.length > 0 && (
         <section className="library" aria-label="Your films">

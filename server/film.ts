@@ -16,7 +16,8 @@ import path from "node:path";
 import type { FilmEvent, FilmFile, FilmHeader, FilmScene, Hotspot, ImageObject, PictureRow, ProgressStage, ProgressStatus, SceneAudio } from "../src/film/types";
 import { alignWords } from "../src/film/words";
 import { validateScene, withPictures } from "../src/film/validate";
-import { PARTS_SYSTEM, PLAN_SYSTEM, SCENE_REPAIR, SCENE_SYSTEM, VOICE_STYLE, drawingPrompt, partsContext, sceneContext, sceneRetry } from "./prompts";
+import { PARTS_SYSTEM, PLAN_SYSTEM, SCENE_REPAIR, SCENE_SYSTEM, VOICE_STYLE, drawingPrompt, partsContext, sceneContext, sceneRetry, sceneStable } from "./prompts";
+import { createMeter } from "./usage";
 import type { ImageBytes, Message, Provider } from "./providers/types";
 import { loadSkills, skillTool } from "./skills";
 import { plainOf } from "./voice";
@@ -120,6 +121,7 @@ export async function makeFilm(job: FilmJob): Promise<FilmFile> {
   const { provider, brief, run, dir, base, emit } = job;
   const skills = loadSkills(job.skillsDir);
   let chosenSkills: string[] = [];
+  const meter = createMeter();
   fs.mkdirSync(path.join(dir, "pictures"), { recursive: true });
   fs.mkdirSync(path.join(dir, "voice"), { recursive: true });
 
@@ -135,6 +137,24 @@ export async function makeFilm(job: FilmJob): Promise<FilmFile> {
   const film: FilmFile = { run, brief, provider: provider.name, status: "generating", header, scenes: [] };
   const save = () => fs.writeFileSync(path.join(dir, "film.json"), JSON.stringify(film, null, 2));
   save();
+
+  // Every model call reports what it consumed; the running total goes to the viewer as it grows.
+  provider.report = (stage, model, usage) => {
+    meter.add(stage, model, usage);
+    film.usage = meter.summary();
+    log({ stage: "usage", for: stage, model, ...usage });
+    emit({ type: "film_usage", run, usage: film.usage });
+  };
+
+  /** The text every scene writer of this film starts with: the rules of the visual skills the planner loaded. */
+  const stableText = () =>
+    sceneStable(skills.filter((skill) => skill.scene && chosenSkills.includes(skill.name)).map((skill) => `<skill name='${skill.name}'>\n${skill.scene}\n</skill>`).join("\n\n"));
+  /**
+   * Resolves once the scene writers' shared prompt is in the cache. Several writers start at the same moment;
+   * without this each of the first few would pay to write the same text, and none could read it.
+   */
+  let warmed: Promise<void> | null = null;
+  const warmUp = () => (warmed ??= provider.warm ? provider.warm(SCENE_SYSTEM, stableText()).catch((error) => log({ stage: "warm-up", error: String((error as Error).message ?? error) })) : Promise.resolve());
 
   const plans = new Map<string, PicturePlan>();
   const steps: Step[] = [];
@@ -306,9 +326,9 @@ export async function makeFilm(job: FilmJob): Promise<FilmFile> {
 
     const verdict = await writing.run(place, async () => {
       progress("scene", "writing", `Writing scene ${place + 1}`, { id: step.id, index: place });
-      // Each scene writer gets the rules and conventions of the visual skills the planner loaded.
-      const conventions = skills.filter((skill) => skill.scene && chosenSkills.includes(skill.name)).map((skill) => `<skill name='${skill.name}'>\n${skill.scene}\n</skill>`).join("\n\n");
-      let messages: Message[] = [{ role: "user", content: sceneContext(conventions, table, { id: step.id, narration: step.narration, show: step.show }) }];
+      // Wait for the shared prompt to be cached (at most 20 s), then send it first and unchanged.
+      await Promise.race([warmUp(), new Promise((resolve) => setTimeout(resolve, 20_000))]);
+      let messages: Message[] = [{ role: "user", stable: stableText(), content: sceneContext(table, { id: step.id, narration: step.narration, show: step.show }) }];
       let raw: Record<string, unknown> | null = null;
       try {
         for (const attempt of ["write", "repair"] as const) {
@@ -398,7 +418,10 @@ export async function makeFilm(job: FilmJob): Promise<FilmFile> {
     const tool = skillTool(skills, (names) => {
       chosenSkills = names;
       progress("plan", "writing", `Teaching with ${names.join(", ")}`);
+      // The skills are now known, so the shared prompt can go into the cache while the pictures are drawn.
+      void warmUp();
     });
+    if (!tool) void warmUp();
     await provider.plan(PLAN_SYSTEM, brief, take, tool);
     fs.writeFileSync(path.join(dir, "plan.json"), buffer);
     progress("plan", "written", `Plan done: ${plans.size} pictures, ${steps.length} steps`);
@@ -414,6 +437,7 @@ export async function makeFilm(job: FilmJob): Promise<FilmFile> {
   await Promise.allSettled([...pictures.values(), ...voices.values()]);
 
   film.status = film.scenes.length ? "ready" : "failed";
+  film.usage = meter.summary();
   save();
   const error = film.status === "failed" ? (failure ?? "no scene could be made") : undefined;
   emit({ type: "film_done", run, status: film.status, scenes: film.scenes.length, ...(error ? { error } : {}) });
