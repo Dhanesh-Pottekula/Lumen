@@ -1,10 +1,10 @@
 /**
  * Film skills: the teaching the planner loads before it writes a plan.
  *
- * A narrative skill says how a film tells its answer (explain, story, how-to, weigh). A visual skill says how
- * one shape of idea is shown (a mechanism, a cause, a change over time, a what-if). They are AiRA's own skill
- * files, read at run time from FILM_SKILLS_DIR, a folder with `narrative/` and `visual/` subfolders of Markdown.
- * Nothing is copied into this repo. With no folder, the planner works from its own prompt alone.
+ * A narrative skill says, in general terms, how one kind of film is told: a study, a story, a movie. The
+ * planner picks the kind that fits the question. Lumen's own are in `skills/narrative/`. A folder may also hold
+ * `visual/` skills (how one shape of idea is shown); Lumen ships none. FILM_SKILLS_DIR points at another folder
+ * of the same layout, such as AiRA's. With no skills at all, the planner works from its own prompt alone.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -73,9 +73,10 @@ export function skillTool(skills: Skill[], chosen: (names: string[]) => void): S
   let loaded = false;
   return {
     description:
-      `Load the skills this film needs. Call it once, before you write any of the plan. Name exactly one narrative: how the film explains. Name one to ${MAX_VISUAL} visual skills: one for each shape of idea its steps show.` +
+      "Load the skill for the kind of film this is. Call it once, before you write any of the plan. Name exactly one narrative: the kind of film that fits the question." +
+      (visuals.length ? ` Name one to ${MAX_VISUAL} visual skills as well: one for each shape of idea its steps show.` : ' Pass an empty list for "visuals".') +
       `\nNarratives:${narratives.map((s) => `\n- ${s.name}: ${s.description}`).join("")}` +
-      `\nVisual skills:${visuals.map((s) => `\n- ${s.name}: ${s.description}`).join("")}`,
+      (visuals.length ? `\nVisual skills:${visuals.map((s) => `\n- ${s.name}: ${s.description}`).join("")}` : ""),
     load(args) {
       if (loaded) return "refused: the skills are loaded already. Write the plan now.";
       const raw = (args ?? {}) as { narrative?: unknown; visuals?: unknown };
@@ -89,7 +90,7 @@ export function skillTool(skills: Skill[], chosen: (names: string[]) => void): S
       loaded = true;
       const all = [narrative, ...(picked as Skill[])];
       chosen(all.map((s) => s.name));
-      return `${all.map((s) => `<skill name='${s.name}' layer='${s.layer}'>\n${s.plan}\n</skill>`).join("\n\n")}\n\nThe skills are loaded. They were written for a whiteboard of separate pictures; follow all of their teaching, and where they place, stack or move separate pictures, show the same idea as "How this film's screen works" says. Write the plan now.`;
+      return `${all.map((s) => `<skill name='${s.name}' layer='${s.layer}'>\n${s.plan}\n</skill>`).join("\n\n")}\n\nThe skills are loaded. Write the plan now.`;
     },
   };
 }

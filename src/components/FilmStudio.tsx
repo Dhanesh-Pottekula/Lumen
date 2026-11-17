@@ -89,7 +89,7 @@ function UsagePanel({ usage, live }: { usage: FilmUsage | null; live: boolean })
         </div>
         <div>
           <strong>{Math.round(usage.cacheHitRate * 100)}%</strong>
-          <span>prompt cache hit rate</span>
+          <span>cache hit rate, plan and scenes</span>
         </div>
         <div>
           <strong>{count(usage.input)}</strong>
@@ -142,7 +142,7 @@ function UsagePanel({ usage, live }: { usage: FilmUsage | null; live: boolean })
       <p className="note">
         Costs are estimates at public list prices, not an invoice.{approximate ? " A ~ marks a rate taken from secondary sources or priced by the minute." : ""}
         {usage.unpriced.length ? ` No price is known for ${[...new Set(usage.unpriced)].join(", ")}, so it is counted but not costed.` : ""} Cached input is billed at a
-        small fraction of the normal rate. The hit rate covers the text models only.
+        small fraction of the normal rate. The hit rate covers planning and scene writing, the calls that repeat a long fixed prompt.
       </p>
     </section>
   );
@@ -486,8 +486,6 @@ export function FilmStudio() {
         </aside>
       </div>
 
-      {film.status !== "idle" && <UsagePanel usage={film.usage} live={film.status === "generating" && openRun === null} />}
-
       {saved && saved.length > 0 && (
         <section className="library" aria-label="Your films">
           <h2>Your films</h2>
@@ -504,6 +502,8 @@ export function FilmStudio() {
           </div>
         </section>
       )}
+
+      {film.status !== "idle" && <UsagePanel usage={film.usage} live={film.status === "generating" && openRun === null} />}
     </div>
   );
 }

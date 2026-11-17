@@ -30,8 +30,8 @@ export interface OpenAISettings {
   hearModel: string;
   /** Mark the stable start of a scene writer's prompt as an explicit cache breakpoint, as AiRA does. */
   cacheBreakpoint: boolean;
-  /** Optional longer cache lifetime, such as "24h", passed as prompt_cache_retention. */
-  cacheRetention?: string;
+  /** Optional cache lifetime: "30m" (the default) or "12h", passed as prompt_cache_options.ttl. */
+  cacheTtl?: string;
 }
 
 export function openAISettings(env: Record<string, string | undefined>, key: string): OpenAISettings {
@@ -46,7 +46,7 @@ export function openAISettings(env: Record<string, string | undefined>, key: str
     voice: env.FILM_TTS_VOICE ?? "coral",
     hearModel: env.FILM_HEAR_MODEL ?? "whisper-1",
     cacheBreakpoint: env.FILM_CACHE_BREAKPOINT !== "0",
-    cacheRetention: env.FILM_CACHE_RETENTION || undefined,
+    cacheTtl: env.FILM_CACHE_TTL || undefined,
   };
 }
 
@@ -122,7 +122,15 @@ export function openAIProvider(settings: OpenAISettings): Provider {
 
   /** Cleared if the API ever refuses the breakpoint field, so the film carries on without it. */
   let breakpoint = settings.cacheBreakpoint;
-  const cacheFields = (key: string) => ({ prompt_cache_key: key, ...(settings.cacheRetention ? { prompt_cache_retention: settings.cacheRetention } : {}) });
+  /**
+   * Explicit mode: only the text before our own mark is written to the cache. Left to itself the provider
+   * marks the end of every request, and then the whole prompt, including the part that is different every
+   * time, is billed at the cache-write rate (1.25 times the normal input rate).
+   */
+  const cacheFields = (key: string) =>
+    breakpoint ? { prompt_cache_key: key, prompt_cache_options: { mode: "explicit", ...(settings.cacheTtl ? { ttl: settings.cacheTtl } : {}) } } : {};
+  /** For a request with nothing worth reusing: explicit mode with no mark, so nothing is written at all. */
+  const noCache = () => (breakpoint ? { prompt_cache_options: { mode: "explicit" } } : {});
 
   /**
    * The conversation as Responses input. A message's `stable` text goes first, as its own part carrying a
@@ -152,7 +160,7 @@ export function openAIProvider(settings: OpenAISettings): Provider {
     try {
       return (await (await call("/responses", body(), 150_000, 1)).json()) as ResponsesOutput;
     } catch (error) {
-      if (!breakpoint || !(error instanceof ApiError) || error.status !== 400 || !/prompt_cache_breakpoint/.test(error.message)) throw error;
+      if (!breakpoint || !(error instanceof ApiError) || error.status !== 400 || !/prompt_cache/.test(error.message)) throw error;
       breakpoint = false;
       return (await (await call("/responses", body(), 150_000, 1)).json()) as ResponsesOutput;
     }
@@ -216,7 +224,7 @@ export function openAIProvider(settings: OpenAISettings): Provider {
           if (!res.ok) {
             const refusal = await res.text();
             // If the API does not accept the breakpoint field, plan without it rather than fail the film.
-            if (!(round === 0 && breakpoint && res.status === 400 && /prompt_cache_breakpoint/.test(refusal))) throw new ApiError(res.status, refusal);
+            if (!(round === 0 && breakpoint && res.status === 400 && /prompt_cache/.test(refusal))) throw new ApiError(res.status, refusal);
             breakpoint = false;
             input = briefInput();
             res = await send();
@@ -284,7 +292,8 @@ export function openAIProvider(settings: OpenAISettings): Provider {
     },
 
     async findParts(system, context, image, _pictureId, partIds) {
-      const res = await call(
+      const request = () =>
+        call(
         "/responses",
         json({
           model: settings.inspectModel,
@@ -301,11 +310,22 @@ export function openAIProvider(settings: OpenAISettings): Provider {
             },
           ],
           text: { format: { type: "json_schema", name: "Parts", strict: true, schema: partsSchema(partIds) } },
-          ...cacheFields("lumen_film_parts"),
+          // Each request is a short prompt and one new picture, so nothing would ever be read back. Without this
+          // the provider writes the whole request to the cache anyway and bills it at the write rate.
+          ...noCache(),
         }),
         120_000,
         1,
       );
+      let res: Response;
+      try {
+        res = await request();
+      } catch (error) {
+        // If the API does not accept the cache option, find the parts without it rather than lose them.
+        if (!breakpoint || !(error instanceof ApiError) || error.status !== 400 || !/prompt_cache/.test(error.message)) throw error;
+        breakpoint = false;
+        res = await request();
+      }
       const found = (await res.json()) as ResponsesOutput;
       provider.report?.("parts", settings.inspectModel, counted(found.usage));
       return JSON.parse(outputText(found)) as PartsFound;

@@ -100,8 +100,9 @@ export function createMeter() {
     /** The film's usage so far. */
     summary(): FilmUsage {
       const all = [...lines.values()].sort((a, b) => STAGE_ORDER.indexOf(a.stage) - STAGE_ORDER.indexOf(b.stage) || a.model.localeCompare(b.model));
-      // The cache hit rate is over the text models only: an image or voice call has no prompt cache to hit.
-      const text = all.filter((line) => line.stage === "plan" || line.stage === "scene" || line.stage === "parts" || line.stage === "warm-up");
+      // The cache hit rate is over planning and scene writing: the calls that repeat a long fixed prompt. A picture,
+      // a voice clip and a part-finding call (whose input is one new picture each time) have nothing to reuse.
+      const text = all.filter((line) => line.stage === "plan" || line.stage === "scene" || line.stage === "warm-up");
       const input = text.reduce((sum, line) => sum + line.input, 0);
       const cached = text.reduce((sum, line) => sum + line.cached, 0);
       const round = (n: number) => Math.round(n * 10000) / 10000;

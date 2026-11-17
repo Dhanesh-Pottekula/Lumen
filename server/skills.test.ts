@@ -48,6 +48,16 @@ describe("film skills", () => {
     expect(tool.load({ narrative: "explain", visuals: ["mechanism"] })).toContain("loaded already");
   });
 
+  it("ships one skill per kind of film, each short and general", () => {
+    const skills = loadSkills(path.resolve("skills"));
+    expect(skills.map((s) => `${s.layer}/${s.name}`)).toEqual(["narrative/movie", "narrative/story", "narrative/study"]);
+    // General guidance, not a rulebook: a skill that grows long has started listing cases.
+    expect(skills.every((s) => s.plan.split(/\s+/).length < 220)).toBe(true);
+    const tool = skillTool(skills, () => undefined)!;
+    expect(tool.description).not.toContain("Visual skills");
+    expect(tool.load({ narrative: "movie", visuals: [] })).toContain("<skill name='movie' layer='narrative'>");
+  });
+
   it("reads AiRA's real skills when FILM_SKILLS_DIR points at them", () => {
     const dir = process.env.FILM_SKILLS_DIR;
     if (!dir || !fs.existsSync(dir)) return;

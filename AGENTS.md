@@ -75,6 +75,22 @@ runs/                      generated films (git-ignored): film.json, plan.json, 
 - Scenes join with hard cuts, so adding a scene never changes a frame that already existed.
 - Pictures are full film frames. Nothing is cut out and no background is removed.
 
+## How the prompts are written
+- Dhanesh's rule (2026-11-17): prompts explain the intention and the medium, then leave the choices to the
+  model. Do not add "when X, use Y" rules, lists of cases, or examples to copy: a rule per case makes every
+  film use the same moves. `PLAN_SYSTEM` says what a good film is and how the screen works; `SCENE_SYSTEM`
+  describes the actions as a neutral vocabulary (what each does, never when to use it).
+- The only fixed rules in a prompt are the ones the pipeline enforces: the JSON shape and key order, exact
+  ids, `say` copied from the narration, length limits, and hidden pictures needing a cut.
+- If a film comes out wrong, first ask what the model did not understand about the goal or the screen, and
+  explain that. Add a hard rule only when the pipeline itself must enforce it.
+- Skills are one per kind of film, in `skills/narrative/`: `study`, `story`, `movie`. The planner picks one
+  with the `load_film_skills` tool. Each is about 140 words and says only the general way that kind of film is
+  told: who it is for, how to tell it, how it should feel, what the screen is for. Keep them that general. To
+  add a kind, add one more file in the same shape; a test fails if a skill grows past about 220 words.
+- AiRA's skills are written the other way, with many specific rules. Setting `FILM_SKILLS_DIR` to AiRA's
+  folder loads those instead of Lumen's own. It is not set by default.
+
 ## Usage, cost and the prompt cache
 - Every model call reports what it consumed (`provider.report`). `server/usage.ts` adds the calls up by stage
   and model, estimates cost from the list prices in `RATES`, and the total is sent as `film_usage` events and
@@ -82,14 +98,22 @@ runs/                      generated films (git-ignored): film.json, plan.json, 
 - Prices: the two text models are the rates AiRA's usage ledger records as verified. The image, voice and
   transcription rates came from public pricing summaries on 2026-11-17 and are marked approximate. A model
   with no rate is counted and shown as "no price", never guessed. Update `RATES` when prices change.
-- Cache, following AiRA: a `prompt_cache_key` per stage, fixed system prompts, and an explicit
-  `prompt_cache_breakpoint` on the stable start of each scene writer's request.
-- Two things Lumen adds: the scene writers' variable text always comes after the film's stable text
-  (`sceneStable` then `sceneContext`), and one small warm-up call writes the shared prompt to the cache before
-  the scene writers start. Without it the first four writers, which start together, would each pay the
-  cache-write rate for the same text and none could read it.
-- `FILM_CACHE_BREAKPOINT=0` turns the breakpoint off; it also turns itself off if the API refuses the field.
-  `FILM_CACHE_RETENTION` (for example `24h`) is passed as `prompt_cache_retention` when set.
+- How the provider's cache bills (OpenAI guide, checked 2026-11-17, and measured): a cache write costs 1.25
+  times the normal input rate, a read costs 0.05 times on Sol. Left in its default mode the provider marks
+  the end of every request, so the whole prompt is billed as a write, including text that is never sent again.
+- So every text request sets `prompt_cache_options.mode: "explicit"`. Then only what comes before our own
+  mark (`prompt_cache_breakpoint` on a content part) is written, and the rest is billed at the normal rate.
+  The marks sit on one fixed opening line in the planner and scene requests (`PLAN_LEAD`, `SCENE_LEAD`), so
+  the cached part is the system prompt, the tool and that line: the same for every user and film.
+- The part finder sends explicit mode with no mark, which means no caching and no write at all: each of its
+  requests is a short prompt and a new picture, so nothing could be read back.
+- One small warm-up call writes the scene writers' shared prompt before they start. Four writers start
+  together; without it each would pay to write the same text. An entry is not readable in the first seconds
+  after it is written, which is another reason to warm it early.
+- Measured after the fix: scene calls read 1,571 tokens from the cache and write 0; a cold warm-up writes only
+  the 1,581-token prefix; the part finder writes 0 (it wrote all 17,900 input tokens in the film before).
+- `FILM_CACHE_BREAKPOINT=0` turns all of this off; it also turns itself off if the API refuses the fields.
+  `FILM_CACHE_TTL=12h` keeps entries for twelve hours instead of thirty minutes, at 2.5 times the write rate.
 - Do not put anything that changes per step (ids, times, the step's text) before the stable text, and do not
   reword `SCENE_SYSTEM` casually: either breaks every cache read.
 

@@ -149,7 +149,7 @@ export function filmServer(): Plugin {
         if (!res.writableEnded && !res.destroyed) res.write(`data: ${JSON.stringify(event)}\n\n`);
       };
       try {
-        await makeFilm({ provider, skillsDir: { ...readEnv(path.join(root, ".env")), ...process.env }.FILM_SKILLS_DIR, brief, run, dir: path.join(runsDir(), run), base: `/film-runs/${run}`, emit });
+        await makeFilm({ provider, skillsDir: { ...readEnv(path.join(root, ".env")), ...process.env }.FILM_SKILLS_DIR || path.join(root, "skills"), brief, run, dir: path.join(runsDir(), run), base: `/film-runs/${run}`, emit });
       } catch (error) {
         emit({ type: "film_done", run, status: "failed", scenes: 0, error: String((error as Error).message ?? error) });
       }
