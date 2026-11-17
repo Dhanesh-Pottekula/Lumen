@@ -168,13 +168,26 @@ function wrap(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): st
 }
 
 /** Where a zone's box of size w × h sits. Bottom zones stay above the subtitles. */
+/** The boxes this frame's words, formulas, counters and charts already occupy, so a new one never lands on another. */
+let zoneTaken: Rect[] = [];
+
 function zoneBox(zone: Zone | undefined, w: number, h: number): Rect {
   const m = 36;
   const bottom = VIEW_H - 118;
   const z = zone ?? "top";
   const x = z.includes("left") ? m : z.includes("right") ? VIEW_W - m - w : (VIEW_W - w) / 2;
-  const y = z.startsWith("top") ? m : z.startsWith("bottom") ? bottom - h : (VIEW_H - h) / 2 - 20;
-  return { x, y, w, h };
+  let y = z.startsWith("top") ? m : z.startsWith("bottom") ? bottom - h : (VIEW_H - h) / 2 - 20;
+  // Two things can collide even from different zones (a wide line in the top-right corner reaches the top
+  // centre). A box that would overlap one already placed steps past it: upward at the bottom, downward elsewhere.
+  const gap = 10;
+  for (let tries = 0; tries < 6; tries++) {
+    const hit = zoneTaken.find((o) => x < o.x + o.w + gap && x + w + gap > o.x && y < o.y + o.h + gap && y + h + gap > o.y);
+    if (!hit) break;
+    y = z.startsWith("bottom") ? hit.y - h - gap : hit.y + hit.h + gap;
+  }
+  const box = { x, y, w, h };
+  zoneTaken.push(box);
+  return box;
 }
 
 // ── Layers ──────────────────────────────────────────────────────────────────────────────────────────
@@ -491,6 +504,7 @@ export interface DrawOptions {
 }
 
 export function drawScene(ctx: CanvasRenderingContext2D, scene: ResolvedScene, t: number, options: DrawOptions) {
+  zoneTaken = [];
   ctx.save();
   ctx.fillStyle = "#000000";
   ctx.fillRect(0, 0, VIEW_W, VIEW_H);
