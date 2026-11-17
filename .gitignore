@@ -20,3 +20,6 @@ npm-debug.log*
 .DS_Store
 .idea/
 .vscode/
+
+# Generated films (pictures, voice, film.json)
+runs/
