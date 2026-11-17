@@ -18,6 +18,7 @@ import { offlineProvider } from "./providers/offline";
 import { openAIProvider, openAISettings } from "./providers/openai";
 import type { Provider } from "./providers/types";
 import { slug } from "./text";
+import { forCartesia } from "./voice";
 
 const TYPES: Record<string, string> = {
   ".png": "image/png",
@@ -54,11 +55,21 @@ export function chooseProvider(root: string): Provider | null {
   if (!env.CARTESIA_API_KEY) return openai;
   // AiRA's own voice when its key is here; the OpenAI voice if a Cartesia call fails.
   const cartesia = cartesiaSettings(env, env.CARTESIA_API_KEY);
-  return {
+  const provider: Provider = {
     ...openai,
     name: "openai+cartesia",
-    speak: (text, style, stepId) => cartesiaSpeak(cartesia, text).catch(() => openai.speak(text, style, stepId)),
+    speak: (text, style, stepId) =>
+      cartesiaSpeak(cartesia, text).then(
+        (audio) => {
+          provider.report?.("voice", cartesia.model, { characters: forCartesia(text).length });
+          return audio;
+        },
+        () => openai.speak(text, style, stepId),
+      ),
   };
+  // The OpenAI calls report through their own object: pass each report on to whoever listens to this one.
+  openai.report = (stage, model, usage) => provider.report?.(stage, model, usage);
+  return provider;
 }
 
 function send(res: ServerResponse, status: number, body: unknown) {
@@ -138,7 +149,7 @@ export function filmServer(): Plugin {
         if (!res.writableEnded && !res.destroyed) res.write(`data: ${JSON.stringify(event)}\n\n`);
       };
       try {
-        await makeFilm({ provider, skillsDir: { ...readEnv(path.join(root, ".env")), ...process.env }.FILM_SKILLS_DIR, brief, run, dir: path.join(runsDir(), run), base: `/film-runs/${run}`, emit });
+        await makeFilm({ provider, skillsDir: { ...readEnv(path.join(root, ".env")), ...process.env }.FILM_SKILLS_DIR || path.join(root, "skills"), brief, run, dir: path.join(runsDir(), run), base: `/film-runs/${run}`, emit });
       } catch (error) {
         emit({ type: "film_done", run, status: "failed", scenes: 0, error: String((error as Error).message ?? error) });
       }

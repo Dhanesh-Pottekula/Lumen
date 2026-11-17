@@ -9,16 +9,27 @@ There is no video model and no render farm. A language model writes a plan and a
 image model draws the frames; the browser draws the film live on an HTML5 canvas, where every frame is a pure
 function of time.
 
-## Two films it made
+## Films it made
 
-Both films below were made from the one-line question shown, with no editing. Click a preview to watch the
-full film with sound.
+Each film below was made from the one-line question shown, with no editing. Click a preview to watch the full
+film with sound.
+
+### "What would happen if you fell into a black hole?"
+
+[![Preview of the black hole film](docs/films/black-hole.gif)](docs/films/black-hole.mp4)
+
+[Watch the full film (3 min 28 s, MP4)](docs/films/black-hole.mp4)
+
+Made by the current version in under three minutes: 7 scenes, 8 pictures and the narration, for about $0.63
+in model and image calls at list price. The planner chose to tell it as a `movie`: you are the one falling in.
+
+### Two earlier films
 
 | "What if the Sun went out for one day?" | "What if gravity doubled overnight? Could you survive 24 hours?" |
 | --- | --- |
 | [![Preview of the Sun film](docs/films/sun-went-out.gif)](docs/films/sun-went-out.mp4) | [![Preview of the gravity film](docs/films/double-gravity.gif)](docs/films/double-gravity.mp4) |
 | [Watch the full film (3 min 15 s, MP4)](docs/films/sun-went-out.mp4) | [Watch the full film (3 min 36 s, MP4)](docs/films/double-gravity.mp4) |
-| 14 pictures, 7 scenes, two to four shots a scene. Planned with the `explain` narrative and three visual skills. | 7 pictures, 8 scenes. An earlier version of the planner: one shot a scene. |
+| 14 pictures, 7 scenes, two to four shots a scene. Made by an earlier version, with more prescriptive prompts. | 7 pictures, 8 scenes. An earlier version of the planner: one shot a scene. |
 
 What to look for:
 
@@ -51,9 +62,9 @@ question
 6. PLAYER    plays scene 1 as soon as it is ready; waits if the next one is not
 ```
 
-1. **Plan.** The planner first loads its teaching: one narrative skill (how this kind of film tells its
-   answer) and up to four visual skills (how each shape of idea is shown). It then writes the narration step
-   by step, a brief for every picture, and what the screen does on each clause.
+1. **Plan.** The planner first decides what kind of film the question calls for (a study, a story or a
+   movie) and loads that skill: a short description of how that kind of film is told. It then writes the
+   narration step by step, a brief for every picture, and what the screen should show as the words go.
 2. **Pictures.** The plan's key order is fixed so pictures come before steps. Drawing, the slowest stage,
    starts while the planner is still writing. The first picture sets the style and character for the rest; a
    later moment of the same shot is redrawn from the earlier one, so the framing holds.
@@ -104,12 +115,22 @@ OPENAI_API_KEY=sk-...
 | Setting | What it does |
 | --- | --- |
 | `OPENAI_API_KEY` | Required to make films: planning, scene writing, drawing, part finding and voice. |
-| `FILM_SKILLS_DIR` | Optional. A folder with `narrative/` and `visual/` Markdown skills for the planner to load. |
+| `FILM_SKILLS_DIR` | Optional. Another folder of skills to use instead of Lumen's own in `skills/`. |
 | `CARTESIA_API_KEY` | Optional. Speak with Cartesia instead of the OpenAI voice. |
 | `FILM_PLAN_MODEL`, `FILM_WRITE_MODEL`, `FILM_IMAGE_MODEL`, `FILM_INSPECT_MODEL`, `FILM_TTS_MODEL`, `FILM_TTS_VOICE` | Optional model overrides. |
 | `FILM_PROVIDER=offline` | A canned film with drawn stand-in pictures, for working on the pipeline without spending. |
 
 A film takes two to four minutes to make and costs real money in model and image calls.
+
+### What a film cost
+
+Under the player, the app shows what making the film consumed: each stage's model, calls, input tokens, how
+many of those were read from the prompt cache, output tokens, pictures drawn, and an estimated cost at list
+price. The same numbers are saved in the film's `film.json`.
+
+The scene writers share one long fixed prompt. Lumen keeps that text first and unchanged in every request,
+marks it as a cache breakpoint, and writes it to the cache once before the writers start, so each of them
+reads it at a fraction of the normal input price.
 
 ### Export a film to video
 
@@ -127,7 +148,7 @@ a Chrome or Chromium (set `CHROME_PATH` if it is not found).
 ### Check it
 
 ```bash
-npm test         # 52 tests: plan streaming, pipeline order and recovery, timing, validation, playback
+npm test         # 61 tests: plan streaming, pipeline order and recovery, timing, validation, playback
 npm run build    # type check and production build
 ```
 
@@ -138,6 +159,7 @@ server/      the film pipeline, mounted on the Vite dev server
   film.ts      plan → pictures → voice → scenes → in-order release
   prompts.ts   the planner, part finder, scene writer and the picture look
   skills.ts    loads planner skills and answers the load_film_skills tool
+  usage.ts     tokens, cache reads and estimated cost of every model call
   providers/   OpenAI, Cartesia voice, and an offline stand-in
 src/film/    the film engine, in the browser
   validate.ts  the verdict on one scene (shared with the server)
@@ -148,8 +170,9 @@ src/film/    the film engine, in the browser
   playback.ts  the cursor: play, wait, finish
 src/components/FilmStudio.tsx   the app
 src/render/  canvas primitives: charts, math, motion, lettering
+skills/      one short skill per kind of film: study, story, movie
 scripts/export-film.mjs         film → MP4
-docs/films/  the two films above
+docs/films/  the films above
 ```
 
 More detail for contributors and coding agents is in [`AGENTS.md`](AGENTS.md).
