@@ -10,6 +10,16 @@ export type Pace = "instant" | "quick" | "normal" | "slow" | "dramatic";
 export type Zone = "top" | "center" | "bottom" | "left" | "right" | "top-left" | "top-right" | "bottom-left" | "bottom-right";
 export type Shot = "overview" | "wide" | "medium" | "close" | "detail";
 export type Movement = "cut" | "move" | "push" | "arc";
+/** The film's few colours, named for what they mean rather than how they look. */
+export type Tone = "white" | "accent" | "danger" | "good" | "cool";
+/** An edge of the frame, for an arrow that sweeps in from outside the picture or leaves it. */
+export type Edge = "left" | "right" | "top" | "bottom";
+export type AttentionVerb = "dim" | "encircle" | "pulse" | "box" | "underline" | "cross" | "check" | "tint";
+export type EffectKind = "fire" | "smoke" | "sparks" | "explosion" | "rain" | "snow" | "dust" | "confetti" | "glow" | "speed";
+export type IconKind =
+  | "question" | "exclaim" | "idea" | "heart" | "skull" | "money" | "check" | "cross" | "warning" | "clock" | "star"
+  | "sweat" | "anger" | "zzz" | "music" | "fire";
+export type Entrance = "fade" | "slam" | "word-by-word" | "typewriter";
 
 /** A part's box inside its picture, as fractions 0..1: [x, y, w, h]. */
 export type Hotspot = [number, number, number, number];
@@ -31,7 +41,9 @@ export interface TextObject {
   text: string;
   zone?: Zone;
   size?: "small" | "medium" | "large";
-  color?: "white" | "accent" | "danger" | "good";
+  color?: Tone;
+  /** bold: outlined lettering; title: a big headline; hand: handwritten with an underline; stamp: a rubber stamp. */
+  style?: "bold" | "title" | "hand" | "stamp";
 }
 
 export interface EquationObject {
@@ -50,6 +62,33 @@ export interface CounterObject {
   prefix?: string;
   suffix?: string;
   label?: string;
+  color?: Tone;
+  zone?: Zone;
+}
+
+/** A date as a calendar card. When `from` is a year and the date ends in a year, the year rolls up to it. */
+export interface DateObject {
+  id: string;
+  kind: "date";
+  text: string;
+  from?: number;
+  zone?: Zone;
+}
+
+/** A timeline of 2–6 events. `show` brings on the first; each `advance` reaches the next. */
+export interface TimelineObject {
+  id: string;
+  kind: "timeline";
+  events: { date: string; text: string }[];
+  zone?: Zone;
+}
+
+/** A list of 2–6 short items. `show` brings on the first; each `advance` adds the next. */
+export interface ListObject {
+  id: string;
+  kind: "list";
+  title?: string;
+  items: string[];
   zone?: Zone;
 }
 
@@ -62,16 +101,26 @@ export interface ChartObject {
   zone?: Zone;
 }
 
-export type OverlayObject = TextObject | EquationObject | CounterObject | ChartObject;
+export type OverlayObject = TextObject | EquationObject | CounterObject | ChartObject | DateObject | TimelineObject | ListObject;
 export type SceneObject = ImageObject | OverlayObject;
 
 export type Action =
   | { do: "camera"; target: string; shot?: Shot; movement?: Movement }
   | { do: "cut"; to: string; entrance?: "cut" | "iris" | "fade" }
-  | { do: "speak"; target: string; text: string }
+  | { do: "speak"; target: string; text: string; style?: "say" | "think" | "shout" }
   | { do: "label"; target: string; text: string; id?: string }
-  | { do: "attention"; target: string; verb: "dim" | "encircle" | "pulse" }
-  | { do: "show"; targets: string[]; entrance?: "fade" | "slam" | "word-by-word" }
+  | { do: "attention"; target: string; verb: AttentionVerb; color?: Tone }
+  /** An arrow drawn from one thing (or an edge of the frame) to another. */
+  | { do: "arrow"; from: string; to: string; text?: string; id?: string; style?: "bold" | "dashed"; color?: Tone }
+  /** A dimension line along one side of a part, with its size written on it. */
+  | { do: "measure"; target: string; text: string; side?: "below" | "above" | "left" | "right"; id?: string }
+  /** Moving matter on a part or over the whole picture: fire, smoke, rain... */
+  | { do: "effect"; target: string; kind: EffectKind; id?: string }
+  /** A symbol that pops up beside a part, like a mark in a comic. */
+  | { do: "icon"; target: string; icon: IconKind; id?: string }
+  /** A timeline or a list moves on to its next entry. */
+  | { do: "advance"; target: string }
+  | { do: "show"; targets: string[]; entrance?: Entrance }
   | { do: "hide"; targets: string[] }
   | { do: "shake"; strength?: "subtle" | "normal" | "strong" }
   | { do: "flash" };

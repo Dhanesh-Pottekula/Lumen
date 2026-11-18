@@ -138,6 +138,7 @@ const SCENES: Record<string, string[]> = {
       ],
       beats: [
         { id: "open", pace: "slow", actions: [{ do: "camera", target: "bedroom-night", shot: "wide" }] },
+        { id: "wrong", say: "feels wrong", pace: "quick", actions: [{ do: "icon", target: "bedroom-night.person", icon: "question" }] },
         { id: "window", say: "to the window", pace: "normal", actions: [{ do: "camera", target: "bedroom-night.person", shot: "medium", movement: "move" }] },
         {
           id: "moon",
@@ -161,9 +162,10 @@ const SCENES: Record<string, string[]> = {
         { id: "earth-space", kind: "image" },
         { id: "distance", kind: "counter", from: 0, to: 384000, suffix: " km", label: "Earth to Moon", zone: "top" },
         { id: "law", kind: "equation", value: "F = G \\frac{m_1 m_2}{r^2}", zone: "bottom-left" },
+        { id: "since", kind: "date", text: "4 billion years ago", zone: "top-left" },
       ],
       beats: [
-        { id: "open", actions: [{ do: "camera", target: "earth-space", shot: "wide" }] },
+        { id: "open", actions: [{ do: "camera", target: "earth-space", shot: "wide" }, { do: "arrow", from: "earth-space.earth", to: "earth-space.moon", style: "dashed", text: "384,000 km", id: "gap" }] },
         {
           id: "far",
           say: "kilometres away",
@@ -174,7 +176,8 @@ const SCENES: Record<string, string[]> = {
           ],
         },
         { id: "tug", say: "its gravity", pace: "normal", actions: [{ do: "attention", target: "earth-space.moon", verb: "encircle" }, { do: "show", targets: ["law"] }] },
-        { id: "earth", say: "the Earth", pace: "normal", actions: [{ do: "hide", targets: ["distance", "law"] }, { do: "camera", target: "earth-space.earth", shot: "medium", movement: "move" }] },
+        { id: "years", say: "four billion years", pace: "normal", actions: [{ do: "show", targets: ["since"] }] },
+        { id: "earth", say: "the Earth", pace: "normal", actions: [{ do: "hide", targets: ["distance", "law", "since", "gap"] }, { do: "camera", target: "earth-space.earth", shot: "medium", movement: "move" }] },
         { id: "circling", say: "circling the Sun", pace: "slow", actions: [{ do: "camera", target: "earth-space", shot: "wide", movement: "move" }, { do: "label", target: "earth-space.earth", text: "same orbit" }] },
       ],
     }),
@@ -201,7 +204,7 @@ const SCENES: Record<string, string[]> = {
         { id: "open", actions: [{ do: "camera", target: "beach-dusk", shot: "wide" }] },
         { id: "sea", say: "the sea", pace: "slow", actions: [{ do: "camera", target: "beach-dusk.sea", shot: "medium", movement: "push" }, { do: "attention", target: "beach-dusk.sea", verb: "dim" }] },
         { id: "third", say: "a third", pace: "normal", actions: [{ do: "show", targets: ["tides"], entrance: "fade" }] },
-        { id: "shore", say: "the shoreline", pace: "slow", actions: [{ do: "hide", targets: ["tides"] }, { do: "camera", target: "beach-dusk.rocks", shot: "close", movement: "move" }, { do: "label", target: "beach-dusk.rocks", text: "low tide line" }] },
+        { id: "shore", say: "the shoreline", pace: "slow", actions: [{ do: "hide", targets: ["tides"] }, { do: "camera", target: "beach-dusk.rocks", shot: "close", movement: "move" }, { do: "measure", target: "beach-dusk.rocks", text: "a third as high", side: "left" }] },
       ],
     }),
   ],
@@ -214,8 +217,8 @@ const SCENES: Record<string, string[]> = {
       beats: [
         { id: "open", pace: "slow", actions: [{ do: "camera", target: "street-dark", shot: "wide" }] },
         { id: "bright", say: "times brighter", pace: "quick", actions: [{ do: "show", targets: ["dark"], entrance: "word-by-word" }] },
-        { id: "lamp", say: "a streetlamp", pace: "slow", actions: [{ do: "hide", targets: ["dark"] }, { do: "camera", target: "street-dark.streetlamp", shot: "medium", movement: "push" }, { do: "attention", target: "street-dark.streetlamp", verb: "dim" }] },
-        { id: "hands", say: "your own hands", pace: "normal", actions: [{ do: "camera", target: "street-dark.person", shot: "close", movement: "move" }, { do: "attention", target: "street-dark.person", verb: "pulse" }] },
+        { id: "lamp", say: "a streetlamp", pace: "slow", actions: [{ do: "hide", targets: ["dark"] }, { do: "camera", target: "street-dark.streetlamp", shot: "medium", movement: "push" }, { do: "attention", target: "street-dark.streetlamp", verb: "dim" }, { do: "effect", target: "street-dark.streetlamp", kind: "glow" }] },
+        { id: "hands", say: "your own hands", pace: "normal", actions: [{ do: "camera", target: "street-dark.person", shot: "close", movement: "move" }, { do: "icon", target: "street-dark.person", icon: "sweat" }] },
       ],
     }),
   ],
@@ -224,12 +227,14 @@ const SCENES: Record<string, string[]> = {
       objects: [
         { id: "bedroom-night", kind: "image" },
         { id: "rooftop-dawn", kind: "image", initial: "hidden" },
-        { id: "tilt", kind: "text", text: "TILT WANDERS", zone: "top", size: "medium", color: "white" },
+        { id: "tilt", kind: "text", text: "Tilt wanders", style: "hand", zone: "top", size: "medium", color: "white" },
+        { id: "changes", kind: "list", title: "Without the Moon", items: ["Smaller tides", "Darker nights", "A wandering tilt"], zone: "left" },
       ],
       beats: [
-        { id: "open", pace: "slow", actions: [{ do: "camera", target: "bedroom-night.person", shot: "medium" }] },
-        { id: "tilt", say: "the tilt", pace: "normal", actions: [{ do: "show", targets: ["tilt"], entrance: "fade" }] },
-        { id: "dawn", say: "survive the night", pace: "slow", actions: [{ do: "hide", targets: ["tilt"] }, { do: "cut", to: "rooftop-dawn" }] },
+        { id: "open", pace: "slow", actions: [{ do: "camera", target: "bedroom-night.person", shot: "medium" }, { do: "show", targets: ["changes"] }] },
+        { id: "steadies", say: "Moon steadies", pace: "normal", actions: [{ do: "advance", target: "changes" }] },
+        { id: "tilt", say: "the tilt", pace: "normal", actions: [{ do: "show", targets: ["tilt"], entrance: "typewriter" }, { do: "advance", target: "changes" }] },
+        { id: "dawn", say: "survive the night", pace: "slow", actions: [{ do: "hide", targets: ["tilt", "changes"] }, { do: "cut", to: "rooftop-dawn" }] },
         { id: "end", say: "quite the same", pace: "dramatic", actions: [{ do: "camera", target: "bedroom-night", shot: "wide", movement: "move" }] },
       ],
     }),

@@ -217,3 +217,11 @@ describe("the film pipeline", () => {
     expect(events.at(-1)).toMatchObject({ type: "film_done", status: "failed", scenes: 0, error: "no plan" });
   });
 });
+
+describe("the canned film", () => {
+  it("plays the explainer vocabulary through the whole pipeline", async () => {
+    const { film } = await run(offlineProvider({ tick: 1 }));
+    const all = JSON.stringify(film.scenes);
+    for (const used of ['"do":"arrow"', '"do":"icon"', '"do":"measure"', '"do":"effect"', '"do":"advance"', '"kind":"date"', '"kind":"list"']) expect(all).toContain(used);
+  });
+});

@@ -292,3 +292,87 @@ describe("a figure's line and how a shot arrives", () => {
     expect(resolved.backdrops).toEqual([{ at: 0, picture: "room", entrance: "cut" }, { at: 10, picture: "street", entrance: "iris" }]);
   });
 });
+
+describe("the explainer vocabulary", () => {
+  const ROOM = [{ id: "room", kind: "image" }];
+
+  it("keeps arrows between parts or from an edge, and refuses ones it cannot draw", () => {
+    const verdict = scene([
+      {
+        id: "open",
+        actions: [
+          { do: "arrow", from: "room.bed", to: "room.moon", text: "look up", style: "dashed", color: "cool", id: "path" },
+          { do: "arrow", from: "left", to: "room.bed" },
+          { do: "arrow", from: "left", to: "right" },
+          { do: "arrow", from: "room.moon", to: "street" },
+          { do: "arrow", from: "room.moon", to: "room.lamp" },
+        ],
+      },
+    ]);
+    expect(verdict.scene.beats[0].actions).toEqual([
+      { do: "arrow", from: "room.bed", to: "room.moon", text: "look up", style: "dashed", color: "cool", id: "path" },
+      { do: "arrow", from: "left", to: "room.bed" },
+    ]);
+    expect(verdict.problems.join("\n")).toContain("not two edges");
+    expect(verdict.problems.join("\n")).toContain('"room.lamp" was not found');
+  });
+
+  it("keeps marks, measures, icons and effects, and lets their ids be hidden", () => {
+    const verdict = scene([
+      {
+        id: "open",
+        actions: [
+          { do: "attention", target: "room.moon", verb: "cross", color: "danger" },
+          { do: "measure", target: "room.bed", text: "2 metres", side: "above", id: "size" },
+          { do: "measure", target: "room", text: "too big" },
+          { do: "icon", target: "room.moon", icon: "question", id: "huh" },
+          { do: "icon", target: "room.moon", icon: "banana" },
+          { do: "effect", target: "room", kind: "rain", id: "wet" },
+        ],
+      },
+      { id: "dark", say: "darker than ever", actions: [{ do: "hide", targets: ["size", "huh", "wet"] }] },
+    ]);
+    expect(verdict.scene.beats[0].actions.map((a) => a.do)).toEqual(["attention", "measure", "icon", "effect"]);
+    expect(verdict.scene.beats[1].actions).toEqual([{ do: "hide", targets: ["size", "huh", "wet"] }]);
+    expect(verdict.problems).toHaveLength(2);
+  });
+
+  it("keeps dates, timelines and lists, and allows one advance per entry after the first", () => {
+    const verdict = scene(
+      [
+        { id: "open", actions: [{ do: "show", targets: ["when", "story", "why"] }] },
+        { id: "a", say: "darker than ever", actions: [{ do: "advance", target: "story" }, { do: "advance", target: "why" }] },
+        { id: "b", say: "the Moon", actions: [{ do: "advance", target: "story" }, { do: "advance", target: "why" }] },
+      ],
+      [
+        ...ROOM,
+        { id: "when", kind: "date", text: "July 1969", from: 1950 },
+        { id: "story", kind: "timeline", events: [{ date: "1957", text: "Sputnik" }, { date: 1969, text: "Apollo 11" }] },
+        { id: "why", kind: "list", title: "Why", items: ["Gravity", "Light", "Tides"] },
+      ],
+    );
+    expect(verdict.scene.objects.find((o) => o.id === "story")).toEqual({ id: "story", kind: "timeline", events: [{ date: "1957", text: "Sputnik" }, { date: "1969", text: "Apollo 11" }] });
+    expect(verdict.scene.objects.find((o) => o.id === "when")).toMatchObject({ kind: "date", text: "July 1969", from: 1950 });
+    expect(verdict.scene.beats[2].actions).toEqual([{ do: "advance", target: "why" }]);
+    expect(verdict.problems.join("\n")).toContain('"story" has no entry left');
+  });
+
+  it("times a timeline's entries, and ties arrows and effects to their picture", () => {
+    const resolved = resolveScene(
+      scene(
+        [
+          { id: "open", actions: [{ do: "show", targets: ["why"] }, { do: "arrow", from: "top", to: "room.moon" }, { do: "effect", target: "room.bed", kind: "fire" }] },
+          { id: "a", say: "darker than ever", actions: [{ do: "advance", target: "why" }] },
+          { id: "out", say: "the Moon", actions: [{ do: "cut", to: "street" }] },
+        ],
+        [...ROOM, { id: "street", kind: "image", initial: "hidden" }, { id: "why", kind: "list", items: ["Gravity", "Light"] }],
+      ).scene,
+      18,
+    );
+    expect(resolved.overlays[0].item.steps).toEqual([0, 6]);
+    expect(resolved.arrows[0]).toMatchObject({ at: 0, until: 10, item: { picture: "room", from: { edge: "top" }, to: { part: "moon" } } });
+    expect(resolved.effects[0]).toMatchObject({ until: 10, item: { kind: "fire", part: "bed" } });
+    // The list is placed on the screen, not on the picture, so it stays through the cut.
+    expect(resolved.overlays[0].until).toBe(Infinity);
+  });
+});

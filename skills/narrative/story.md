@@ -13,4 +13,4 @@ moments that mattered most the most room, stay true to what really happened, and
 
 It should feel like being told something real, with the weight and tension the events themselves had.
 
-The screen is there to let the person watch it happen.
+The screen is there to let the person watch it happen, and to keep the when, the where and the who in view.

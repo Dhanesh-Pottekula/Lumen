@@ -74,7 +74,7 @@ function picturePlanOf(entry: unknown, known: Map<string, PicturePlan>): Picture
   for (const part of Array.isArray(raw.parts) ? raw.parts : []) {
     const record = typeof part === "string" ? { id: part, where: part } : (part as Record<string, unknown> | null);
     const partId = slug(record?.id ?? "");
-    if (!partId || parts.some((p) => p.id === partId) || parts.length >= 4) continue;
+    if (!partId || parts.some((p) => p.id === partId) || parts.length >= 6) continue;
     parts.push({ id: partId, where: typeof record?.where === "string" && record.where.trim() ? record.where.trim() : partId });
   }
   const of = typeof raw.of === "string" && known.has(slug(raw.of)) ? slug(raw.of) : null;

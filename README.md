@@ -96,8 +96,12 @@ This is what a scene writer produces for one step. The server adds each picture'
 }
 ```
 
-Actions: `camera`, `cut` (hard, iris or dissolve), `label`, `speak` (a speech bubble), `attention` (dim,
-encircle, pulse), `show` and `hide` for words, formulas, counters and charts, `shake`, `flash`.
+Actions: `camera`, `cut` (hard, iris or dissolve), `label`, `arrow` (between two parts, or in from an edge of
+the frame; solid or a dashed route), `attention` (dim, encircle, pulse, box, underline, cross, check, tint),
+`measure` (a dimension line with its size), `icon` (a comic symbol beside a figure), `effect` (fire, smoke,
+sparks, explosion, rain, snow, dust, confetti, glow, speed lines), `speak` (a speech, thought or shout bubble),
+`show`, `advance` and `hide` for words (bold, title, handwriting, stamp), dates on a calendar card, timelines,
+lists, counters, charts and formulas, `shake`, `flash`.
 
 ## Run it
 

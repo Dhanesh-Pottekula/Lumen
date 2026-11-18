@@ -53,7 +53,10 @@ src/film/                  the film engine (browser)
   validate.ts                the verdict on one scene; shared by the server (retry) and the player (safety)
   words.ts                   narration words, say-cues, subtitle lines
   resolve.ts                 scene + narration length → a timeline in seconds
-  render.ts                  draws one scene at time t: full-bleed picture, camera, labels, overlays
+  render.ts                  draws one scene at time t: full-bleed picture, camera, then every layer in order
+  marks.ts                   what is tied to a part: arrows, dimension lines, comic symbols, effects, eye marks
+  cards.ts                   what is placed on the screen: headline styles, date cards, timelines, lists
+  paint.ts                   shared ink, colours, lettering and the film's two bundled fonts (fonts/, OFL/Apache)
   compiler.ts                scenes added one by one; one stable slide that grows
   store.ts                   receives events, admits scenes in order once their pictures and voice load
 src/components/FilmStudio.tsx  the whole app: player, scene track, new-film box, production panel, film shelf
@@ -118,6 +121,20 @@ runs/                      generated films (git-ignored): film.json, plan.json, 
   reword `SCENE_SYSTEM` casually: either breaks every cache read.
 
 ## Notes / findings
+- 2026-11-18: the film learned the moves of YouTube's narrated cartoon explainers (reference films: Fauna Sticks,
+  Simpled First, The Entire War, Casual Economics, Ink Explainer). YouTube refuses downloads from the cloud
+  machine, so the analysis used thumbnails, frames at 25/50/75 %, chapter lists and the channels' other
+  transcripts. What those films do: a picture per spoken line or two, big outlined captions, dates and place
+  names stamped on as they are said, labels beside the thing, money in green and red, dimension lines, comic
+  symbols (!!, ?, sweat), map arrows. New vocabulary: `arrow`, `measure`, `icon`, `effect`, `advance`; attention
+  verbs box, underline, cross, check, tint (and dim on a whole picture darkens it); `date`, `timeline`, `list`
+  objects; text styles title, hand, stamp; a typewriter entrance; think and shout bubbles; colours for counters
+  and marks. The prompts explain the genre's intention (the screen keeps answering the voice) and list the
+  vocabulary neutrally. The picture look moved from moody and dark to clear colour with calm space round the
+  subject, and maps are allowed. Pictures may name up to six parts (was four), since arrows need ends.
+- To look at the engine without a key: put pictures and a hand-written film.json in `runs/<name>/` and grab
+  frames through `window.lumenExport` (as `scripts/export-film.mjs` does). This was how the new vocabulary was
+  checked; no film has been made with the new prompts by a real model yet.
 - AiRA's newer engine (`aira_canvas`, the `simple-json` and `gcl` layers) is not on this machine, only as a
   minified bundle. It is portrait and built around cut-out pictures, so this repo has its own small scene
   grammar instead of that bundle.

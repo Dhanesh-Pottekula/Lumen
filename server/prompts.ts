@@ -36,7 +36,8 @@ These are aims, not a checklist. Use your judgement about how each one applies t
 - It is true. Reason from how the world really works, with real quantities, including when the question is a
   hypothetical. A film that invents drama to be interesting has failed at its one job.
 - It is concrete. People understand a thing they can picture happening before they understand its name or its
-  rule. Assume the person knows everyday life and none of the subject's terms.
+  rule. Assume the person knows everyday life and none of the subject's terms. Real dates, places, names, sizes
+  and amounts make a story solid, and each one gives the screen something to show as it is said.
 - It has pull. Interest should come from the subject itself: its stakes, its surprises, the gap between what
   seems obvious and what is so. A film that feels the same from start to finish goes flat.
 - It sounds like a person. The narration is heard, not read. It should sound like a thoughtful friend talking to
@@ -52,15 +53,33 @@ These are aims, not a checklist. Use your judgement about how each one applies t
 
 Knowing the medium lets you decide how to show an idea.
 
+The films people love in this form, the narrated cartoon explainers of YouTube, are never a slideshow. The screen
+keeps answering the voice: what the narrator names, the viewer finds; what moves, they see move; what is counted,
+dated or measured, they see arrive at the moment it is said. The picture changes often, on the narrator's lines,
+and while a picture holds, it is worked on. That is the film you are planning.
+
 - Every picture is one whole 16:9 film frame: people and things in their setting, drawn edge to edge by an image
-  model from your brief. Pictures are still. Nothing inside a frame can move by itself.
-- So any change the viewer must see is another picture. A picture can be a later moment of an earlier one, and
-  it is then redrawn from that earlier picture so the framing holds and only the difference stands out.
-- The film can cut between pictures, and the camera can move within a picture to any part of it you named.
-- The film can draw on top of a picture, at the moment the voice says it: short words, a number, a formula, a
-  simple chart, a label on a named part, a ring or dimming around a named part, and a figure's own short line as
-  a speech bubble.
-- The image model cannot be trusted with writing, so pictures never contain text, numbers or labels.
+  model from your brief. A picture can also be an illustrated map seen from above, when where things are is the
+  point. Pictures are still: nothing inside a frame can move by itself.
+- So a change the viewer must see in the world itself is another picture. A picture can be a later moment of an
+  earlier one, and it is then redrawn from that earlier picture so the framing holds and only the difference
+  stands out. Cutting often, on the narrator's lines, is what gives these films their pace.
+- The camera can frame the whole picture or move in to any part of it you named.
+- On top of the picture the film can draw, at the moment the voice says it: an arrow from one named part to
+  another, or sweeping in from an edge of the frame, solid or as a dashed route; a label on a named part; a ring,
+  a box, an underline, a cross, a tick, a coloured wash or a dimming round a named part; a dimension line along a
+  part with its size written on it; a comic symbol beside a figure (a question mark, an exclamation, a light bulb,
+  a sweat drop, a heart, a skull, a dollar sign and others); moving matter on a part or over the whole frame (fire,
+  smoke, sparks, an explosion, rain, snow, dust, confetti, a glow, speed lines); a figure's own line as a speech,
+  thought or shout bubble; headlines as bold words, a big title, handwriting or a rubber stamp; a date as a
+  calendar card whose year can roll forward; a timeline that is walked event by event; a list that builds item by
+  item; a number that counts; a simple chart; a formula. The frame can also shake or flash.
+- Arrows, labels, marks, symbols and effects attach to named parts. A part you do not name in a picture's brief
+  cannot be pointed at, so name the things the narration will point at, travel between or measure, including the
+  places on a map. An inspector finds each part by looking, so it must be drawn as something visible: a city on
+  a map as a marked dot, a country as its own coloured area.
+- The image model cannot be trusted with writing, so pictures never contain text, numbers or labels: the film
+  writes all of it.
 - Subtitles of the narration run along the bottom of the frame.
 - Drawing is the slowest and most expensive part of the film. Pictures are drawn while you are still writing,
   in the order you list them.
@@ -91,12 +110,13 @@ pictures: every picture the film shows, listed in the order the steps first need
 - id: lowercase letters, digits and hyphens, starting with a letter.
 - brief: what is seen, in enough detail that an illustrator who knows nothing else draws the right frame. It
   describes only what is visible.
-- parts: the things inside the picture that the film may later point at, move the camera to, or attach a label
-  or a line of speech to. Each has an id and "where", a few words that tell an inspector which thing it is. A
-  part has to be plainly visible in the picture to be found. Leave the list empty if nothing will be singled out.
+- parts: up to six things inside the picture that the film may later point at, draw an arrow to or from, mark,
+  measure, set on fire, or give a label or a line of speech. Each has an id and "where", a few words that tell an
+  inspector which thing it is. A part has to be plainly visible in the picture to be found, so the brief should
+  draw each one clearly. Leave the list empty if nothing will be singled out.
 - of: only for a later moment of an earlier picture: that picture's id.
 How many pictures to make is your call. Each one costs time and money, so each should earn its place; but the
-screen should keep up with the voice.
+screen should keep up with the voice, and a picture held for a whole step rarely does.
 
 steps: the film in order. Aim for six to eight steps and 400 to 600 spoken words in all.
 - id: "s1", "s2", and so on.
@@ -104,10 +124,11 @@ steps: the film in order. Aim for six to eight steps and 400 to 600 spoken words
 - screen: the ids of the pictures this step shows, in the order it shows them. Every picture you listed should
   be used somewhere.
 - show: your direction to the scene writer, who sees only this step and its pictures. Say what this step is
-  meant to do for the viewer, and what the screen should be showing as the narration goes. Tie each thing to the
-  narration words it belongs with by quoting those words exactly, because that is how it will be timed. Refer to
-  pictures and parts by id, a part as picture.part. Put in quotes any words you want written on the screen;
-  they should be words the narration says.
+  meant to do for the viewer, and what the screen should be doing moment by moment as the narration goes: what
+  is cut to, pointed at, drawn, written, dated, counted or set moving. Tie each thing to the narration words it
+  belongs with by quoting those words exactly, because that is how it will be timed. Refer to pictures and parts
+  by id, a part as picture.part. Put in quotes any words you want written on the screen; they should be words
+  the narration says.
 
 ## Voice marks
 
@@ -139,13 +160,13 @@ export function drawingPrompt(brief: string, character: string, mode: "lead" | "
     mode === "styled"
       ? "\nThe image given is another frame of the same film. Match its drawing style, line weight, colour grade and character design exactly, but draw this new scene, not that one."
       : "";
-  return `One frame from a 2D animated explainer film, wide 16:9, composed like a film shot. Flat cartoon drawing with clean bold dark outlines, simple shapes and flat cel shading with one or two shadow tones. The whole frame is a complete scene with its full setting drawn edge to edge: walls, floor, sky, furniture, street, whatever the place has. Never a blank, white or plain background, and never a diagram. Cinematic, moody lighting from one clear light source, deep soft shadows, a strong atmospheric colour grade and a slight dark vignette.
+  return `One frame from a 2D animated explainer film of the kind made for YouTube, wide 16:9, composed like a film shot. Flat cartoon drawing with clean bold dark outlines, simple shapes and flat cel shading with one or two shadow tones. Clear, saturated colours and readable lighting from one light source; the colour grade follows the mood of the moment, warm and bright for an ordinary day, dark and cold for danger or night. The whole frame is a complete scene with its setting drawn edge to edge: walls, floor, sky, land, street, whatever the place has, never a blank or white background. When the brief asks for a map, draw an illustrated map seen from above, land and sea and borders in the same cartoon style, with no writing on it. Keep the setting simple behind the main subject, with calm open areas around it where the film can draw arrows and words.
 
 ${cast}
 
 ${ask}${match}
 
-Keep the things the brief names large and clearly separate from each other, and keep the lowest sixth of the frame free of anything important, since subtitles sit there.
+Keep the things the brief names large, clearly drawn and clearly separate from each other, so each can be pointed at, and keep the lowest sixth of the frame free of anything important, since subtitles sit there.
 Write no text anywhere in the picture: no letters, numbers, captions, labels, signs with writing, logos, watermarks or speech bubbles.`;
 }
 
@@ -196,10 +217,14 @@ the whole film and an illustrator has drawn its pictures. You are given one step
 the planner's direction for the step, and the pictures drawn for it. You decide what the screen does, moment by
 moment, while those words are spoken.
 
-What you are aiming for: at every moment the viewer is looking at the thing the narrator is talking about, at the
-moment it is said, and nothing on screen is there without a reason. Good direction is mostly invisible. The viewer
-should come away having understood the step, not having noticed the effects. What is written on the screen should
-agree with what the narrator says, because a viewer who reads one thing while hearing another takes in neither.
+What you are aiming for is the feel of the best narrated cartoon explainers on YouTube: the screen is listening.
+At every moment the viewer is looking at the thing the narrator is talking about, at the moment it is said. What
+the narrator names, the viewer finds on screen; what moves, they see move; when a date, a size, an amount or a
+place is spoken, they see it arrive. Something arrives, moves or changes with nearly every sentence, so a held
+picture never becomes a slideshow; and everything that arrives is about what is being said, so the screen never
+becomes decoration. Take things off when the voice has moved on: a screen covered in old marks is as hard to
+follow as an empty one. What is written on the screen should agree with what the narrator says, because a viewer
+who reads one thing while hearing another takes in neither.
 
 The planner's "show" tells you what this step is meant to do for the viewer and what it wants seen with which
 words. Honour that intent. How to achieve it with what follows is your judgement.
@@ -211,8 +236,10 @@ words. Honour that intent. How to achieve it with what follows is your judgement
 - The first picture you declare is on screen when the step begins. Any other picture has to be brought on.
 - The camera can frame the whole picture or any part that is listed for it. Only listed parts exist for you: a
   part that is not listed was not found in the drawing and cannot be aimed at.
-- You can draw on top of the picture: words, a formula, a number that counts up, a chart, a label attached to a
-  picture or part, a mark that draws the eye to a part, and a speech bubble beside a part.
+- You can draw on top of the picture: things tied to a part (labels, arrows, marks, dimension lines, symbols,
+  moving matter, speech), and things placed on the screen (words, dates, timelines, lists, numbers, charts,
+  formulas). Things tied to a part follow the camera and leave when the picture changes. Things placed on the
+  screen stay through a change of picture until you hide them.
 - Subtitles of the narration already run along the bottom of the frame.
 - Timing comes from the narration, never from seconds. Each moment you write is tied to the words it belongs
   with, and it happens when the narrator says them.
@@ -230,16 +257,25 @@ Everything the step uses, each declared once with its own id (lowercase letters,
 
 - {"id": "<picture id>", "kind": "image"}: one of this step's pictures. Add "initial": "hidden" to every picture
   except the one the step opens on.
-- {"id": "...", "kind": "text", "text": "...", "zone": "...", "size": "small|medium|large",
-  "color": "white|accent|danger|good"}: bold words over the picture, at most 60 characters.
-- {"id": "...", "kind": "equation", "value": "..."}: a formula, in simple TeX.
+- {"id": "...", "kind": "text", "text": "...", "style": "bold|title|hand|stamp", "zone": "...",
+  "size": "small|medium|large", "color": "white|accent|danger|good|cool"}: words over the picture, at most 60
+  characters. bold is outlined lettering, title a big comic headline, hand a handwritten note underlined in
+  marker, stamp a rubber stamp.
+- {"id": "...", "kind": "date", "text": "...", "from": 1900}: a date on a calendar card, at most 32 characters,
+  such as "March 1945" or "65 million years ago". With "from" (a year), the card's year rolls from that year to
+  the date's.
+- {"id": "...", "kind": "timeline", "events": [{"date": "...", "text": "..."}]}: 2 to 6 events in order; date
+  at most 20 characters, text at most 28. It comes on at its first event; each advance walks it to the next.
+- {"id": "...", "kind": "list", "title": "...", "items": ["..."]}: 2 to 6 items of at most 40 characters. It
+  comes on with its first item; each advance adds the next.
 - {"id": "...", "kind": "counter", "from": 0, "to": 100, "prefix": "...", "suffix": "...", "decimals": 0,
-  "label": "..."}: a number that counts from one value to another.
+  "label": "...", "color": "..."}: a number that counts from one value to another.
 - {"id": "...", "kind": "chart", "chart": "bar|pie|line", "title": "...", "data": [{"label": "...", "value": 1}]}:
   a chart of 2 to 8 values.
+- {"id": "...", "kind": "equation", "value": "..."}: a formula, in simple TeX.
 
-"zone" places words, a formula, a counter or a chart: top, center, bottom, left, right, top-left, top-right,
-bottom-left or bottom-right. All four start hidden.
+"zone" places any of these: top, center, bottom, left, right, top-left, top-right, bottom-left or bottom-right.
+They all start hidden.
 
 ### beats
 
@@ -252,37 +288,60 @@ A beat is one moment: the changes that happen together when the narrator reaches
 - "pace": how long the beat's changes take: instant, quick, normal, slow or dramatic.
 - "actions": what changes. Each is one of these.
 
+A target is a picture, "<picture>", or one of its listed parts, "<picture>.<part>". The colours are white,
+accent (yellow), danger (red), good (green) and cool (blue).
+
 {"do": "cut", "to": "<picture>", "entrance": "cut|iris|fade"}
   Changes the picture on screen. cut switches at once, iris opens the new picture outward from the middle of the
-  frame, fade dissolves into it. Labels and marks on the old picture leave with it.
-{"do": "camera", "target": "<picture>" or "<picture>.<part>", "shot": "overview|wide|medium|close|detail",
- "movement": "cut|move|push|arc"}
+  frame, fade dissolves into it. Everything tied to the old picture leaves with it.
+{"do": "camera", "target": "...", "shot": "overview|wide|medium|close|detail", "movement": "cut|move|push|arc"}
   Reframes the picture on screen. The shots run from the whole picture (overview) to one precise point (detail).
   The movements are an instant jump (cut), a smooth travel (move), a push inward (push) and a curved swing (arc).
-{"do": "label", "target": "<picture>" or "<picture>.<part>", "text": "...", "id": "..."}
-  Attaches a short name to a thing, at most 32 characters. It stays until the picture changes, or until you hide
-  it by its id.
-{"do": "speak", "target": "<picture>.<part>", "text": "..."}
-  Shows a figure's own words in a speech bubble beside that part, at most 60 characters. One bubble at a time.
-{"do": "attention", "target": "<picture>.<part>", "verb": "dim|encircle|pulse"}
-  Draws the eye to a part: dim darkens everything else, encircle draws a ring round it, pulse beats a ring on it.
-{"do": "show", "targets": ["<id>"], "entrance": "fade|slam|word-by-word"}
-  Brings on words, a formula, a counter or a chart. fade is gentle, slam lands hard, word-by-word builds it up.
+{"do": "label", "target": "...", "text": "...", "id": "..."}
+  Attaches a short name to a thing, at most 32 characters.
+{"do": "arrow", "from": "...", "to": "...", "text": "...", "style": "bold|dashed", "color": "...", "id": "..."}
+  Draws a curved arrow from one thing to another on the same picture. Either end may instead be an edge of the
+  frame, "left", "right", "top" or "bottom", for something arriving from outside or leaving. bold is a solid
+  arrow, dashed a route; text, at most 24 characters, rides beside it.
+{"do": "attention", "target": "...", "verb": "dim|encircle|pulse|box|underline|cross|check|tint", "color": "..."}
+  Marks a thing. dim darkens everything else (on a whole picture, it darkens the picture behind what is drawn
+  over it); encircle draws a ring round it; pulse beats a ring on it; box closes corner brackets on it; underline
+  strokes a line under it; cross slashes an X over it; check draws a tick on it; tint washes it in a colour.
+{"do": "measure", "target": "<picture>.<part>", "text": "...", "side": "below|above|left|right", "id": "..."}
+  Draws a dimension line along one side of a part with its size written on it, at most 24 characters.
+{"do": "icon", "target": "...", "icon": "...", "id": "..."}
+  Pops up a comic symbol beside a thing: question, exclaim, idea, heart, skull, money, check, cross, warning,
+  clock, star, sweat, anger, zzz, music or fire.
+{"do": "effect", "target": "...", "kind": "...", "id": "..."}
+  Sets moving matter on a thing, or on the whole picture: fire, smoke, sparks, explosion, rain, snow, dust,
+  confetti, glow or speed (lines racing across the frame). An explosion and confetti are over in a moment; the
+  rest keep going.
+{"do": "speak", "target": "<picture>.<part>", "text": "...", "style": "say|think|shout"}
+  Shows a figure's own words beside that part, at most 60 characters: a speech bubble, a thought cloud or a
+  jagged shout. One at a time.
+{"do": "show", "targets": ["<id>"], "entrance": "fade|slam|word-by-word|typewriter"}
+  Brings on things declared in objects. fade is gentle, slam lands hard, word-by-word builds it up, typewriter
+  types it out.
+{"do": "advance", "target": "<timeline or list id>"}
+  Walks a timeline to its next event, or adds a list's next item.
 {"do": "hide", "targets": ["<id>"]}
-  Takes off words, a formula, a counter, a chart, or a label that has an id.
+  Takes off anything shown, and anything tied to a part that was given an id.
 {"do": "shake", "strength": "subtle|normal|strong"}
   Shakes the whole frame briefly.
 {"do": "flash"}
   Flashes the whole frame white for an instant.
 
-These are a vocabulary, not a recipe. Most steps need only a little of it, and which parts a step needs depends
-on what the step is trying to make the viewer see.
+These are a vocabulary, not a recipe. Which of them a step needs depends on what it is trying to make the viewer
+see.
 
 ## What the film will not accept
 
 The film checks your scene. Anything below is dropped from it, and you are asked to write it again.
 
 - An id that is not one of this step's pictures, a part listed for it, or an object you declared.
+- An arrow whose two ends are on different pictures, or are both edges.
+- A measure on a whole picture instead of a part.
+- More advances than a timeline has events or a list has items, after the first.
 - A "say" that is not in the narration word for word, or that comes earlier in the narration than the beat
   before it.
 - A picture declared hidden that nothing ever brings on.

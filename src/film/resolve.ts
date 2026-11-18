@@ -5,7 +5,7 @@
  * the narration's length (`floor`) is known: from the audio, or 0.4 s a word. Everything here is pure, so the
  * same scene and floor always give the same timeline and the film stays a function of t.
  */
-import type { Action, FilmScene, ImageObject, Movement, OverlayObject, Pace, Shot } from "./types";
+import type { Action, AttentionVerb, Edge, EffectKind, Entrance, FilmScene, IconKind, ImageObject, Movement, OverlayObject, Pace, Shot, Tone } from "./types";
 import { findCue, narrationWords, subtitles } from "./words";
 
 /** How long a beat's moves take. */
@@ -31,6 +31,9 @@ export interface Timed<T> {
   item: T;
 }
 
+/** One end of an arrow: a picture or one of its parts, or an edge of the frame. */
+export type ArrowEnd = { part?: string; edge?: Edge };
+
 export interface ResolvedScene {
   id: string;
   narration: string;
@@ -41,11 +44,16 @@ export interface ResolvedScene {
   /** Which picture fills the screen from when, and how it arrives. The first entry is at 0. */
   backdrops: { at: number; picture: string; entrance: "cut" | "iris" | "fade" }[];
   /** A figure's own line, shown as speech beside it. One at a time. */
-  speeches: Timed<{ picture: string; part?: string; text: string }>[];
+  speeches: Timed<{ picture: string; part?: string; text: string; style: "say" | "think" | "shout" }>[];
   cameras: CameraKey[];
   labels: Timed<{ picture: string; part?: string; text: string }>[];
-  attentions: Timed<{ picture: string; part?: string; verb: "dim" | "encircle" | "pulse" }>[];
-  overlays: Timed<{ object: OverlayObject; entrance: "fade" | "slam" | "word-by-word"; dur: number }>[];
+  attentions: Timed<{ picture: string; part?: string; verb: AttentionVerb; color?: Tone; dur: number }>[];
+  arrows: Timed<{ picture: string; from: ArrowEnd; to: ArrowEnd; text?: string; style: "bold" | "dashed"; color?: Tone; dur: number }>[];
+  measures: Timed<{ picture: string; part?: string; text: string; side: "below" | "above" | "left" | "right" }>[];
+  effects: Timed<{ picture: string; part?: string; kind: EffectKind; seed: number }>[];
+  icons: Timed<{ picture: string; part?: string; icon: IconKind; slot: number }>[];
+  /** `steps` holds the second each entry of a timeline or list arrives: the first with show, the rest with advance. */
+  overlays: Timed<{ object: OverlayObject; entrance: Entrance; dur: number; steps: number[] }>[];
   shakes: { at: number; strength: number }[];
   flashes: number[];
   subtitles: { at: number; until: number; text: string }[];
@@ -82,6 +90,10 @@ export function resolveScene(scene: FilmScene, floor: number, wordTimes?: number
     cameras: [],
     labels: [],
     attentions: [],
+    arrows: [],
+    measures: [],
+    effects: [],
+    icons: [],
     overlays: [],
     shakes: [],
     flashes: [],
@@ -110,12 +122,16 @@ export function resolveScene(scene: FilmScene, floor: number, wordTimes?: number
   // ── What each beat does ──────────────────────────────────────────────────────────────────────────
   let current = opening?.id;
   const labelIds = new Map<string, Timed<unknown>>();
-  const shown = new Map<string, Timed<unknown>>();
+  const shown = new Map<string, Timed<{ steps: number[] }>>();
+  const edges = new Set(["left", "right", "top", "bottom"]);
+  const end = (ref: string): { picture?: string; end: ArrowEnd } => (edges.has(ref) ? { end: { edge: ref as Edge } } : { picture: ref.split(".")[0], end: { part: ref.split(".")[1] } });
   /** An attention mark lasts until the picture changes or the camera or another mark takes over. */
   const endMarks = (at: number, alsoLabels: boolean) => {
     for (const mark of out.attentions) if (mark.until === Infinity && mark.at < at) mark.until = Math.max(at, mark.at + 1.2);
     if (alsoLabels) {
-      for (const label of out.labels) if (label.until === Infinity) label.until = at;
+      for (const list of [out.labels, out.arrows, out.measures, out.effects, out.icons] as Timed<unknown>[][]) {
+        for (const mark of list) if (mark.until === Infinity) mark.until = at;
+      }
       for (const line of out.speeches) if (line.until > at) line.until = at;
     }
   };
@@ -160,26 +176,69 @@ export function resolveScene(scene: FilmScene, floor: number, wordTimes?: number
           if (action.id) labelIds.set(action.id, label);
           break;
         }
+        case "arrow": {
+          const from = end(action.from);
+          const to = end(action.to);
+          const picture = from.picture ?? to.picture;
+          if (picture !== current) break;
+          const arrow = { at, until: Infinity, item: { picture, from: from.end, to: to.end, text: action.text, style: action.style ?? "bold", color: action.color, dur: Math.max(0.45, Math.min(dur, 1.6)) } };
+          out.arrows.push(arrow);
+          if (action.id) labelIds.set(action.id, arrow);
+          break;
+        }
+        case "measure": {
+          const target = aim(action.target);
+          if (target.picture !== current) break;
+          const measure = { at, until: Infinity, item: { ...target, text: action.text, side: action.side ?? "below" } };
+          out.measures.push(measure);
+          if (action.id) labelIds.set(action.id, measure);
+          break;
+        }
+        case "effect": {
+          const target = aim(action.target);
+          if (target.picture !== current) break;
+          const effect = { at, until: Infinity, item: { ...target, kind: action.kind, seed: out.effects.length + 1 } };
+          // A burst is over in a moment; everything else keeps going until the picture changes.
+          if (action.kind === "explosion" || action.kind === "confetti") effect.until = at + 2.6;
+          out.effects.push(effect);
+          if (action.id) labelIds.set(action.id, effect);
+          break;
+        }
+        case "icon": {
+          const target = aim(action.target);
+          if (target.picture !== current) break;
+          // Icons on the same thing at the same time sit side by side.
+          const slot = out.icons.filter((m) => m.until > at && m.item.picture === target.picture && m.item.part === target.part).length;
+          const icon = { at, until: Infinity, item: { ...target, icon: action.icon, slot } };
+          out.icons.push(icon);
+          if (action.id) labelIds.set(action.id, icon);
+          break;
+        }
+        case "advance": {
+          const overlay = shown.get(action.target);
+          if (overlay && overlay.until === Infinity) overlay.item.steps.push(at);
+          break;
+        }
         case "speak": {
           const target = aim(action.target);
           if (target.picture !== current) break;
           // One line at a time: a new line takes the last one off. A line stays for its sentence.
           for (const line of out.speeches) if (line.until > at) line.until = at;
           const next = starts[i + 1];
-          out.speeches.push({ at, until: Math.max(at + 2.2, Math.min(next ?? at + 4.5, at + 6)), item: { ...target, text: action.text } });
+          out.speeches.push({ at, until: Math.max(at + 2.2, Math.min(next ?? at + 4.5, at + 6)), item: { ...target, text: action.text, style: action.style ?? "say" } });
           break;
         }
         case "attention": {
           const target = aim(action.target);
           if (target.picture !== current) break;
-          out.attentions.push({ at, until: Infinity, item: { ...target, verb: action.verb } });
+          out.attentions.push({ at, until: Infinity, item: { ...target, verb: action.verb, color: action.color, dur } });
           break;
         }
         case "show":
           for (const id of action.targets) {
             const object = overlayObjects.get(id);
             if (!object || shown.has(id)) continue;
-            const overlay = { at, until: Infinity, item: { object, entrance: action.entrance ?? "fade", dur: Math.max(0.5, dur) } };
+            const overlay = { at, until: Infinity, item: { object, entrance: action.entrance ?? "fade", dur: Math.max(0.5, dur), steps: [at] } };
             out.overlays.push(overlay);
             shown.set(id, overlay);
           }

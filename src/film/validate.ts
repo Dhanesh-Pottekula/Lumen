@@ -5,15 +5,22 @@
  * Salvage rule (AiRA's): what cannot be played is dropped, never retargeted. An action aimed at a part that
  * was not found is dropped; a beat left with no actions is dropped; a scene left with no picture is refused.
  */
-import type { Action, Beat, FilmScene, ImageObject, OverlayObject, PictureRow, SceneObject } from "./types";
+import type { Action, Beat, Edge, FilmScene, ImageObject, OverlayObject, PictureRow, SceneObject, Tone } from "./types";
 import { findCue, narrationWords } from "./words";
 
 const ZONES = new Set(["top", "center", "bottom", "left", "right", "top-left", "top-right", "bottom-left", "bottom-right"]);
 const PACES = new Set(["instant", "quick", "normal", "slow", "dramatic"]);
 const SHOTS = new Set(["overview", "wide", "medium", "close", "detail"]);
 const MOVEMENTS = new Set(["cut", "move", "push", "arc"]);
-const VERBS = new Set(["dim", "encircle", "pulse"]);
-const ENTRANCES = new Set(["fade", "slam", "word-by-word"]);
+const VERBS = new Set(["dim", "encircle", "pulse", "box", "underline", "cross", "check", "tint"]);
+const ENTRANCES = new Set(["fade", "slam", "word-by-word", "typewriter"]);
+const TONES = new Set(["white", "accent", "danger", "good", "cool"]);
+const EDGES = new Set(["left", "right", "top", "bottom"]);
+const EFFECTS = new Set(["fire", "smoke", "sparks", "explosion", "rain", "snow", "dust", "confetti", "glow", "speed"]);
+const ICONS = new Set(["question", "exclaim", "idea", "heart", "skull", "money", "check", "cross", "warning", "clock", "star", "sweat", "anger", "zzz", "music", "fire"]);
+const SIDES = new Set(["below", "above", "left", "right"]);
+const TEXT_STYLES = new Set(["bold", "title", "hand", "stamp"]);
+const tone = (v: unknown) => (typeof v === "string" && TONES.has(v) ? (v as Tone) : undefined);
 const STRENGTHS = new Set(["subtle", "normal", "strong"]);
 const ID = /^[a-z][a-z0-9-]{0,39}$/;
 
@@ -38,6 +45,8 @@ export function validateScene(raw: unknown, pictures: PictureRow[], id: string, 
   const parts = new Map(pictures.map((p) => [p.id, new Set(p.parts)]));
   const images = new Set<string>();
   const overlays = new Set<string>();
+  /** Timelines and lists, with how many entries each has: they can be advanced. */
+  const steppable = new Map<string, number>();
 
   for (const [i, entry] of (Array.isArray(raw.objects) ? raw.objects : []).entries()) {
     const where = `objects[${i}]`;
@@ -64,6 +73,8 @@ export function validateScene(raw: unknown, pictures: PictureRow[], id: string, 
     if (overlay) {
       scene.objects.push(overlay);
       overlays.add(overlay.id);
+      if (overlay.kind === "timeline") steppable.set(overlay.id, overlay.events.length);
+      if (overlay.kind === "list") steppable.set(overlay.id, overlay.items.length);
     }
   }
 
@@ -91,6 +102,7 @@ export function validateScene(raw: unknown, pictures: PictureRow[], id: string, 
 
   const words = narrationWords(narration);
   const labels = new Set<string>();
+  const advanced = new Map<string, number>();
   let spoken = 0;
   const beatIds = new Set<string>();
 
@@ -119,7 +131,7 @@ export function validateScene(raw: unknown, pictures: PictureRow[], id: string, 
     }
 
     for (const [k, action] of (Array.isArray(entry.actions) ? entry.actions : []).entries()) {
-      const kept = actionOf(action, `${where}.actions[${k}]`, { aimable, images, overlays, labels, problems });
+      const kept = actionOf(action, `${where}.actions[${k}]`, { aimable, images, overlays, labels, problems, steppable, advanced });
       if (kept) beat.actions.push(kept);
     }
     if (beat.actions.length === 0) {
@@ -162,8 +174,9 @@ function overlayOf(entry: Raw, where: string, problems: string[]): OverlayObject
         return null;
       }
       const size = entry.size === "small" || entry.size === "large" ? entry.size : "medium";
-      const color = entry.color === "accent" || entry.color === "danger" || entry.color === "good" ? entry.color : "white";
-      return { id, kind: "text", text: value, zone, size, color };
+      const color = tone(entry.color) ?? "white";
+      const style = typeof entry.style === "string" && TEXT_STYLES.has(entry.style) ? (entry.style as "bold") : undefined;
+      return { id, kind: "text", text: value, zone, size, color, ...(style && style !== "bold" ? { style } : {}) };
     }
     case "equation": {
       const value = text(entry.value, 120);
@@ -188,8 +201,37 @@ function overlayOf(entry: Raw, where: string, problems: string[]): OverlayObject
         prefix: typeof entry.prefix === "string" && entry.prefix.length <= 8 ? entry.prefix : undefined,
         suffix: typeof entry.suffix === "string" && entry.suffix.length <= 12 ? entry.suffix : undefined,
         label: text(entry.label, 40) ?? undefined,
+        color: tone(entry.color),
         zone,
       };
+    }
+    case "date": {
+      const value = text(entry.text, 32);
+      if (!value) {
+        problems.push(`${where}: date needs text of 1 to 32 characters`);
+        return null;
+      }
+      const from = typeof entry.from === "number" && Number.isFinite(entry.from) ? Math.round(entry.from) : typeof entry.from === "string" && /^-?\d{1,4}$/.test(entry.from.trim()) ? Number(entry.from) : undefined;
+      return { id, kind: "date", text: value, ...(from !== undefined ? { from } : {}), zone };
+    }
+    case "timeline": {
+      const events = (Array.isArray(entry.events) ? entry.events : [])
+        .filter((e): e is Raw => isRecord(e) && (typeof e.date === "string" || typeof e.date === "number"))
+        .map((e) => ({ date: String(e.date).trim().slice(0, 20), text: typeof e.text === "string" ? e.text.trim().slice(0, 28) : "" }))
+        .filter((e) => e.date);
+      if (events.length < 2 || events.length > 6) {
+        problems.push(`${where}: timeline needs 2 to 6 events of {date, text}`);
+        if (events.length < 2) return null;
+      }
+      return { id, kind: "timeline", events: events.slice(0, 6), zone };
+    }
+    case "list": {
+      const items = (Array.isArray(entry.items) ? entry.items : []).filter((v): v is string => typeof v === "string" && v.trim().length > 0).map((v) => v.trim().slice(0, 40));
+      if (items.length < 2 || items.length > 6) {
+        problems.push(`${where}: list needs 2 to 6 items of at most 40 characters`);
+        if (items.length < 2) return null;
+      }
+      return { id, kind: "list", items: items.slice(0, 6), title: text(entry.title, 32) ?? undefined, zone };
     }
     case "chart": {
       const chart = entry.chart === "pie" || entry.chart === "line" ? entry.chart : entry.chart === "bar" ? "bar" : null;
@@ -204,7 +246,7 @@ function overlayOf(entry: Raw, where: string, problems: string[]): OverlayObject
       return { id, kind: "chart", chart, data, title: text(entry.title, 40) ?? undefined, zone };
     }
     default:
-      problems.push(`${where}: kind "${String(entry.kind)}" is not one of image, text, equation, counter, chart`);
+      problems.push(`${where}: kind "${String(entry.kind)}" is not one of image, text, equation, counter, chart, date, timeline, list`);
       return null;
   }
 }
@@ -213,8 +255,18 @@ interface ActionContext {
   aimable: (ref: unknown, where: string) => ref is string;
   images: Set<string>;
   overlays: Set<string>;
+  /** Ids given to labels, arrows, measures, effects and icons, so they can be hidden. */
   labels: Set<string>;
   problems: string[];
+  steppable: Map<string, number>;
+  advanced: Map<string, number>;
+}
+
+/** Keep an action's own id when it is free, so a later hide can name it. */
+function markId(raw: Raw, c: ActionContext): string | undefined {
+  if (typeof raw.id !== "string" || !ID.test(raw.id) || c.images.has(raw.id) || c.overlays.has(raw.id)) return undefined;
+  c.labels.add(raw.id);
+  return raw.id;
 }
 
 function actionOf(raw: unknown, where: string, c: ActionContext): Action | null {
@@ -246,7 +298,9 @@ function actionOf(raw: unknown, where: string, c: ActionContext): Action | null 
         c.problems.push(`${where}: speak needs text of 1 to 60 characters, the figure's own short line`);
         return null;
       }
-      return { do: "speak", target: raw.target, text: line };
+      const speech: Action = { do: "speak", target: raw.target, text: line };
+      if (raw.style === "think" || raw.style === "shout") speech.style = raw.style;
+      return speech;
     }
     case "label": {
       if (!c.aimable(raw.target, where)) return null;
@@ -256,10 +310,8 @@ function actionOf(raw: unknown, where: string, c: ActionContext): Action | null 
         return null;
       }
       const action: Action = { do: "label", target: raw.target, text: value };
-      if (typeof raw.id === "string" && ID.test(raw.id) && !c.images.has(raw.id) && !c.overlays.has(raw.id)) {
-        action.id = raw.id;
-        c.labels.add(raw.id);
-      }
+      const id = markId(raw, c);
+      if (id) action.id = id;
       return action;
     }
     case "attention": {
@@ -268,7 +320,97 @@ function actionOf(raw: unknown, where: string, c: ActionContext): Action | null 
         c.problems.push(`${where}: attention verb must be one of ${[...VERBS].join(", ")}`);
         return null;
       }
-      return { do: "attention", target: raw.target, verb: raw.verb as never };
+      const mark: Action = { do: "attention", target: raw.target, verb: raw.verb as never };
+      const color = tone(raw.color);
+      if (color) mark.color = color;
+      return mark;
+    }
+    case "arrow": {
+      const end = (ref: unknown, key: string): string | Edge | null => {
+        if (typeof ref === "string" && EDGES.has(ref)) return ref as Edge;
+        return c.aimable(ref, `${where}.${key}`) ? (ref as string) : null;
+      };
+      const from = end(raw.from, "from");
+      const to = end(raw.to, "to");
+      if (!from || !to) return null;
+      if (EDGES.has(from) && EDGES.has(to)) {
+        c.problems.push(`${where}: an arrow needs at least one end on a picture or a part, not two edges`);
+        return null;
+      }
+      const owner = (ref: string) => (EDGES.has(ref) ? null : ref.split(".")[0]);
+      if (owner(from) && owner(to) && owner(from) !== owner(to)) {
+        c.problems.push(`${where}: both ends of an arrow must be on the same picture`);
+        return null;
+      }
+      if (from === to) {
+        c.problems.push(`${where}: an arrow cannot go from a thing to itself`);
+        return null;
+      }
+      const arrow: Action = { do: "arrow", from, to };
+      const label = text(raw.text, 24);
+      if (label) arrow.text = label;
+      else if (raw.text !== undefined) c.problems.push(`${where}: arrow text must be 1 to 24 characters; it is left off`);
+      if (raw.style === "dashed") arrow.style = "dashed";
+      const color = tone(raw.color);
+      if (color) arrow.color = color;
+      const id = markId(raw, c);
+      if (id) arrow.id = id;
+      return arrow;
+    }
+    case "measure": {
+      if (!c.aimable(raw.target, where)) return null;
+      if (!raw.target.includes(".")) {
+        c.problems.push(`${where}: measure needs a part, not a whole picture`);
+        return null;
+      }
+      const value = text(raw.text, 24);
+      if (!value) {
+        c.problems.push(`${where}: measure needs text of 1 to 24 characters, the size it shows`);
+        return null;
+      }
+      const action: Action = { do: "measure", target: raw.target, text: value };
+      if (typeof raw.side === "string" && SIDES.has(raw.side)) action.side = raw.side as never;
+      const id = markId(raw, c);
+      if (id) action.id = id;
+      return action;
+    }
+    case "effect": {
+      if (!c.aimable(raw.target, where)) return null;
+      if (typeof raw.kind !== "string" || !EFFECTS.has(raw.kind)) {
+        c.problems.push(`${where}: effect kind must be one of ${[...EFFECTS].join(", ")}`);
+        return null;
+      }
+      const action: Action = { do: "effect", target: raw.target, kind: raw.kind as never };
+      const id = markId(raw, c);
+      if (id) action.id = id;
+      return action;
+    }
+    case "icon": {
+      if (!c.aimable(raw.target, where)) return null;
+      if (typeof raw.icon !== "string" || !ICONS.has(raw.icon)) {
+        c.problems.push(`${where}: icon must be one of ${[...ICONS].join(", ")}`);
+        return null;
+      }
+      const action: Action = { do: "icon", target: raw.target, icon: raw.icon as never };
+      const id = markId(raw, c);
+      if (id) action.id = id;
+      return action;
+    }
+    case "advance": {
+      const target = typeof raw.target === "string" ? raw.target : "";
+      const size = c.steppable.get(target);
+      if (size === undefined) {
+        c.problems.push(`${where}: advance needs the target of a timeline or list declared in objects`);
+        return null;
+      }
+      // The first entry arrives with show; there are size - 1 advances to give.
+      const used = (c.advanced.get(target) ?? 0) + 1;
+      if (used > size - 1) {
+        c.problems.push(`${where}: "${target}" has no entry left to advance to (it has ${size})`);
+        return null;
+      }
+      c.advanced.set(target, used);
+      return { do: "advance", target };
     }
     case "show":
     case "hide": {
@@ -279,7 +421,7 @@ function actionOf(raw: unknown, where: string, c: ActionContext): Action | null 
         c.problems.push(
           c.images.has(t)
             ? `${where}: "${t}" is a picture; a picture is brought on with cut, never with ${raw.do}`
-            : `${where}: "${t}" is not one of this scene's text, equation, counter or chart objects`,
+            : `${where}: "${t}" is not one of this scene's overlay objects${raw.do === "hide" ? " or a mark given an id" : ""}`,
         );
       }
       if (allowed.length === 0) return null;
@@ -296,7 +438,7 @@ function actionOf(raw: unknown, where: string, c: ActionContext): Action | null 
     case "flash":
       return { do: "flash" };
     default:
-      c.problems.push(`${where}: do "${String(raw.do)}" is not one of camera, cut, label, speak, attention, show, hide, shake, flash`);
+      c.problems.push(`${where}: do "${String(raw.do)}" is not one of camera, cut, label, speak, attention, arrow, measure, effect, icon, show, advance, hide, shake, flash`);
       return null;
   }
 }

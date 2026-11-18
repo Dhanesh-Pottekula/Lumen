@@ -9,15 +9,15 @@ import { barChart, lineChart, makePlot, pie } from "../render/charts";
 import { drawMath, measureMath } from "../render/mathtext";
 import { clamp01, easeInOutCubic, easeOutBack, easeOutCubic, lerp } from "../render/motion";
 import { formatNumber } from "../render/type-motion";
-import { backdropAt, type CameraKey, type ResolvedScene } from "./resolve";
-import type { Hotspot, ImageObject, OverlayObject, Shot, Zone } from "./types";
+import { drawDate, drawList, drawText, drawTimeline } from "./cards";
+import { drawArrow, drawAttention, drawEffect, drawIconMark, drawMeasure } from "./marks";
+import { COLORS, comicText, FONT, HEADLINE, INK, loadFonts, panel, wrap, type Rect } from "./paint";
+import { backdropAt, type ArrowEnd, type CameraKey, type ResolvedScene } from "./resolve";
+import type { Entrance, Hotspot, ImageObject, OverlayObject, Shot, Zone } from "./types";
 
 export const VIEW_W = 960;
 export const VIEW_H = 540;
 
-const FONT = `-apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif`;
-const INK = "#0b0d12";
-const COLORS = { white: "#ffffff", accent: "#ffd24a", danger: "#ff5a4f", good: "#6fe08a" } as const;
 
 /** Zoom for each shot: on a whole picture, and the most it may reach on a part. */
 // overview is the whole picture; wide keeps the thing with its context (about 1.2 times), as in AiRA's catalog.
@@ -26,10 +26,11 @@ const SHOT_ZOOM: Record<Shot, [number, number]> = { overview: [1, 1], wide: [1.0
 // ── Pictures ────────────────────────────────────────────────────────────────────────────────────────
 const cache = new Map<string, HTMLImageElement>();
 
-/** Load a picture into the cache the renderer draws from. Resolves either way: a failed picture draws as a dark frame. */
+/** Load a picture into the cache the renderer draws from (and the film's fonts, once). Resolves either way: a failed picture draws as a dark frame. */
 export function loadPicture(src: string): Promise<void> {
-  if (cache.has(src)) return Promise.resolve();
-  return new Promise((resolve) => {
+  const fonts = loadFonts();
+  if (cache.has(src)) return fonts;
+  return new Promise<void>((resolve) => {
     const image = new Image();
     image.onload = () => {
       cache.set(src, image);
@@ -37,17 +38,10 @@ export function loadPicture(src: string): Promise<void> {
     };
     image.onerror = () => resolve();
     image.src = src;
-  });
+  }).then(() => fonts);
 }
 
 // ── Camera ──────────────────────────────────────────────────────────────────────────────────────────
-interface Rect {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
-
 /** Focus point as fractions of the picture, plus zoom. */
 interface Lens {
   fx: number;
@@ -127,46 +121,7 @@ function onScreen(view: View, spot: Hotspot | undefined): Rect {
   };
 }
 
-// ── Drawing helpers ─────────────────────────────────────────────────────────────────────────────────
-/** Bold cartoon lettering: a colour fill inside a thick dark outline, readable over any picture. */
-function comicText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, size: number, color: string, align: CanvasTextAlign = "center") {
-  ctx.font = `900 ${size}px ${FONT}`;
-  ctx.textAlign = align;
-  ctx.textBaseline = "middle";
-  ctx.lineJoin = "round";
-  ctx.lineWidth = Math.max(4, size * 0.2);
-  ctx.strokeStyle = INK;
-  ctx.strokeText(text, x, y);
-  ctx.fillStyle = color;
-  ctx.fillText(text, x, y);
-}
-
-function panel(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number) {
-  ctx.beginPath();
-  ctx.roundRect(x, y, w, h, 14);
-  ctx.fillStyle = "rgba(10, 12, 18, 0.78)";
-  ctx.fill();
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = "rgba(255, 255, 255, 0.22)";
-  ctx.stroke();
-}
-
-/** Split a line in two near the middle when it is too wide. */
-function wrap(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
-  if (ctx.measureText(text).width <= maxWidth) return [text];
-  const words = text.split(" ");
-  let best = 1;
-  let bestDiff = Infinity;
-  for (let i = 1; i < words.length; i++) {
-    const diff = Math.abs(ctx.measureText(words.slice(0, i).join(" ")).width - ctx.measureText(words.slice(i).join(" ")).width);
-    if (diff < bestDiff) {
-      bestDiff = diff;
-      best = i;
-    }
-  }
-  return [words.slice(0, best).join(" "), words.slice(best).join(" ")];
-}
-
+// ── Placing things ─────────────────────────────────────────────────────────────────────────────────
 /** Where a zone's box of size w × h sits. Bottom zones stay above the subtitles. */
 /** The boxes this frame's words, formulas, counters and charts already occupy, so a new one never lands on another. */
 let zoneTaken: Rect[] = [];
@@ -210,52 +165,6 @@ function drawBackdrop(ctx: CanvasRenderingContext2D, image: ImageObject | undefi
   ctx.restore();
 }
 
-function drawAttention(ctx: CanvasRenderingContext2D, verb: "dim" | "encircle" | "pulse", box: Rect, age: number, left: number) {
-  const fade = clamp01(age / 0.45) * clamp01(left / 0.35);
-  if (fade <= 0) return;
-  const cx = box.x + box.w / 2;
-  const cy = box.y + box.h / 2;
-  ctx.save();
-  if (verb === "dim") {
-    // Darken everything except the part: one path with a hole in it.
-    const pad = 10;
-    ctx.beginPath();
-    ctx.rect(-20, -20, VIEW_W + 40, VIEW_H + 40);
-    ctx.roundRect(box.x - pad, box.y - pad, box.w + pad * 2, box.h + pad * 2, 18);
-    ctx.fillStyle = `rgba(4, 6, 12, ${0.62 * fade})`;
-    ctx.fill("evenodd");
-    ctx.beginPath();
-    ctx.roundRect(box.x - pad, box.y - pad, box.w + pad * 2, box.h + pad * 2, 18);
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = `rgba(255, 210, 74, ${0.9 * fade})`;
-    ctx.stroke();
-  } else if (verb === "encircle") {
-    // A hand-drawn ring that draws itself on, slightly past a full turn.
-    const p = easeOutCubic(clamp01(age / 0.8));
-    ctx.globalAlpha = clamp01(left / 0.35);
-    ctx.beginPath();
-    ctx.ellipse(cx, cy, box.w / 2 + 14, box.h / 2 + 14, -0.06, -Math.PI * 0.6, -Math.PI * 0.6 + Math.PI * 2.08 * p);
-    ctx.lineCap = "round";
-    ctx.lineWidth = 9;
-    ctx.strokeStyle = INK;
-    ctx.stroke();
-    ctx.lineWidth = 5;
-    ctx.strokeStyle = COLORS.accent;
-    ctx.stroke();
-  } else {
-    for (let ring = 0; ring < 2; ring++) {
-      const p = (age * 0.8 + ring * 0.5) % 1;
-      ctx.globalAlpha = (1 - p) * fade;
-      ctx.beginPath();
-      ctx.ellipse(cx, cy, (box.w / 2) * (0.7 + p * 0.7) + 8, (box.h / 2) * (0.7 + p * 0.7) + 8, 0, 0, Math.PI * 2);
-      ctx.lineWidth = 4;
-      ctx.strokeStyle = COLORS.accent;
-      ctx.stroke();
-    }
-  }
-  ctx.restore();
-}
-
 /** A tag naming a thing, with a line to it. Placed above the thing when there is room, else below. */
 function drawLabel(ctx: CanvasRenderingContext2D, text: string, box: Rect, age: number, left: number, placed: Rect[]) {
   const cx = box.x + box.w / 2;
@@ -270,19 +179,25 @@ function drawLabel(ctx: CanvasRenderingContext2D, text: string, box: Rect, age: 
   const w = ctx.measureText(text).width + 28;
   const h = 38;
   const reach = Math.min(box.h / 2, 90) + 34;
-  const above = cy - reach - h > 16;
-  let tag: Rect = { x: cx - w / 2, y: above ? cy - reach - h : Math.min(VIEW_H - 130, cy + reach), w, h };
-  tag.x = Math.min(VIEW_W - w - 14, Math.max(14, tag.x));
-  // Step aside from tags already placed this frame.
-  for (const other of placed) {
-    if (tag.x < other.x + other.w + 6 && tag.x + tag.w + 6 > other.x && tag.y < other.y + other.h + 6 && tag.y + tag.h + 6 > other.y) {
-      tag = { ...tag, y: above ? other.y - h - 8 : other.y + other.h + 8 };
-    }
+  const clash = (r: Rect) => placed.some((o) => r.x < o.x + o.w + 6 && r.x + r.w + 6 > o.x && r.y < o.y + o.h + 6 && r.y + r.h + 6 > o.y);
+  const fits = (r: Rect) => r.y >= 10 && r.y + r.h <= VIEW_H - 124;
+  const at = (y: number, dx = 0): Rect => ({ x: Math.min(VIEW_W - w - 14, Math.max(14, cx - w / 2 + dx)), y, w, h });
+  // Above the thing if there is room, else below; slid sideways, then stacked, to step clear of what is already
+  // on screen (cards, arrow tags, other labels).
+  const aboveY = cy - reach - h;
+  const belowY = Math.min(VIEW_H - 124 - h, cy + reach);
+  const candidates: { tag: Rect; above: boolean }[] = [];
+  for (const dx of [0, -(w / 2 + 40), w / 2 + 40]) {
+    candidates.push({ tag: at(aboveY, dx), above: true }, { tag: at(belowY, dx), above: false });
   }
+  for (let k = 1; k <= 3; k++) candidates.push({ tag: at(aboveY - k * (h + 8)), above: true }, { tag: at(belowY + k * (h + 8)), above: false });
+  const chosen = candidates.find((c) => fits(c.tag) && !clash(c.tag)) ?? candidates.find((c) => fits(c.tag)) ?? candidates[0];
+  const tag = chosen.tag;
+  const above = chosen.above;
   placed.push(tag);
 
   ctx.globalAlpha = alpha;
-  const from = { x: tag.x + w / 2, y: above ? tag.y + h : tag.y };
+  const from = { x: Math.min(tag.x + w - 14, Math.max(tag.x + 14, cx)), y: above ? tag.y + h : tag.y };
   const to = { x: cx, y: above ? Math.max(box.y + 6, cy - Math.min(box.h / 2, 90)) : Math.min(box.y + box.h - 6, cy + Math.min(box.h / 2, 90)) };
   const reachP = clamp01(age / 0.35);
   ctx.beginPath();
@@ -321,105 +236,132 @@ function drawLabel(ctx: CanvasRenderingContext2D, text: string, box: Rect, age: 
   ctx.restore();
 }
 
-/** A figure's own line: a speech bubble above the speaker, its tail pointing down at them. */
-function drawSpeech(ctx: CanvasRenderingContext2D, text: string, box: Rect, age: number, left: number) {
+/** A figure's own line: a speech bubble above the speaker, its tail pointing down at them. A thought is a cloud
+ * with a trail of little circles; a shout is a jagged burst. */
+function drawSpeech(ctx: CanvasRenderingContext2D, text: string, style: "say" | "think" | "shout", box: Rect, age: number, left: number) {
   const alpha = clamp01(age / 0.2) * clamp01(left / 0.25);
   const cx = box.x + box.w / 2;
   if (alpha <= 0 || cx < -60 || cx > VIEW_W + 60) return;
+  const shout = style === "shout";
+  const think = style === "think";
+  const words = shout ? text.toUpperCase() : text;
+  const size = shout ? 26 : 21;
+  const lineH = shout ? 31 : 27;
   ctx.save();
-  ctx.font = `800 21px ${FONT}`;
-  const lines = wrap(ctx, text, 330);
-  const w = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 34;
-  const h = lines.length * 27 + 22;
-  // Above the speaker when there is room, otherwise below; kept inside the frame and clear of the subtitles.
-  const above = box.y - h - 26 > 12;
-  const x = Math.min(VIEW_W - w - 14, Math.max(14, cx - w / 2));
-  const y = above ? Math.max(12, box.y - h - 22) : Math.min(VIEW_H - 126 - h, box.y + box.h + 22);
-  const tipX = Math.min(x + w - 22, Math.max(x + 22, cx));
+  ctx.font = shout ? `400 ${size + 4}px ${HEADLINE}` : `${think ? "italic " : ""}800 ${size}px ${FONT}`;
+  const lines = wrap(ctx, words, 330);
+  const pad = shout ? 34 : think ? 30 : 17;
+  const w = Math.max(...lines.map((l) => ctx.measureText(l).width)) + pad * 2;
+  const h = lines.length * lineH + (shout ? 40 : think ? 34 : 22);
+  // Above the speaker when there is room; otherwise beside their head, on the side with more space. Kept inside
+  // the frame and clear of the subtitles.
+  const above = box.y - h - 30 > 12;
+  const toRight = cx < VIEW_W / 2;
+  const head = box.y + Math.min(box.h * 0.18, 60);
+  const sideX = toRight ? box.x + box.w + 26 : box.x - w - 26;
+  const x = Math.min(VIEW_W - w - 14, Math.max(14, above ? cx - w / 2 : sideX));
+  const y = above ? Math.max(12, box.y - h - (think ? 40 : 22)) : Math.min(VIEW_H - 126 - h, Math.max(12, head - h / 2));
+  const tipX = above ? Math.min(x + w - 22, Math.max(x + 22, cx)) : toRight ? x : x + w;
+  const tipY = above ? y + h : Math.min(y + h - 18, Math.max(y + 18, head));
   const p = easeOutBack(clamp01(age / 0.35));
   ctx.globalAlpha = alpha;
-  ctx.translate(tipX, above ? y + h : y);
+  ctx.translate(tipX, tipY);
   ctx.scale(0.8 + 0.2 * p, 0.8 + 0.2 * p);
-  ctx.translate(-tipX, -(above ? y + h : y));
+  // A shout shudders as it lands.
+  if (shout && age < 0.5) ctx.translate(Math.sin(age * 90) * 4 * (1 - age / 0.5), 0);
+  ctx.translate(-tipX, -tipY);
   ctx.beginPath();
-  ctx.roundRect(x, y, w, h, 16);
-  if (above) {
-    ctx.moveTo(tipX - 11, y + h - 1);
-    ctx.lineTo(tipX, y + h + 16);
-    ctx.lineTo(tipX + 11, y + h - 1);
+  if (shout) {
+    // A jagged burst around the words.
+    const bx = x + w / 2;
+    const by = y + h / 2;
+    const spikes = 18;
+    for (let i = 0; i <= spikes * 2; i++) {
+      const a = (i / (spikes * 2)) * Math.PI * 2;
+      const out = i % 2 === 0 ? 1.08 : 0.9;
+      const jitter = 1 + 0.06 * Math.sin(i * 12.9898);
+      const px = bx + Math.cos(a) * (w / 2) * out * jitter;
+      const py = by + Math.sin(a) * (h / 2) * out * jitter;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+  } else if (think) {
+    // A cloud: bumps along a rounded box.
+    const bumps = Math.max(4, Math.round(w / 46));
+    const r = w / bumps / 2 + 4;
+    ctx.roundRect(x + 6, y + 6, w - 12, h - 12, 26);
+    for (let i = 0; i < bumps; i++) {
+      const bx = x + r - 2 + i * ((w - 2 * r + 4) / Math.max(1, bumps - 1));
+      ctx.moveTo(bx + r, y + 8);
+      ctx.arc(bx, y + 8, r, 0, Math.PI * 2);
+      ctx.moveTo(bx + r, y + h - 8);
+      ctx.arc(bx, y + h - 8, r, 0, Math.PI * 2);
+    }
   } else {
-    ctx.moveTo(tipX - 11, y + 1);
-    ctx.lineTo(tipX, y - 16);
-    ctx.lineTo(tipX + 11, y + 1);
+    ctx.roundRect(x, y, w, h, 16);
+    if (above) {
+      ctx.moveTo(tipX - 11, y + h - 1);
+      ctx.lineTo(tipX, y + h + 16);
+      ctx.lineTo(tipX + 11, y + h - 1);
+    } else {
+      // The tail points sideways at the speaker's head.
+      const dir = toRight ? -1 : 1;
+      ctx.moveTo(tipX - dir, tipY - 10);
+      ctx.lineTo(tipX + dir * 18, tipY + 4);
+      ctx.lineTo(tipX - dir, tipY + 10);
+    }
   }
-  ctx.fillStyle = "#ffffff";
+  ctx.fillStyle = shout ? "#fff3b0" : "#ffffff";
   ctx.lineJoin = "round";
   ctx.lineWidth = 7;
   ctx.strokeStyle = INK;
   ctx.stroke();
   ctx.fill();
+  if (think) {
+    // The trail of little circles from the thinker's head.
+    for (const [k, r] of [[0, 9], [1, 6]] as const) {
+      const bx = above ? tipX + (k + 1) * 6 : tipX + (toRight ? -1 : 1) * (12 + k * 16);
+      const by = above ? y + h + 12 + k * 16 : tipY + (k + 1) * 6;
+      ctx.beginPath();
+      ctx.arc(bx, by, r, 0, Math.PI * 2);
+      ctx.fillStyle = "#ffffff";
+      ctx.fill();
+      ctx.lineWidth = 3.5;
+      ctx.stroke();
+    }
+  }
   ctx.fillStyle = INK;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-  lines.forEach((l, i) => ctx.fillText(l, x + w / 2, y + 11 + 27 * (i + 0.5)));
+  ctx.font = shout ? `400 ${size + 4}px ${HEADLINE}` : `${think ? "italic " : ""}800 ${size}px ${FONT}`;
+  lines.forEach((l, i) => ctx.fillText(l, x + w / 2, y + (h - lines.length * lineH) / 2 + lineH * (i + 0.5)));
   ctx.restore();
 }
 
-function drawOverlay(ctx: CanvasRenderingContext2D, object: OverlayObject, entrance: "fade" | "slam" | "word-by-word", t: number, at: number, dur: number, until: number) {
+function drawOverlay(ctx: CanvasRenderingContext2D, object: OverlayObject, entrance: Entrance, t: number, at: number, dur: number, until: number, steps: number[]) {
   const age = t - at;
   const exit = clamp01((until - t) / 0.3);
   const enter = clamp01(age / Math.min(0.5, dur));
   if (exit <= 0 || age < 0) return;
   ctx.save();
-  ctx.globalAlpha = exit * (entrance === "slam" ? clamp01(age / 0.08) : enter);
+  const instant = entrance === "slam" || entrance === "typewriter" || entrance === "word-by-word";
+  ctx.globalAlpha = exit * (instant ? clamp01(age / 0.08) : enter);
+  const place = (fallback: Zone) => (w: number, h: number) => zoneBox(object.zone ?? fallback, w, h);
 
   switch (object.kind) {
-    case "text": {
-      const size = object.size === "large" ? 78 : object.size === "small" ? 30 : 48;
-      ctx.font = `900 ${size}px ${FONT}`;
-      const lines = wrap(ctx, object.text, VIEW_W - 120);
-      const widest = Math.max(...lines.map((line) => ctx.measureText(line).width));
-      const box = zoneBox(object.zone, widest, lines.length * size * 1.1);
-      const cx = box.x + box.w / 2;
-      const cy = box.y + box.h / 2;
-      ctx.translate(cx, cy);
-      if (entrance === "slam") {
-        // Lands oversized and settles, like a stamp.
-        const s = 1 + (1 - easeOutBack(clamp01(age / 0.32))) * 1.6;
-        ctx.scale(s, s);
-        ctx.rotate(-0.03);
-      } else if (entrance === "fade") {
-        ctx.translate(0, (1 - easeOutCubic(enter)) * 16);
-      }
-      const color = COLORS[object.color ?? "white"];
-      let wordIndex = 0;
-      lines.forEach((line, i) => {
-        const y = (i - (lines.length - 1) / 2) * size * 1.1;
-        if (entrance !== "word-by-word") {
-          comicText(ctx, line, 0, y, size, color);
-          return;
-        }
-        // Each word pops in turn, left to right.
-        ctx.font = `900 ${size}px ${FONT}`;
-        const space = ctx.measureText(" ").width;
-        let x = -ctx.measureText(line).width / 2;
-        for (const word of line.split(" ")) {
-          const p = clamp01((age - wordIndex * 0.14) / 0.22);
-          wordIndex++;
-          const width = ctx.measureText(word).width;
-          if (p > 0) {
-            ctx.save();
-            ctx.globalAlpha *= p;
-            ctx.translate(x + width / 2, y + (1 - easeOutBack(p)) * 14);
-            comicText(ctx, word, 0, 0, size, color);
-            ctx.restore();
-            ctx.font = `900 ${size}px ${FONT}`;
-          }
-          x += width + space;
-        }
-      });
+    case "text":
+      drawText(ctx, object, entrance, age, dur, place("top"), VIEW_W - 120);
       break;
-    }
+    case "date":
+      drawDate(ctx, object, age, dur, place("top-left"));
+      break;
+    case "timeline":
+      drawTimeline(ctx, object, steps, t, at, place("bottom"), VIEW_W - 80);
+      break;
+    case "list":
+      drawList(ctx, object, steps, t, at, place("left"));
+      break;
     case "equation": {
       const size = 40;
       const m = measureMath(object.value, size);
@@ -436,7 +378,7 @@ function drawOverlay(ctx: CanvasRenderingContext2D, object: OverlayObject, entra
       const w = Math.max(ctx.measureText(final).width, object.label ? object.label.length * 11 : 0) + 56;
       const box = zoneBox(object.zone, w, object.label ? 124 : 96);
       panel(ctx, box.x, box.y, box.w, box.h);
-      comicText(ctx, shown, box.x + box.w / 2, box.y + 50, 60, COLORS.accent);
+      comicText(ctx, shown, box.x + box.w / 2, box.y + 50, 60, COLORS[object.color ?? "accent"]);
       if (object.label) {
         ctx.font = `700 18px ${FONT}`;
         ctx.fillStyle = "rgba(255, 255, 255, 0.86)";
@@ -555,36 +497,74 @@ export function drawScene(ctx: CanvasRenderingContext2D, scene: ResolvedScene, t
   }
 
   const spotOf = (part?: string) => (part ? image?.hotspots?.[part] : undefined);
+  const live = <T extends { picture: string }>(m: { at: number; until: number; item: T }) => t >= m.at && t < m.until && m.item.picture === picture;
+  // A mark on a whole picture points at its middle, not at a box as big as the screen.
+  const middle = onScreen(view, [0.4, 0.4, 0.2, 0.2]);
+  const boxOf = (part?: string) => {
+    const spot = spotOf(part);
+    return spot ? onScreen(view, spot) : middle;
+  };
+
+  // Marks that lie on the picture itself: tints and dimming under everything else.
   for (const mark of scene.attentions) {
-    if (t < mark.at || t >= mark.until || mark.item.picture !== picture) continue;
-    drawAttention(ctx, mark.item.verb, onScreen(view, spotOf(mark.item.part)), t - mark.at, mark.until - t);
+    if (!live(mark) || (mark.item.verb !== "dim" && mark.item.verb !== "tint")) continue;
+    const spot = spotOf(mark.item.part);
+    drawAttention(ctx, mark.item.verb, onScreen(view, spot), !spot, mark.item.color && COLORS[mark.item.color], t - mark.at, mark.until - t, VIEW_W, VIEW_H);
   }
 
-  // Film grade: a soft dark vignette pulls the eye to the middle.
-  const vignette = ctx.createRadialGradient(VIEW_W / 2, VIEW_H / 2, VIEW_H * 0.42, VIEW_W / 2, VIEW_H / 2, VIEW_W * 0.72);
+  // Film grade: a soft vignette pulls the eye to the middle without darkening the picture.
+  const vignette = ctx.createRadialGradient(VIEW_W / 2, VIEW_H / 2, VIEW_H * 0.48, VIEW_W / 2, VIEW_H / 2, VIEW_W * 0.75);
   vignette.addColorStop(0, "rgba(0, 0, 0, 0)");
-  vignette.addColorStop(1, "rgba(0, 0, 0, 0.5)");
+  vignette.addColorStop(1, "rgba(0, 0, 0, 0.3)");
   ctx.fillStyle = vignette;
   ctx.fillRect(0, 0, VIEW_W, VIEW_H);
 
-  const placed: Rect[] = [];
+  for (const effect of scene.effects) {
+    if (!live(effect)) continue;
+    const spot = spotOf(effect.item.part);
+    drawEffect(ctx, effect.item.kind, spot ? onScreen(view, spot) : onScreen(view, undefined), !spot, effect.item.seed, t - effect.at, effect.until - t, VIEW_W, VIEW_H);
+  }
+
+  for (const mark of scene.attentions) {
+    if (!live(mark) || mark.item.verb === "dim" || mark.item.verb === "tint") continue;
+    const spot = spotOf(mark.item.part);
+    drawAttention(ctx, mark.item.verb, onScreen(view, spot), !spot, mark.item.color && COLORS[mark.item.color], t - mark.at, mark.until - t, VIEW_W, VIEW_H);
+  }
+
+  // Words, dates, timelines, lists and charts. Drawn before the marks tied to things, so a label can step
+  // aside from a card instead of hiding under it.
+  for (const overlay of scene.overlays) {
+    if (t < overlay.at || t >= overlay.until) continue;
+    drawOverlay(ctx, overlay.item.object, overlay.item.entrance, t, overlay.at, overlay.item.dur, overlay.until, overlay.item.steps);
+  }
+
+  const placed: Rect[] = [...zoneTaken];
+  const endOf = (end: ArrowEnd) => end.edge ?? boxOf(end.part);
+  for (const arrow of scene.arrows) {
+    if (!live(arrow)) continue;
+    const a = arrow.item;
+    drawArrow(ctx, { from: endOf(a.from), to: endOf(a.to), text: a.text, dashed: a.style === "dashed", color: COLORS[a.color ?? "accent"], age: t - arrow.at, dur: a.dur, left: arrow.until - t }, VIEW_W, VIEW_H, placed);
+  }
+
+  for (const measure of scene.measures) {
+    if (!live(measure)) continue;
+    drawMeasure(ctx, boxOf(measure.item.part), measure.item.text, measure.item.side, t - measure.at, measure.until - t, VIEW_W, VIEW_H);
+  }
+
   for (const label of scene.labels) {
-    if (t < label.at || t >= label.until || label.item.picture !== picture) continue;
-    const spot = spotOf(label.item.part);
-    // A label on a whole picture points at its middle, not at a box as big as the screen.
-    const box = spot ? onScreen(view, spot) : onScreen(view, [0.4, 0.4, 0.2, 0.2]);
-    drawLabel(ctx, label.item.text, box, t - label.at, label.until - t, placed);
+    if (!live(label)) continue;
+    drawLabel(ctx, label.item.text, boxOf(label.item.part), t - label.at, label.until - t, placed);
+  }
+
+  for (const icon of scene.icons) {
+    if (!live(icon)) continue;
+    const spot = spotOf(icon.item.part);
+    drawIconMark(ctx, icon.item.icon, spot ? onScreen(view, spot) : { x: 0, y: 0, w: VIEW_W, h: VIEW_H }, icon.item.slot, !spot, t - icon.at, icon.until - t, VIEW_W);
   }
 
   for (const line of scene.speeches) {
-    if (t < line.at || t >= line.until || line.item.picture !== picture) continue;
-    const spot = spotOf(line.item.part);
-    drawSpeech(ctx, line.item.text, spot ? onScreen(view, spot) : onScreen(view, [0.4, 0.4, 0.2, 0.2]), t - line.at, line.until - t);
-  }
-
-  for (const overlay of scene.overlays) {
-    if (t < overlay.at || t >= overlay.until) continue;
-    drawOverlay(ctx, overlay.item.object, overlay.item.entrance, t, overlay.at, overlay.item.dur, overlay.until);
+    if (!live(line)) continue;
+    drawSpeech(ctx, line.item.text, line.item.style, boxOf(line.item.part), t - line.at, line.until - t);
   }
 
   for (const at of scene.flashes) {
