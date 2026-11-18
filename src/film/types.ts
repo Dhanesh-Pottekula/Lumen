@@ -107,6 +107,8 @@ export type SceneObject = ImageObject | OverlayObject;
 export type Action =
   | { do: "camera"; target: string; shot?: Shot; movement?: Movement }
   | { do: "cut"; to: string; entrance?: "cut" | "iris" | "fade" }
+  /** Two pictures side by side, for a comparison. Ends at the next cut or camera move. */
+  | { do: "split"; left: string; right: string }
   | { do: "speak"; target: string; text: string; style?: "say" | "think" | "shout" }
   | { do: "label"; target: string; text: string; id?: string }
   | { do: "attention"; target: string; verb: AttentionVerb; color?: Tone }

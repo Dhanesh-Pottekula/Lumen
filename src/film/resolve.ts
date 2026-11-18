@@ -42,7 +42,7 @@ export interface ResolvedScene {
   duration: number;
   images: Map<string, ImageObject>;
   /** Which picture fills the screen from when, and how it arrives. The first entry is at 0. */
-  backdrops: { at: number; picture: string; entrance: "cut" | "iris" | "fade" }[];
+  backdrops: { at: number; picture: string; entrance: "cut" | "iris" | "fade" | "split"; pair?: [string, string] }[];
   /** A figure's own line, shown as speech beside it. One at a time. */
   speeches: Timed<{ picture: string; part?: string; text: string; style: "say" | "think" | "shout" }>[];
   cameras: CameraKey[];
@@ -121,6 +121,9 @@ export function resolveScene(scene: FilmScene, floor: number, wordTimes?: number
 
   // ── What each beat does ──────────────────────────────────────────────────────────────────────────
   let current = opening?.id;
+  /** While a split is on screen, both its pictures are; `current` is the left one. */
+  let pair: [string, string] | null = null;
+  const onScreen = (picture: string | undefined) => picture !== undefined && (pair ? pair.includes(picture) : picture === current);
   const labelIds = new Map<string, Timed<unknown>>();
   const shown = new Map<string, Timed<{ steps: number[] }>>();
   const edges = new Set(["left", "right", "top", "bottom"]);
@@ -136,8 +139,9 @@ export function resolveScene(scene: FilmScene, floor: number, wordTimes?: number
     }
   };
   const cutTo = (picture: string, at: number, entrance: "cut" | "iris" | "fade" = "cut") => {
-    if (picture === current) return;
+    if (picture === current && !pair) return;
     current = picture;
+    pair = null;
     out.backdrops.push({ at, picture, entrance });
     endMarks(at, true);
   };
@@ -155,6 +159,13 @@ export function resolveScene(scene: FilmScene, floor: number, wordTimes?: number
 
     for (const action of beat.actions as Action[]) {
       switch (action.do) {
+        case "split":
+          if (pair && pair[0] === action.left && pair[1] === action.right) break;
+          current = action.left;
+          pair = [action.left, action.right];
+          out.backdrops.push({ at, picture: action.left, entrance: "split", pair });
+          endMarks(at, true);
+          break;
         case "cut":
           cutTo(action.to, at, action.entrance);
           out.cameras.push({ at, dur: 0, picture: action.to, shot: "overview", movement: "cut" });
@@ -162,7 +173,7 @@ export function resolveScene(scene: FilmScene, floor: number, wordTimes?: number
         case "camera": {
           const target = aim(action.target);
           // Aiming at a picture that is not on screen means cutting to it first.
-          const jumped = target.picture !== current;
+          const jumped = target.picture !== current || pair !== null;
           cutTo(target.picture, at);
           const movement = jumped ? "cut" : (action.movement ?? "push");
           out.cameras.push({ at, dur: movement === "cut" ? 0 : dur, ...target, shot: action.shot ?? (target.part ? "close" : "overview"), movement });
@@ -170,7 +181,7 @@ export function resolveScene(scene: FilmScene, floor: number, wordTimes?: number
         }
         case "label": {
           const target = aim(action.target);
-          if (target.picture !== current) break;
+          if (!onScreen(target.picture)) break;
           const label = { at, until: Infinity, item: { ...target, text: action.text } };
           out.labels.push(label);
           if (action.id) labelIds.set(action.id, label);
@@ -180,7 +191,7 @@ export function resolveScene(scene: FilmScene, floor: number, wordTimes?: number
           const from = end(action.from);
           const to = end(action.to);
           const picture = from.picture ?? to.picture;
-          if (picture !== current) break;
+          if (!picture || !onScreen(picture)) break;
           const arrow = { at, until: Infinity, item: { picture, from: from.end, to: to.end, text: action.text, style: action.style ?? "bold", color: action.color, dur: Math.max(0.45, Math.min(dur, 1.6)) } };
           out.arrows.push(arrow);
           if (action.id) labelIds.set(action.id, arrow);
@@ -188,7 +199,7 @@ export function resolveScene(scene: FilmScene, floor: number, wordTimes?: number
         }
         case "measure": {
           const target = aim(action.target);
-          if (target.picture !== current) break;
+          if (!onScreen(target.picture)) break;
           const measure = { at, until: Infinity, item: { ...target, text: action.text, side: action.side ?? "below" } };
           out.measures.push(measure);
           if (action.id) labelIds.set(action.id, measure);
@@ -196,7 +207,7 @@ export function resolveScene(scene: FilmScene, floor: number, wordTimes?: number
         }
         case "effect": {
           const target = aim(action.target);
-          if (target.picture !== current) break;
+          if (!onScreen(target.picture)) break;
           const effect = { at, until: Infinity, item: { ...target, kind: action.kind, seed: out.effects.length + 1 } };
           // A burst is over in a moment; everything else keeps going until the picture changes.
           if (action.kind === "explosion" || action.kind === "confetti") effect.until = at + 2.6;
@@ -206,7 +217,7 @@ export function resolveScene(scene: FilmScene, floor: number, wordTimes?: number
         }
         case "icon": {
           const target = aim(action.target);
-          if (target.picture !== current) break;
+          if (!onScreen(target.picture)) break;
           // Icons on the same thing at the same time sit side by side.
           const slot = out.icons.filter((m) => m.until > at && m.item.picture === target.picture && m.item.part === target.part).length;
           const icon = { at, until: Infinity, item: { ...target, icon: action.icon, slot } };
@@ -221,7 +232,7 @@ export function resolveScene(scene: FilmScene, floor: number, wordTimes?: number
         }
         case "speak": {
           const target = aim(action.target);
-          if (target.picture !== current) break;
+          if (!onScreen(target.picture)) break;
           // One line at a time: a new line takes the last one off. A line stays for its sentence.
           for (const line of out.speeches) if (line.until > at) line.until = at;
           const next = starts[i + 1];
@@ -230,7 +241,7 @@ export function resolveScene(scene: FilmScene, floor: number, wordTimes?: number
         }
         case "attention": {
           const target = aim(action.target);
-          if (target.picture !== current) break;
+          if (!onScreen(target.picture)) break;
           out.attentions.push({ at, until: Infinity, item: { ...target, verb: action.verb, color: action.color, dur } });
           break;
         }
@@ -272,6 +283,13 @@ export function resolveScene(scene: FilmScene, floor: number, wordTimes?: number
 }
 
 /** The picture on screen at local time `t`. */
+/** The backdrop entry in force at local time `t`: one picture, or a split pair. */
+export function entryAt(scene: ResolvedScene, t: number): ResolvedScene["backdrops"][number] | undefined {
+  let found = scene.backdrops[0];
+  for (const entry of scene.backdrops) if (entry.at <= t) found = entry;
+  return found;
+}
+
 export function backdropAt(scene: ResolvedScene, t: number): string | undefined {
   let picture: string | undefined;
   for (const entry of scene.backdrops) if (entry.at <= t) picture = entry.picture;

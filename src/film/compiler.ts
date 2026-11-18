@@ -7,7 +7,7 @@
  */
 import type { CanvasSlideDefinition } from "../slides/types";
 import { drawScene, endLens, VIEW_H, VIEW_W } from "./render";
-import { backdropAt, resolveScene, type ResolvedScene } from "./resolve";
+import { backdropAt, entryAt, resolveScene, type ResolvedScene } from "./resolve";
 import type { FilmHeader, FilmScene } from "./types";
 
 export interface SceneSpan {
@@ -51,7 +51,7 @@ export function createFilmCompiler(header: FilmHeader): FilmCompiler {
       const previous = entries[entries.length - 1];
       const start = previous ? previous.end : 0;
       // Fade in on a change of place. When the same picture carries over, the cut is invisible.
-      const carried = previous ? backdropAt(previous.scene, previous.scene.duration) === resolved.backdrops[0]?.picture : false;
+      const carried = previous ? !entryAt(previous.scene, previous.scene.duration)?.pair && backdropAt(previous.scene, previous.scene.duration) === resolved.backdrops[0]?.picture : false;
       // ...and the camera carries on from where it was, instead of snapping back to wide.
       if (carried && previous) resolved.openLens = endLens(previous.scene);
       const entry: Entry = { id: scene.id, start, end: start + resolved.duration, scene: resolved, fadeIn: !carried };

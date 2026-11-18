@@ -375,4 +375,25 @@ describe("the explainer vocabulary", () => {
     // The list is placed on the screen, not on the picture, so it stays through the cut.
     expect(resolved.overlays[0].until).toBe(Infinity);
   });
+
+  it("puts two pictures side by side, ties marks to either, and ends the split on a camera move", () => {
+    const verdict = scene(
+      [
+        { id: "open", actions: [{ do: "split", left: "room", right: "street" }, { do: "label", target: "room.moon", text: "here" }, { do: "label", target: "street", text: "there" }] },
+        { id: "back", say: "the Moon", actions: [{ do: "camera", target: "room.moon" }] },
+      ],
+      [{ id: "room", kind: "image" }, { id: "street", kind: "image", initial: "hidden" }],
+    );
+    expect(verdict.problems).toEqual([]);
+    const resolved = resolveScene(verdict.scene, 18);
+    expect(resolved.backdrops.map((b) => [b.picture, b.pair ?? null])).toEqual([
+      ["room", null],
+      ["room", ["room", "street"]],
+      ["room", null],
+    ]);
+    expect(resolved.labels.map((l) => [l.item.picture, l.until])).toEqual([
+      ["room", 10],
+      ["street", 10],
+    ]);
+  });
 });

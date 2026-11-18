@@ -148,6 +148,10 @@ export function validateScene(raw: unknown, pictures: PictureRow[], id: string, 
   for (const beat of scene.beats) {
     for (const action of beat.actions) {
       if (action.do === "cut") shownPictures.add(action.to);
+      if (action.do === "split") {
+        shownPictures.add(action.left);
+        shownPictures.add(action.right);
+      }
       if (action.do === "camera") shownPictures.add(action.target.split(".")[0]);
     }
   }
@@ -281,6 +285,13 @@ function actionOf(raw: unknown, where: string, c: ActionContext): Action | null 
       if (typeof raw.shot === "string" && SHOTS.has(raw.shot)) action.shot = raw.shot as never;
       if (typeof raw.movement === "string" && MOVEMENTS.has(raw.movement)) action.movement = raw.movement as never;
       return action;
+    }
+    case "split": {
+      if (typeof raw.left !== "string" || !c.images.has(raw.left) || typeof raw.right !== "string" || !c.images.has(raw.right) || raw.left === raw.right) {
+        c.problems.push(`${where}: split needs "left" and "right", two different pictures in this scene's objects`);
+        return null;
+      }
+      return { do: "split", left: raw.left, right: raw.right };
     }
     case "cut": {
       if (typeof raw.to !== "string" || !c.images.has(raw.to)) {
@@ -438,7 +449,7 @@ function actionOf(raw: unknown, where: string, c: ActionContext): Action | null 
     case "flash":
       return { do: "flash" };
     default:
-      c.problems.push(`${where}: do "${String(raw.do)}" is not one of camera, cut, label, speak, attention, arrow, measure, effect, icon, show, advance, hide, shake, flash`);
+      c.problems.push(`${where}: do "${String(raw.do)}" is not one of camera, cut, split, label, speak, attention, arrow, measure, effect, icon, show, advance, hide, shake, flash`);
       return null;
   }
 }

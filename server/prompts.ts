@@ -64,7 +64,8 @@ and while a picture holds, it is worked on. That is the film you are planning.
 - So a change the viewer must see in the world itself is another picture. A picture can be a later moment of an
   earlier one, and it is then redrawn from that earlier picture so the framing holds and only the difference
   stands out. Cutting often, on the narrator's lines, is what gives these films their pace.
-- The camera can frame the whole picture or move in to any part of it you named.
+- The camera can frame the whole picture or move in to any part of it you named, and two pictures can stand
+  side by side, each in half the frame; a picture meant for that keeps its subject in the middle.
 - On top of the picture the film can draw, at the moment the voice says it: an arrow from one named part to
   another, or sweeping in from an edge of the frame, solid or as a dashed route; a label on a named part; a ring,
   a box, an underline, a cross, a tick, a coloured wash or a dimming round a named part; a dimension line along a
@@ -294,6 +295,9 @@ accent (yellow), danger (red), good (green) and cool (blue).
 {"do": "cut", "to": "<picture>", "entrance": "cut|iris|fade"}
   Changes the picture on screen. cut switches at once, iris opens the new picture outward from the middle of the
   frame, fade dissolves into it. Everything tied to the old picture leaves with it.
+{"do": "split", "left": "<picture>", "right": "<picture>"}
+  Puts two pictures side by side, each filling half the frame, sliding in from the sides. Both are on screen, so
+  anything can be tied to the parts of either. It lasts until the next cut or camera move.
 {"do": "camera", "target": "...", "shot": "overview|wide|medium|close|detail", "movement": "cut|move|push|arc"}
   Reframes the picture on screen. The shots run from the whole picture (overview) to one precise point (detail).
   The movements are an instant jump (cut), a smooth travel (move), a push inward (push) and a curved swing (arc).

@@ -438,6 +438,40 @@ function drawSubtitle(ctx: CanvasRenderingContext2D, text: string, alpha: number
   ctx.restore();
 }
 
+/**
+ * Two pictures side by side, each covering its half of the frame, with a dark bar between them. `slide` runs
+ * 0..1 as the halves slide in from the sides. Returns the view of each half, so marks land on the right one.
+ */
+function drawSplit(ctx: CanvasRenderingContext2D, scene: ResolvedScene, pair: [string, string], slide: number, dx: number, dy: number): Map<string, View> {
+  const views = new Map<string, View>();
+  const half = VIEW_W / 2;
+  pair.forEach((id, side) => {
+    const image = scene.images.get(id);
+    const aspect = image?.aspect ?? VIEW_W / VIEW_H;
+    const w = Math.max(half, VIEW_H * aspect);
+    const h = w / aspect;
+    const shift = (1 - slide) * half * (side === 0 ? -1 : 1);
+    const rect = { x: side * half + (half - w) / 2 + shift, y: (VIEW_H - h) / 2, w, h };
+    // With the centre at the middle of the frame and no zoom, a view maps picture space straight to the screen.
+    const view: View = { px: VIEW_W / 2, py: VIEW_H / 2, zoom: 1, rect, dx, dy };
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(side * half + shift, 0, half, VIEW_H);
+    ctx.clip();
+    drawBackdrop(ctx, image, view);
+    ctx.restore();
+    views.set(id, view);
+  });
+  if (slide > 0.6) {
+    ctx.save();
+    ctx.globalAlpha = clamp01((slide - 0.6) / 0.4);
+    ctx.fillStyle = INK;
+    ctx.fillRect(half - 4, 0, 8, VIEW_H);
+    ctx.restore();
+  }
+  return views;
+}
+
 // ── The frame ───────────────────────────────────────────────────────────────────────────────────────
 export interface DrawOptions {
   /** Fade in from black at the start: on a change of place, not when the picture carries over. */
@@ -472,44 +506,57 @@ export function drawScene(ctx: CanvasRenderingContext2D, scene: ResolvedScene, t
   const lens = picture ? lensAt(scene, t, picture, rect) : { fx: 0.5, fy: 0.5, zoom: 1 };
   // A little extra zoom while shaking, so the jolt never shows past the picture's edge.
   const view = viewOf({ ...lens, zoom: lens.zoom + (dx || dy ? 0.05 : 0) }, rect, dx, dy);
-  // How this shot arrived: a hard cut, an iris opening from the middle, or a dissolve.
+  // How this shot arrived: a hard cut, an iris opening from the middle, a dissolve, or a split sliding in.
   const entryIndex = scene.backdrops.reduce((found, entry, i) => (entry.at <= t ? i : found), 0);
   const entry = scene.backdrops[entryIndex];
   const before = entryIndex > 0 ? scene.backdrops[entryIndex - 1] : undefined;
-  const arriving = entry && before && entry.entrance !== "cut" ? clamp01((t - entry.at) / 0.7) : 1;
-  if (arriving < 1 && before) {
-    // The shot we are leaving, held where its camera stopped.
+  const arriving = entry && before && entry.entrance !== "cut" ? clamp01((t - entry.at) / (entry.entrance === "split" ? 0.55 : 0.7)) : 1;
+  /** Where each picture on screen is drawn: one view, or one for each half of a split. */
+  const views = new Map<string, View>();
+  const drawOld = () => {
+    if (!before) return;
+    if (before.pair) {
+      drawSplit(ctx, scene, before.pair, 1, 0, 0);
+      return;
+    }
     const old = scene.images.get(before.picture);
     const oldRect = coverRect(old?.aspect ?? VIEW_W / VIEW_H);
     drawBackdrop(ctx, old, viewOf(lensAt(scene, entry.at - 0.001, before.picture, oldRect), oldRect, 0, 0));
-    ctx.save();
-    if (entry.entrance === "iris") {
-      ctx.beginPath();
-      ctx.arc(VIEW_W / 2, VIEW_H / 2, easeInOutCubic(arriving) * Math.hypot(VIEW_W, VIEW_H) * 0.52, 0, Math.PI * 2);
-      ctx.clip();
-    } else {
-      ctx.globalAlpha = easeInOutCubic(arriving);
-    }
-    drawBackdrop(ctx, image, view);
-    ctx.restore();
+  };
+  if (entry?.pair) {
+    if (arriving < 1) drawOld();
+    for (const [id, v] of drawSplit(ctx, scene, entry.pair, easeOutCubic(arriving), dx, dy)) views.set(id, v);
   } else {
-    drawBackdrop(ctx, image, view);
+    if (picture) views.set(picture, view);
+    if (arriving < 1 && before) {
+      // The shot we are leaving, held where its camera stopped.
+      drawOld();
+      ctx.save();
+      if (entry.entrance === "iris") {
+        ctx.beginPath();
+        ctx.arc(VIEW_W / 2, VIEW_H / 2, easeInOutCubic(arriving) * Math.hypot(VIEW_W, VIEW_H) * 0.52, 0, Math.PI * 2);
+        ctx.clip();
+      } else {
+        ctx.globalAlpha = easeInOutCubic(arriving);
+      }
+      drawBackdrop(ctx, image, view);
+      ctx.restore();
+    } else {
+      drawBackdrop(ctx, image, view);
+    }
   }
 
-  const spotOf = (part?: string) => (part ? image?.hotspots?.[part] : undefined);
-  const live = <T extends { picture: string }>(m: { at: number; until: number; item: T }) => t >= m.at && t < m.until && m.item.picture === picture;
+  type Item = { picture: string; part?: string };
+  const spotOf = (item: Item) => (item.part ? scene.images.get(item.picture)?.hotspots?.[item.part] : undefined);
+  const live = <T extends Item>(m: { at: number; until: number; item: T }) => t >= m.at && t < m.until && views.has(m.item.picture);
+  const screenOf = (item: Item) => onScreen(views.get(item.picture) as View, spotOf(item));
   // A mark on a whole picture points at its middle, not at a box as big as the screen.
-  const middle = onScreen(view, [0.4, 0.4, 0.2, 0.2]);
-  const boxOf = (part?: string) => {
-    const spot = spotOf(part);
-    return spot ? onScreen(view, spot) : middle;
-  };
+  const boxOf = (item: Item) => (spotOf(item) ? screenOf(item) : onScreen(views.get(item.picture) as View, [0.4, 0.4, 0.2, 0.2]));
 
   // Marks that lie on the picture itself: tints and dimming under everything else.
   for (const mark of scene.attentions) {
     if (!live(mark) || (mark.item.verb !== "dim" && mark.item.verb !== "tint")) continue;
-    const spot = spotOf(mark.item.part);
-    drawAttention(ctx, mark.item.verb, onScreen(view, spot), !spot, mark.item.color && COLORS[mark.item.color], t - mark.at, mark.until - t, VIEW_W, VIEW_H);
+    drawAttention(ctx, mark.item.verb, screenOf(mark.item), !spotOf(mark.item), mark.item.color && COLORS[mark.item.color], t - mark.at, mark.until - t, VIEW_W, VIEW_H);
   }
 
   // Film grade: a soft vignette pulls the eye to the middle without darkening the picture.
@@ -521,14 +568,12 @@ export function drawScene(ctx: CanvasRenderingContext2D, scene: ResolvedScene, t
 
   for (const effect of scene.effects) {
     if (!live(effect)) continue;
-    const spot = spotOf(effect.item.part);
-    drawEffect(ctx, effect.item.kind, spot ? onScreen(view, spot) : onScreen(view, undefined), !spot, effect.item.seed, t - effect.at, effect.until - t, VIEW_W, VIEW_H);
+    drawEffect(ctx, effect.item.kind, screenOf(effect.item), !spotOf(effect.item), effect.item.seed, t - effect.at, effect.until - t, VIEW_W, VIEW_H);
   }
 
   for (const mark of scene.attentions) {
     if (!live(mark) || mark.item.verb === "dim" || mark.item.verb === "tint") continue;
-    const spot = spotOf(mark.item.part);
-    drawAttention(ctx, mark.item.verb, onScreen(view, spot), !spot, mark.item.color && COLORS[mark.item.color], t - mark.at, mark.until - t, VIEW_W, VIEW_H);
+    drawAttention(ctx, mark.item.verb, screenOf(mark.item), !spotOf(mark.item), mark.item.color && COLORS[mark.item.color], t - mark.at, mark.until - t, VIEW_W, VIEW_H);
   }
 
   // Words, dates, timelines, lists and charts. Drawn before the marks tied to things, so a label can step
@@ -539,32 +584,32 @@ export function drawScene(ctx: CanvasRenderingContext2D, scene: ResolvedScene, t
   }
 
   const placed: Rect[] = [...zoneTaken];
-  const endOf = (end: ArrowEnd) => end.edge ?? boxOf(end.part);
+  const endOf = (picture: string, end: ArrowEnd) => end.edge ?? boxOf({ picture, part: end.part });
   for (const arrow of scene.arrows) {
     if (!live(arrow)) continue;
     const a = arrow.item;
-    drawArrow(ctx, { from: endOf(a.from), to: endOf(a.to), text: a.text, dashed: a.style === "dashed", color: COLORS[a.color ?? "accent"], age: t - arrow.at, dur: a.dur, left: arrow.until - t }, VIEW_W, VIEW_H, placed);
+    drawArrow(ctx, { from: endOf(a.picture, a.from), to: endOf(a.picture, a.to), text: a.text, dashed: a.style === "dashed", color: COLORS[a.color ?? "accent"], age: t - arrow.at, dur: a.dur, left: arrow.until - t }, VIEW_W, VIEW_H, placed);
   }
 
   for (const measure of scene.measures) {
     if (!live(measure)) continue;
-    drawMeasure(ctx, boxOf(measure.item.part), measure.item.text, measure.item.side, t - measure.at, measure.until - t, VIEW_W, VIEW_H);
+    drawMeasure(ctx, boxOf(measure.item), measure.item.text, measure.item.side, t - measure.at, measure.until - t, VIEW_W, VIEW_H);
   }
 
   for (const label of scene.labels) {
     if (!live(label)) continue;
-    drawLabel(ctx, label.item.text, boxOf(label.item.part), t - label.at, label.until - t, placed);
+    drawLabel(ctx, label.item.text, boxOf(label.item), t - label.at, label.until - t, placed);
   }
 
   for (const icon of scene.icons) {
     if (!live(icon)) continue;
-    const spot = spotOf(icon.item.part);
-    drawIconMark(ctx, icon.item.icon, spot ? onScreen(view, spot) : { x: 0, y: 0, w: VIEW_W, h: VIEW_H }, icon.item.slot, !spot, t - icon.at, icon.until - t, VIEW_W);
+    const spot = spotOf(icon.item);
+    drawIconMark(ctx, icon.item.icon, screenOf(icon.item), icon.item.slot, !spot, t - icon.at, icon.until - t, VIEW_W);
   }
 
   for (const line of scene.speeches) {
     if (!live(line)) continue;
-    drawSpeech(ctx, line.item.text, line.item.style, boxOf(line.item.part), t - line.at, line.until - t);
+    drawSpeech(ctx, line.item.text, line.item.style, boxOf(line.item), t - line.at, line.until - t);
   }
 
   for (const at of scene.flashes) {

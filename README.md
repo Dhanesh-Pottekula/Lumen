@@ -96,7 +96,7 @@ This is what a scene writer produces for one step. The server adds each picture'
 }
 ```
 
-Actions: `camera`, `cut` (hard, iris or dissolve), `label`, `arrow` (between two parts, or in from an edge of
+Actions: `camera`, `cut` (hard, iris or dissolve), `split` (two pictures side by side), `label`, `arrow` (between two parts, or in from an edge of
 the frame; solid or a dashed route), `attention` (dim, encircle, pulse, box, underline, cross, check, tint),
 `measure` (a dimension line with its size), `icon` (a comic symbol beside a figure), `effect` (fire, smoke,
 sparks, explosion, rain, snow, dust, confetti, glow, speed lines), `speak` (a speech, thought or shout bubble),

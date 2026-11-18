@@ -113,7 +113,8 @@ runs/                      generated films (git-ignored): film.json, plan.json, 
 - One small warm-up call writes the scene writers' shared prompt before they start. Four writers start
   together; without it each would pay to write the same text. An entry is not readable in the first seconds
   after it is written, which is another reason to warm it early.
-- Measured after the fix: scene calls read 1,571 tokens from the cache and write 0; a cold warm-up writes only
+- Measured after the fix (before the 2026-11-18 vocabulary made `SCENE_SYSTEM` longer, so these numbers are now
+  higher): scene calls read 1,571 tokens from the cache and write 0; a cold warm-up writes only
   the 1,581-token prefix; the part finder writes 0 (it wrote all 17,900 input tokens in the film before).
 - `FILM_CACHE_BREAKPOINT=0` turns all of this off; it also turns itself off if the API refuses the fields.
   `FILM_CACHE_TTL=12h` keeps entries for twelve hours instead of thirty minutes, at 2.5 times the write rate.
@@ -126,7 +127,7 @@ runs/                      generated films (git-ignored): film.json, plan.json, 
   machine, so the analysis used thumbnails, frames at 25/50/75 %, chapter lists and the channels' other
   transcripts. What those films do: a picture per spoken line or two, big outlined captions, dates and place
   names stamped on as they are said, labels beside the thing, money in green and red, dimension lines, comic
-  symbols (!!, ?, sweat), map arrows. New vocabulary: `arrow`, `measure`, `icon`, `effect`, `advance`; attention
+  symbols (!!, ?, sweat), map arrows. New vocabulary: `arrow`, `measure`, `icon`, `effect`, `advance`, `split` (two pictures side by side); attention
   verbs box, underline, cross, check, tint (and dim on a whole picture darkens it); `date`, `timeline`, `list`
   objects; text styles title, hand, stamp; a typewriter entrance; think and shout bubbles; colours for counters
   and marks. The prompts explain the genre's intention (the screen keeps answering the voice) and list the
