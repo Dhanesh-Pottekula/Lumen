@@ -396,4 +396,10 @@ describe("the explainer vocabulary", () => {
       ["street", 10],
     ]);
   });
+
+  it("times each subtitle word, so the spoken one can be picked out", () => {
+    const resolved = resolveScene(scene([{ id: "open", actions: [{ do: "flash" }] }]).scene, 18);
+    expect(resolved.subtitles[0]).toMatchObject({ text: "You wake up at night.", times: [0, 1, 2, 3, 4] });
+    expect(resolved.subtitles[1].times[0]).toBe(5);
+  });
 });

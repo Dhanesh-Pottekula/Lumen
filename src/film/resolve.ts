@@ -56,7 +56,8 @@ export interface ResolvedScene {
   overlays: Timed<{ object: OverlayObject; entrance: Entrance; dur: number; steps: number[] }>[];
   shakes: { at: number; strength: number }[];
   flashes: number[];
-  subtitles: { at: number; until: number; text: string }[];
+  /** Each subtitle line, and when each of its space-separated tokens is spoken (null for a token with no word). */
+  subtitles: { at: number; until: number; text: string; times: (number | null)[] }[];
   /** Each beat's cue: the narration word it waits for and the second it is due. */
   cues: { word: number; at: number }[];
   /** Where the camera starts, when the previous scene ended on this scene's opening picture. */
@@ -276,7 +277,9 @@ export function resolveScene(scene: FilmScene, floor: number, wordTimes?: number
   lines.forEach((line, i) => {
     const at = spokenAt(line.word);
     const until = i + 1 < lines.length ? spokenAt(lines[i + 1].word) : floor + 0.3;
-    out.subtitles.push({ at, until, text: line.text });
+    let word = line.word;
+    const times = line.text.split(" ").map((token) => (narrationWords(token).length ? spokenAt(word++) : null));
+    out.subtitles.push({ at, until, text: line.text, times });
   });
 
   return out;

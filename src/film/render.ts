@@ -417,7 +417,8 @@ function drawOverlay(ctx: CanvasRenderingContext2D, object: OverlayObject, entra
   ctx.restore();
 }
 
-function drawSubtitle(ctx: CanvasRenderingContext2D, text: string, alpha: number) {
+/** A subtitle line, with the word being spoken picked out as the voice reaches it. */
+function drawSubtitle(ctx: CanvasRenderingContext2D, text: string, times: (number | null)[], t: number, alpha: number) {
   ctx.save();
   ctx.globalAlpha = alpha;
   ctx.font = `600 23px ${FONT}`;
@@ -431,10 +432,25 @@ function drawSubtitle(ctx: CanvasRenderingContext2D, text: string, alpha: number
   ctx.beginPath();
   ctx.roundRect(x, y, w, h, 6);
   ctx.fill();
-  ctx.fillStyle = "#ffffff";
-  ctx.textAlign = "center";
+  // The token being spoken: the last one whose time has come.
+  let speaking = -1;
+  times.forEach((at, i) => {
+    if (at !== null && at <= t) speaking = i;
+  });
+  ctx.textAlign = "left";
   ctx.textBaseline = "middle";
-  lines.forEach((line, i) => ctx.fillText(line, VIEW_W / 2, y + 6 + lineH * (i + 0.5)));
+  const space = ctx.measureText(" ").width;
+  let token = 0;
+  lines.forEach((line, i) => {
+    let cx = VIEW_W / 2 - ctx.measureText(line).width / 2;
+    const cy = y + 6 + lineH * (i + 0.5);
+    for (const word of line.split(" ")) {
+      ctx.fillStyle = token === speaking ? COLORS.accent : "#ffffff";
+      ctx.fillText(word, cx, cy);
+      cx += ctx.measureText(word).width + space;
+      token++;
+    }
+  });
   ctx.restore();
 }
 
@@ -622,7 +638,7 @@ export function drawScene(ctx: CanvasRenderingContext2D, scene: ResolvedScene, t
   if (options.subtitles) {
     for (const line of scene.subtitles) {
       if (t < line.at || t >= line.until) continue;
-      drawSubtitle(ctx, line.text, clamp01((t - line.at) / 0.12));
+      drawSubtitle(ctx, line.text, line.times, t, clamp01((t - line.at) / 0.12));
     }
   }
 
