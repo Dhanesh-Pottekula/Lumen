@@ -104,6 +104,14 @@ export function drawArrow(ctx: CanvasRenderingContext2D, a: ArrowDraw, w: number
   const points: Pt[] = [];
   for (let i = 0; i <= steps; i++) points.push(quad(start, ctrl, end, (i / steps) * p));
   const tip = points[points.length - 1];
+  // Labels placed after this step aside from the arrow instead of covering it: its head and its shaft.
+  if (p > 0.9) {
+    for (let i = 0; i < points.length; i += 6) {
+      const q = points[i];
+      if (q[0] > -20 && q[0] < w + 20 && q[1] > -20 && q[1] < h + 20) placed.push({ x: q[0] - 12, y: q[1] - 12, w: 24, h: 24 });
+    }
+    placed.push({ x: end[0] - 20, y: end[1] - 20, w: 40, h: 40 });
+  }
   const back = quad(start, ctrl, end, Math.max(0, p - 0.04));
   const angle = Math.atan2(tip[1] - back[1], tip[0] - back[0]);
   // Stop the shaft short of the head so the head's point is sharp.
