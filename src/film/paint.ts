@@ -38,6 +38,8 @@ export interface Rect {
   y: number;
   w: number;
   h: number;
+  /** For a box something occupies on screen: the second that thing arrived. */
+  since?: number;
 }
 
 /** Bold cartoon lettering: a colour fill inside a thick dark outline, readable over any picture. */

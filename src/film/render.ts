@@ -125,6 +125,8 @@ function onScreen(view: View, spot: Hotspot | undefined): Rect {
 /** Where a zone's box of size w × h sits. Bottom zones stay above the subtitles. */
 /** The boxes this frame's words, formulas, counters and charts already occupy, so a new one never lands on another. */
 let zoneTaken: Rect[] = [];
+/** When the overlay being placed arrived, so labels can tell what was already on screen when they came. */
+let zoneSince = 0;
 
 function zoneBox(zone: Zone | undefined, w: number, h: number): Rect {
   const m = 36;
@@ -141,7 +143,7 @@ function zoneBox(zone: Zone | undefined, w: number, h: number): Rect {
     y = z.startsWith("bottom") ? hit.y - h - gap : hit.y + hit.h + gap;
   }
   const box = { x, y, w, h };
-  zoneTaken.push(box);
+  zoneTaken.push({ ...box, since: zoneSince });
   return box;
 }
 
@@ -166,7 +168,7 @@ function drawBackdrop(ctx: CanvasRenderingContext2D, image: ImageObject | undefi
 }
 
 /** A tag naming a thing, with a line to it. Placed above the thing when there is room, else below. */
-function drawLabel(ctx: CanvasRenderingContext2D, text: string, box: Rect, age: number, left: number, placed: Rect[]) {
+function drawLabel(ctx: CanvasRenderingContext2D, text: string, box: Rect, age: number, left: number, placed: Rect[], since: number) {
   const cx = box.x + box.w / 2;
   const cy = box.y + box.h / 2;
   if (cx < -40 || cx > VIEW_W + 40 || cy < -40 || cy > VIEW_H + 40) return; // the camera has left it
@@ -179,7 +181,8 @@ function drawLabel(ctx: CanvasRenderingContext2D, text: string, box: Rect, age: 
   const w = ctx.measureText(text).width + 28;
   const h = 38;
   const reach = Math.min(box.h / 2, 90) + 34;
-  const clash = (r: Rect) => placed.some((o) => r.x < o.x + o.w + 6 && r.x + r.w + 6 > o.x && r.y < o.y + o.h + 6 && r.y + r.h + 6 > o.y);
+  // Only what was on screen when the label arrived counts, so a label keeps its place when something new comes.
+  const clash = (r: Rect) => placed.some((o) => (o.since === undefined || o.since <= since) && r.x < o.x + o.w + 6 && r.x + r.w + 6 > o.x && r.y < o.y + o.h + 6 && r.y + r.h + 6 > o.y);
   const fits = (r: Rect) => r.y >= 10 && r.y + r.h <= VIEW_H - 124;
   const at = (y: number, dx = 0): Rect => ({ x: Math.min(VIEW_W - w - 14, Math.max(14, cx - w / 2 + dx)), y, w, h });
   // Above the thing if there is room, else below; slid sideways, then stacked, to step clear of what is already
@@ -194,7 +197,7 @@ function drawLabel(ctx: CanvasRenderingContext2D, text: string, box: Rect, age: 
   const chosen = candidates.find((c) => fits(c.tag) && !clash(c.tag)) ?? candidates.find((c) => fits(c.tag)) ?? candidates[0];
   const tag = chosen.tag;
   const above = chosen.above;
-  placed.push(tag);
+  placed.push({ ...tag, since });
 
   ctx.globalAlpha = alpha;
   const from = { x: Math.min(tag.x + w - 14, Math.max(tag.x + 14, cx)), y: above ? tag.y + h : tag.y };
@@ -596,6 +599,7 @@ export function drawScene(ctx: CanvasRenderingContext2D, scene: ResolvedScene, t
   // aside from a card instead of hiding under it.
   for (const overlay of scene.overlays) {
     if (t < overlay.at || t >= overlay.until) continue;
+    zoneSince = overlay.at;
     drawOverlay(ctx, overlay.item.object, overlay.item.entrance, t, overlay.at, overlay.item.dur, overlay.until, overlay.item.steps);
   }
 
@@ -604,7 +608,9 @@ export function drawScene(ctx: CanvasRenderingContext2D, scene: ResolvedScene, t
   for (const arrow of scene.arrows) {
     if (!live(arrow)) continue;
     const a = arrow.item;
+    const before = placed.length;
     drawArrow(ctx, { from: endOf(a.picture, a.from), to: endOf(a.picture, a.to), text: a.text, dashed: a.style === "dashed", color: COLORS[a.color ?? "accent"], age: t - arrow.at, dur: a.dur, left: arrow.until - t }, VIEW_W, VIEW_H, placed);
+    for (let k = before; k < placed.length; k++) placed[k].since = arrow.at;
   }
 
   for (const measure of scene.measures) {
@@ -614,7 +620,7 @@ export function drawScene(ctx: CanvasRenderingContext2D, scene: ResolvedScene, t
 
   for (const label of scene.labels) {
     if (!live(label)) continue;
-    drawLabel(ctx, label.item.text, boxOf(label.item), t - label.at, label.until - t, placed);
+    drawLabel(ctx, label.item.text, boxOf(label.item), t - label.at, label.until - t, placed, label.at);
   }
 
   for (const icon of scene.icons) {

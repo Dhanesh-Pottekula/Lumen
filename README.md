@@ -23,6 +23,33 @@ film with sound.
 Made by the current version in under three minutes: 7 scenes, 8 pictures and the narration, for about $0.63
 in model and image calls at list price. The planner chose to tell it as a `movie`: you are the one falling in.
 
+### The explainer moves: "The war in Afghanistan, 2001 to 2021"
+
+[![Preview of the Afghanistan film](docs/films/afghanistan-war.gif)](docs/films/afghanistan-war.mp4)
+
+[Watch the full film (2 min 9 s, MP4)](docs/films/afghanistan-war.mp4)
+
+A showcase of everything the screen can do since the film learned the moves of YouTube's narrated cartoon
+explainers. Unlike the films above, this one was not made by the models: the script and every scene were written
+by hand in Lumen's scene format, following the planner and scene-writer prompts, the six pictures were drawn in
+code, and the voice is a stock text-to-speech voice. Everything on screen is Lumen's own engine, timed to the
+word from the voice's word times.
+
+What happens, and on which words:
+
+- **Dates** land on calendar cards as they are spoken, and roll forward: "November 2001" turns into "August 2021"
+  while the narrator says "Twenty years later".
+- **Maps with arrows.** "Swept down from the north" draws an arrow in from the top of the frame to Kabul; "Kabul
+  fell" sets off an explosion and shakes the frame; "fled south" and "across the border" draw dashed routes to
+  Kandahar and into Pakistan. Afghanistan is washed red "under the Taliban".
+- **Labels and marks** on the thing being named: corner brackets on the cave and the compound, a pulse and then a
+  cross on the silent radio, a dimension line ("academy: under 1 mile"), an underline along the fence.
+- **Headlines and stamps**: "TORA BORA" in comic lettering, "MISSING" and "BACK WHERE IT BEGAN" as rubber stamps.
+- **A timeline** walked year by year (2001, 2004, 2009, 2011) and **counters** for troops, dollars and lives.
+- **A list** that builds as the narrator reads out the terms of the Doha deal.
+- **A split screen** of 2001 and 2021 side by side, speed lines on the departing plane, snow at Tora Bora, comic
+  symbols ("?") and subtitles that pick out each word as it is spoken.
+
 ### Two earlier films
 
 | "What if the Sun went out for one day?" | "What if gravity doubled overnight? Could you survive 24 hours?" |
