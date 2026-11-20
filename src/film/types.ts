@@ -234,5 +234,86 @@ export interface FilmFile {
   /** What making the film consumed. Absent on films made before usage was recorded. */
   usage?: FilmUsage;
   /** What the film was made with, so its numbers can be set beside other films'. Absent on older films. */
-  made?: { prompts: string; skills: string[]; skillsFrom: string | null };
+  made?: {
+    prompts: string;
+    skills: string[];
+    skillsFrom: string | null;
+    /** Keys of the prompts a person had rewritten when this film was made. */
+    edited?: string[];
+    /** The model and settings each stage ran on. */
+    stages?: Partial<Record<UsageStage, { model: string; effort?: string; settings?: Record<string, string> }>>;
+  };
 }
+
+// ── The record of a film's making ───────────────────────────────────────────────────────────────────
+
+/** One thing sent to a model, or sent back by it: a text, or a picture or sound kept in the run's folder. */
+export interface TracePart {
+  kind: "text" | "image" | "audio";
+  /** What it is: "System prompt", "The brief", "Reference picture". */
+  title: string;
+  /** The whole text, for a text part. */
+  text?: string;
+  /** Where the picture or sound can be fetched from, when it is one the run keeps. */
+  src?: string;
+  /** A short remark: its size, or why there is nothing to show. */
+  note?: string;
+}
+
+/** One request as it went over the wire and the answer that came back, with picture and sound data left out. */
+export interface TraceExchange {
+  path: string;
+  request: unknown;
+  status: number;
+  response: unknown;
+  ms: number;
+}
+
+/** What a list of calls shows: everything but the texts themselves. */
+export interface CallSummary {
+  /** The call's number in the run, from 1, in the order calls began. */
+  n: number;
+  stage: UsageStage;
+  /** The step or picture the call was for, or "" for a call that belongs to the whole film. */
+  id: string;
+  title: string;
+  model: string;
+  /** The reasoning effort asked for, when the stage has one. */
+  effort?: string;
+  status: "running" | "ok" | "failed";
+  /** Seconds from the start of the run to the start of this call, and how long it took. */
+  at: number;
+  ms: number;
+  usage: { input: number; cached: number; cacheWrite: number; output: number; reasoning: number; images: number; characters: number; seconds: number };
+  /** Estimated US dollars, or null when the model has no price. */
+  cost: number | null;
+  error?: string;
+  /** How many requests the call made: more than one when a tool was used or a request was sent again. */
+  requests: number;
+}
+
+/** One model call in full: every character that went in and came out. */
+export interface CallRecord extends CallSummary {
+  /** Other settings the call was made with: an image quality, a voice. */
+  settings: Record<string, string>;
+  input: TracePart[];
+  output: TracePart[];
+  /** Tool calls the model made during the call, with what the tool answered. */
+  tools: { name: string; arguments: string; result: string }[];
+  exchanges: TraceExchange[];
+}
+
+/** The model and settings one stage of the pipeline uses. Which fields apply depends on the stage. */
+export interface StageSetting {
+  model: string;
+  /** Reasoning effort, for the stages that think: "" leaves it to the model's own default. */
+  effort?: string;
+  /** Picture quality, for the drawing stage. */
+  quality?: string;
+  /** The voice, for the speaking stage. */
+  voice?: string;
+}
+
+export type SettingStage = "plan" | "scene" | "parts" | "picture" | "voice" | "timing";
+export type StageSettings = Record<SettingStage, StageSetting>;
+

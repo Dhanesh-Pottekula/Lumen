@@ -40,6 +40,8 @@ export interface PartsFound {
 
 export interface Provider {
   name: string;
+  /** The model and settings each stage runs on, for the record of a film's making. */
+  stages?: Partial<Record<UsageStage, { model: string; effort?: string; settings?: Record<string, string> }>>;
   /** Set by the pipeline: called once per model call with what it consumed. */
   report?: (stage: UsageStage, model: string, usage: CallUsage) => void;
   /**

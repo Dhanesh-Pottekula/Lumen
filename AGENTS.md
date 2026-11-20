@@ -48,6 +48,9 @@ server/                    the film server (Node, mounted on Vite's dev server)
   prompts.ts                 planner, part finder, scene writer and the picture look
   text.ts                    read a JSON plan while it streams; lanes; image sizes
   cutout.ts                  remove the white round a drawing (AiRA's method, no dependency); PNG read and write
+  trace.ts                   the record of a film's making: every model call in full, written to calls.jsonl
+  settings.ts                what a person chose: model and effort per stage, rewritten prompts (.lumen/settings.json)
+  metrics.ts                 numbers read off a finished film, for comparing prompts
   skills.ts                  loads AiRA film skills and answers the load_film_skills tool
   voice.ts                   voice marks: plain words, Cartesia form, delivery notes
   providers/                 openai.ts (real), offline.ts (canned, misbehaves on purpose), types.ts
@@ -59,7 +62,10 @@ src/film/                  the film engine (browser)
   render.ts                  draws one scene at time t: full-bleed picture, camera, labels, overlays
   compiler.ts                scenes added one by one; one stable slide that grows
   store.ts                   receives events, admits scenes in order once their pictures and voice load
-src/components/FilmStudio.tsx  the whole app: player, scene track, new-film box, production panel, film shelf
+src/components/FilmStudio.tsx  the studio: player, scene track, new-film box, production panel, film shelf
+src/components/RunsPage.tsx    how each film was made: totals, stages, every call, step by step, plan, log
+src/components/SettingsPage.tsx  model and reasoning per stage; the prompts, each editable with a reset
+src/observe.css            styles for those two pages
 src/film.css               the app's styles
 src/render/                canvas drawing primitives; the film uses charts, mathtext, motion and type-motion
 src/slides/                anim.ts, compose.ts, types.ts: shared helpers the primitives are built on
@@ -112,6 +118,36 @@ runs/                      generated films (git-ignored): film.json, plan.json, 
 - Each film records `made.prompts`, a fingerprint of the prompt texts, and the skills it loaded. Two films with
   the same fingerprint were written by the same prompts. Films made before 2026-11-20 show "unknown".
 - The log keeps every scene writer reply in full, and the retry's reply, its problems and whether it was kept.
+
+## Seeing how a film was made
+- Every model call of a film is recorded in full in `runs/<run>/calls.jsonl`: the stage, the step or picture it
+  was for, the model and reasoning effort, every text that went in (system prompt, request, tool offered), every
+  picture or clip sent (as a link to the saved file), everything that came back, each tool call with its answer,
+  the token counts (input, read from cache, written to cache, output, reasoning), the cost, and how long it took.
+  For the OpenAI provider it also keeps each request body and response as they went over the wire, with picture
+  and sound data replaced by a note of its size.
+- It works by wrapping the provider (`tracer.wrap`), so every provider is recorded the same way. A call's record
+  travels with it in an `AsyncLocalStorage`: the counts a provider reports and the requests it sends are attached
+  to the call they happened inside, however many are running at once. A line is written when a call starts and
+  again when it ends (and, for the plan, every second or so while it is written); the last line for a number wins.
+- The Runs page (`#/runs/<run>`) reads `GET /api/films/<run>/calls`, `/calls/<n>`, `/plan` and `/log`. While a
+  run is being made it asks again every second and a half. A run counts as being made if this server is making
+  it, or if its file says so and its log was written to in the last four minutes.
+- Films made before 2026-11-21 have no `calls.jsonl`; the page says so and shows their plan and log.
+
+## Choosing models and rewriting prompts
+- `.lumen/settings.json` (git-ignored) holds only what differs from the defaults: per stage a model and, where
+  it applies, a reasoning effort, a picture quality or a voice; and any prompt a person rewrote. The Settings
+  page edits it through `GET`/`PUT /api/settings`. A stage's default is the environment's (`FILM_PLAN_MODEL`,
+  `FILM_PLAN_EFFORT` and so on), else the code's.
+- Six prompts can be rewritten: planner, picture look, cut-out look, part finder, scene writer, voice style
+  (`PROMPT_INFO`). The two looks are the opening paragraph of a drawing request; the rest of that request is
+  what the pipeline needs and stays in code. A rewrite that is empty, or equal to the default, is not kept, so
+  "Reset to default" is simply forgetting it. A film records which prompts were rewritten (`made.edited`) and
+  what each stage ran on (`made.stages`), and its prompt fingerprint covers the texts actually used.
+- The command line (`npm run film`) reads the same settings, so both ways of making a film agree.
+- With a Cartesia key set, Cartesia speaks and times its own words. The voice stage's model in Settings is then
+  only the stand-in for a failed Cartesia call, and both the page and each call's record say so.
 
 ## Usage, cost and the prompt cache
 - Every model call reports what it consumed (`provider.report`). `server/usage.ts` adds the calls up by stage
@@ -268,4 +304,23 @@ runs/                      generated films (git-ignored): film.json, plan.json, 
   voice marks. Scene writer, re-asked on all seven steps of the saved film with the same pictures: cameras
   aimed where they already were fell from 13 to 1, the one caption the voice never says was gone, and the
   number captions stayed. One run of each, so some of that is chance.
+- 2026-11-21, Dhanesh: full observability, a model and reasoning effort for each stage, and prompts that can be
+  rewritten in the app and reset. Built as described under "Seeing how a film was made" and "Choosing models and
+  rewriting prompts". Checked on three real films: each film's calls add up to its own cost to the cent; a call
+  refused by the image model's safety system shows the provider's message, the prompt and the reference sent.
+- Three films were made to judge the prompts, changing one thing between each.
+  Film 1, "Why is the sky blue?" (study): pictures explained well, but the narration had no figure at all
+  ("much more strongly") and 7 name tags. So the planner was told a real figure said plainly is concrete, and
+  that a name met for the first time is written beside the thing.
+  Film 2, same question: 21 name tags and a real comparison, "450 nm", "650 nm", "about 4×". But every word on
+  screen was a small tag, the key figure no bigger than a label. So planner and scene writer were told what the
+  two sizes of writing are for: a small tag names a thing; large words or a large number carry the figure or the
+  point a step turns on.
+  Film 3, "How was penicillin discovered?" (story, the first of its kind): 23 large texts (years, names,
+  places) and 7 tags, no camera aimed where it already was, nothing dropped.
+- Seen in film 3 and fixed: one background was refused by the image model ("rejected by the safety system"),
+  and its step then showed words about fermentation tanks over a picture of a mouse. A background now gets a
+  second try, as a cut-out already did. Seen and not fixed: the story has no people in it, because the planner
+  may not draw a named or real person and so drew none; one caption the voice never says; large words placed
+  over the subject of the picture.
 

@@ -24,7 +24,7 @@ const saved = option("cut");
 const character = option("character") ?? "none";
 fs.mkdirSync(out, { recursive: true });
 
-const vite = await createServer({ root, configFile: false, logLevel: "error", appType: "custom", server: { middlewareMode: true }, optimizeDeps: { noDiscovery: true, include: [] } });
+const vite = await createServer({ root, configFile: false, logLevel: "error", appType: "custom", server: { middlewareMode: true, hmr: false, ws: false }, optimizeDeps: { noDiscovery: true, include: [] } });
 try {
   const { cutOutPng, decodePng, encodePng } = await vite.ssrLoadModule("/server/cutout.ts");
   const { cutoutPrompt } = await vite.ssrLoadModule("/server/prompts.ts");

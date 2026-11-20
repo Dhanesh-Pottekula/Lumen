@@ -5,6 +5,12 @@
  *   GET  /api/films            the saved films, newest first
  *   GET  /api/films/<run>      one saved film (also the resync source when a stream is cut)
  *   DELETE /api/films/<run>    remove one saved film: its folder of pictures, voice and film.json
+ *   GET  /api/films/<run>/calls        every model call of the run, without the texts
+ *   GET  /api/films/<run>/calls/<n>    one call in full: all that went in and all that came out
+ *   GET  /api/films/<run>/plan         the plan as the planner wrote it
+ *   GET  /api/films/<run>/log          the run's log: every stage's progress, with its time
+ *   GET  /api/settings         the model and effort each stage uses, and every prompt with its default
+ *   PUT  /api/settings         save them: {stages, prompts}; a prompt sent empty goes back to its default
  *   GET  /api/provider         which provider films are made with
  *   GET  /film-runs/<run>/...  a run's pictures and voice files
  */
@@ -18,7 +24,10 @@ import { cartesiaSettings, cartesiaSpeak } from "./providers/cartesia";
 import { offlineProvider } from "./providers/offline";
 import { openAIProvider, openAISettings } from "./providers/openai";
 import type { Provider } from "./providers/types";
+import { DEFAULT_PROMPTS, PROMPT_INFO } from "./prompts";
+import { CHOICES, STAGES, defaultStages, loadSettings, saveSettings, stagesWith } from "./settings";
 import { slug } from "./text";
+import { readCalls, summaryOf } from "./trace";
 import { forCartesia } from "./voice";
 
 const TYPES: Record<string, string> = {
@@ -29,6 +38,7 @@ const TYPES: Record<string, string> = {
   ".mp3": "audio/mpeg",
   ".wav": "audio/wav",
   ".json": "application/json",
+  ".jsonl": "application/x-ndjson",
 };
 
 /** KEY=value lines of a .env file; missing file → {}. */
@@ -53,13 +63,30 @@ export function chooseProvider(root: string): Provider | null {
   // FILM_OFFLINE_TICK slows the offline provider down (milliseconds per tick), to watch the player wait for scenes.
   if (env.FILM_PROVIDER === "offline") return offlineProvider({ tick: Number(env.FILM_OFFLINE_TICK) || undefined });
   if (!key) return null;
-  const openai = openAIProvider(openAISettings(env, key));
+  // What was chosen in the app goes over the environment's settings, stage by stage.
+  const stages = stagesWith(loadSettings(root), env);
+  const openai = openAIProvider({
+    ...openAISettings(env, key),
+    planModel: stages.plan.model,
+    planEffort: stages.plan.effort ?? "",
+    writeModel: stages.scene.model,
+    writeEffort: stages.scene.effort ?? "",
+    inspectModel: stages.parts.model,
+    inspectEffort: stages.parts.effort ?? "",
+    imageModel: stages.picture.model,
+    imageQuality: stages.picture.quality ?? "medium",
+    voiceModel: stages.voice.model,
+    voice: stages.voice.voice ?? "coral",
+    hearModel: stages.timing.model,
+  });
   if (!env.CARTESIA_API_KEY) return openai;
   // AiRA's own voice when its key is here; the OpenAI voice if a Cartesia call fails.
   const cartesia = cartesiaSettings(env, env.CARTESIA_API_KEY);
   const provider: Provider = {
     ...openai,
     name: "openai+cartesia",
+    // The record should say who really spoke: Cartesia, with the OpenAI voice only as its stand-in.
+    stages: { ...openai.stages, voice: { model: cartesia.model, settings: { voice: cartesia.voice, "if it fails": `${stages.voice.model} (${stages.voice.voice ?? "coral"})` } } },
     speak: (text, style, stepId) =>
       cartesiaSpeak(cartesia, text).then(
         (audio) => {
@@ -84,11 +111,11 @@ function send(res: ServerResponse, status: number, body: unknown) {
   res.end(JSON.stringify(body));
 }
 
-async function readBody(req: IncomingMessage): Promise<string> {
+async function readBody(req: IncomingMessage, most = 20_000): Promise<string> {
   let body = "";
   for await (const chunk of req) {
     body += chunk;
-    if (body.length > 20_000) throw new Error("the request is too large");
+    if (body.length > most) throw new Error("the request is too large");
   }
   return body;
 }
@@ -98,6 +125,21 @@ export function filmServer(): Plugin {
   const runsDir = () => path.join(root, "runs");
   /** Films being made right now. Their folders are still being written to, so they cannot be removed. */
   const making = new Set<string>();
+
+  /**
+   * True while a run is being made. A film made by this server is known for certain. One made another way (the
+   * command line) says "generating" in its file, and counts as live while its log is still being written to; a
+   * run that stopped without finishing goes quiet and is then no longer live.
+   */
+  const isLive = (film: FilmFile): boolean => {
+    if (making.has(film.run)) return true;
+    if (film.status !== "generating") return false;
+    try {
+      return Date.now() - fs.statSync(path.join(runsDir(), film.run, "log.jsonl")).mtimeMs < 240_000;
+    } catch {
+      return false;
+    }
+  };
 
   const savedFilm = (run: string): FilmFile | null => {
     const file = path.join(runsDir(), run, "film.json");
@@ -115,16 +157,50 @@ export function filmServer(): Plugin {
 
     if (route === "/api/provider" && req.method === "GET") return send(res, 200, { name: chooseProvider(root)?.name ?? "none" });
 
+    if (route === "/api/settings" && (req.method === "GET" || req.method === "PUT")) {
+      if (req.method === "PUT") {
+        let body: unknown;
+        try {
+          body = JSON.parse(await readBody(req, 2_000_000));
+        } catch {
+          return send(res, 400, { error: "send JSON: {\"stages\": {...}, \"prompts\": {...}}" });
+        }
+        saveSettings(root, body);
+      }
+      const env = { ...readEnv(path.join(root, ".env")), ...process.env };
+      const settings = loadSettings(root);
+      const defaults = defaultStages(env);
+      const inForce = stagesWith(settings, env);
+      return send(res, 200, {
+        provider: chooseProvider(root)?.name ?? "none",
+        stages: STAGES.map((info) => ({
+          ...info,
+          setting: inForce[info.stage],
+          default: defaults[info.stage],
+          changed: Boolean(settings.stages[info.stage]),
+          // With a Cartesia key the narration is Cartesia's, and it times its own words: say so where it matters.
+          ...(env.CARTESIA_API_KEY && info.stage === "voice" ? { note: `Cartesia speaks (${env.FILM_CARTESIA_MODEL ?? "sonic-3.6"}), because a Cartesia key is set. The model below is used only when a Cartesia call fails.` } : {}),
+          ...(env.CARTESIA_API_KEY && info.stage === "timing" ? { note: "Cartesia reports each word's time itself, so this stage runs only for a clip the fallback voice spoke." } : {}),
+        })),
+        choices: CHOICES,
+        prompts: PROMPT_INFO.map((info) => ({ ...info, default: DEFAULT_PROMPTS[info.key], text: settings.prompts[info.key] ?? DEFAULT_PROMPTS[info.key], edited: info.key in settings.prompts })),
+      });
+    }
+
     if (route === "/api/films" && req.method === "GET") {
       const runs = fs.existsSync(runsDir()) ? fs.readdirSync(runsDir()) : [];
       const films = runs
         .map(savedFilm)
-        .filter((film): film is FilmFile => film !== null && film.scenes.length > 0)
+        // The studio's shelf shows films that can be played; the runs page asks for every run, playable or not.
+        .filter((film): film is FilmFile => film !== null && (url.searchParams.has("all") || film.scenes.length > 0))
         .map((film) => ({
           run: film.run,
           title: film.header.title,
           brief: film.brief,
-          status: film.status,
+          // A run that says it is being made but is not: the server was stopped under it.
+          status: film.status === "generating" && !isLive(film) ? (film.scenes.length ? "ready" : "failed") : film.status,
+          making: isLive(film),
+          cost: film.usage?.cost ?? null,
           scenes: film.scenes.length,
           provider: film.provider,
           // The first picture of the film, as its poster.
@@ -158,7 +234,7 @@ export function filmServer(): Plugin {
       };
       making.add(run);
       try {
-        await makeFilm({ provider, skillsDir: { ...readEnv(path.join(root, ".env")), ...process.env }.FILM_SKILLS_DIR || path.join(root, "skills"), brief, run, dir: path.join(runsDir(), run), base: `/film-runs/${run}`, emit });
+        await makeFilm({ provider, prompts: loadSettings(root).prompts, skillsDir: { ...readEnv(path.join(root, ".env")), ...process.env }.FILM_SKILLS_DIR || path.join(root, "skills"), brief, run, dir: path.join(runsDir(), run), base: `/film-runs/${run}`, emit });
       } catch (error) {
         emit({ type: "film_done", run, status: "failed", scenes: 0, error: String((error as Error).message ?? error) });
       } finally {
@@ -166,6 +242,47 @@ export function filmServer(): Plugin {
       }
       res.end();
       return;
+    }
+
+    // The record of a run's making. A film made before calls were recorded has an empty list.
+    const record = /^\/api\/films\/([a-z0-9-]+)\/(calls|plan|log)(?:\/(\d+))?$/.exec(route);
+    if (record && req.method === "GET") {
+      const dir = path.join(runsDir(), record[1]);
+      if (!fs.existsSync(path.join(dir, "film.json"))) return send(res, 404, { error: "no such film" });
+      if (record[2] === "plan") {
+        const file = path.join(dir, "plan.json");
+        return send(res, 200, { text: fs.existsSync(file) ? fs.readFileSync(file, "utf8") : "" });
+      }
+      if (record[2] === "log") {
+        const file = path.join(dir, "log.jsonl");
+        const lines = fs.existsSync(file) ? fs.readFileSync(file, "utf8").split("\n").filter(Boolean) : [];
+        // A scene writer's whole reply is in the calls; here it would only bury the progress lines.
+        const events = lines.flatMap((line) => {
+          try {
+            const { reply: _reply, ...event } = JSON.parse(line) as Record<string, unknown>;
+            return [event];
+          } catch {
+            return [];
+          }
+        });
+        return send(res, 200, { events });
+      }
+      const calls = readCalls(path.join(dir, "calls.jsonl"));
+      if (record[3] === undefined) {
+        const film = savedFilm(record[1]);
+        // How long the run has been going, for a run still being made: its folder's first file marks its start.
+        let elapsed: number | null = null;
+        if (film && isLive(film)) {
+          try {
+            elapsed = Math.round((Date.now() - fs.statSync(path.join(dir, "film.json")).birthtimeMs) / 100) / 10;
+          } catch {
+            elapsed = null;
+          }
+        }
+        return send(res, 200, { calls: calls.map(summaryOf), making: film ? isLive(film) : false, elapsed });
+      }
+      const call = calls.find((c) => c.n === Number(record[3]));
+      return call ? send(res, 200, call) : send(res, 404, { error: "no such call" });
     }
 
     const one = /^\/api\/films\/([a-z0-9-]+)$/.exec(route);

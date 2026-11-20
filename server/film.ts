@@ -18,7 +18,8 @@ import type { FilmEvent, FilmFile, FilmHeader, FilmScene, Hotspot, ImageObject, 
 import { alignWords } from "../src/film/words";
 import { validateScene, withPictures } from "../src/film/validate";
 import { cutOutPng, shrinkPng } from "./cutout";
-import { PARTS_SYSTEM, PLAN_SYSTEM, SCENE_REPAIR, SCENE_SYSTEM, VOICE_STYLE, cutoutPrompt, drawingPrompt, partsContext, sceneContext, sceneRetry, sceneStable } from "./prompts";
+import { DEFAULT_PROMPTS, PROMPT_INFO, type Prompts, SCENE_REPAIR, cutoutPrompt, drawingPrompt, partsContext, promptsWith, sceneContext, sceneRetry, sceneStable } from "./prompts";
+import { createTracer } from "./trace";
 import { createMeter } from "./usage";
 import type { ImageBytes, Message, Provider } from "./providers/types";
 import { loadSkills, skillTool } from "./skills";
@@ -64,6 +65,8 @@ export interface FilmJob {
   dir: string;
   /** Folder of AiRA film skills (narrative/ and visual/), or nothing. */
   skillsDir?: string;
+  /** Prompts a person rewrote, by key. Each one left out is the default. */
+  prompts?: Partial<Prompts>;
   /** Web path the folder is served at, such as /film-runs/<run>. */
   base: string;
   emit: (event: FilmEvent) => void;
@@ -132,13 +135,25 @@ export function hotspotsOf(found: { parts: { part: string; box: number[] }[]; mi
  * A short fingerprint of the prompts a film was made with. Two films with the same value were written by the
  * same planner, scene writer, part finder and look, so their numbers can be compared.
  */
-export function promptVersion(): string {
-  const text = [PLAN_SYSTEM, SCENE_SYSTEM, PARTS_SYSTEM, VOICE_STYLE, drawingPrompt("", "none", "lead"), drawingPrompt("the main character", "x", "state"), drawingPrompt("", "x", "styled"), cutoutPrompt("the main character", "x", "styled"), cutoutPrompt("", "x", "state")].join("\u0000");
+export function promptVersion(prompts: Prompts = DEFAULT_PROMPTS): string {
+  const text = [
+    prompts.plan,
+    prompts.scene,
+    prompts.parts,
+    prompts.voice,
+    drawingPrompt("", "none", "lead", prompts.look),
+    drawingPrompt("the main character", "x", "state", prompts.look),
+    drawingPrompt("", "x", "styled", prompts.look),
+    cutoutPrompt("the main character", "x", "styled", prompts.cutoutLook),
+    cutoutPrompt("", "x", "state", prompts.cutoutLook),
+  ].join("\u0000");
   return createHash("sha256").update(text).digest("hex").slice(0, 12);
 }
 
 export async function makeFilm(job: FilmJob): Promise<FilmFile> {
-  const { provider, brief, run, dir, base, emit } = job;
+  const { brief, run, dir, base, emit } = job;
+  const source = job.provider;
+  const P = promptsWith(job.prompts);
   const skills = loadSkills(job.skillsDir);
   let chosenSkills: string[] = [];
   const meter = createMeter();
@@ -146,6 +161,15 @@ export async function makeFilm(job: FilmJob): Promise<FilmFile> {
   fs.mkdirSync(path.join(dir, "voice"), { recursive: true });
 
   const started = Date.now();
+  // Every model call is recorded in full, for anyone who wants to see how the film was made.
+  const tracer = createTracer({
+    file: path.join(dir, "calls.jsonl"),
+    started,
+    describe: (stage) => source.stages?.[stage] ?? { model: source.name },
+    // A cut-out's call gets back the drawing on white; that is the file kept as <id>.drawn.png.
+    outputSrc: (stage, id, type) => (stage === "picture" ? `${base}/pictures/${id}${plans.get(id)?.cutout ? ".drawn" : ""}.${EXTENSIONS[type] ?? "png"}` : stage === "voice" ? `${base}/voice/${id}.${EXTENSIONS[type] ?? "mp3"}` : undefined),
+  });
+  const provider = tracer.wrap(source);
   const log = (entry: Record<string, unknown>) =>
     fs.appendFileSync(path.join(dir, "log.jsonl"), JSON.stringify({ t: Math.round((Date.now() - started) / 100) / 10, ...entry }) + "\n");
   const progress = (stage: ProgressStage, status: ProgressStatus, text: string, extra: { id?: string; index?: number; src?: string } = {}) => {
@@ -159,7 +183,8 @@ export async function makeFilm(job: FilmJob): Promise<FilmFile> {
   save();
 
   // Every model call reports what it consumed; the running total goes to the viewer as it grows.
-  provider.report = (stage, model, usage) => {
+  source.report = (stage, model, usage) => {
+    tracer.usage(model, usage);
     meter.add(stage, model, usage);
     film.usage = meter.summary();
     log({ stage: "usage", for: stage, model, ...usage });
@@ -174,7 +199,7 @@ export async function makeFilm(job: FilmJob): Promise<FilmFile> {
    * without this each of the first few would pay to write the same text, and none could read it.
    */
   let warmed: Promise<void> | null = null;
-  const warmUp = () => (warmed ??= provider.warm ? provider.warm(SCENE_SYSTEM, stableText()).catch((error) => log({ stage: "warm-up", error: String((error as Error).message ?? error) })) : Promise.resolve());
+  const warmUp = () => (warmed ??= provider.warm ? provider.warm(P.scene, stableText()).catch((error) => log({ stage: "warm-up", error: String((error as Error).message ?? error) })) : Promise.resolve());
 
   const plans = new Map<string, PicturePlan>();
   const steps: Step[] = [];
@@ -235,7 +260,7 @@ export async function makeFilm(job: FilmJob): Promise<FilmFile> {
           // One redraw: the image model sometimes adds a floor, a shadow or a whole scene, and the cut says so.
           for (let attempt = 1; attempt <= 2; attempt++) {
             try {
-              const prompt = cutoutPrompt(plan.brief, character, mode) + (why ? `\n\nThe last drawing could not be used: ${why}. Draw it again as asked.` : "");
+              const prompt = cutoutPrompt(plan.brief, character, mode, P.cutoutLook) + (why ? `\n\nThe last drawing could not be used: ${why}. Draw it again as asked.` : "");
               const image = await provider.draw(prompt, reference, plan.id);
               const cut = cutOutPng(image.bytes);
               log({ stage: "picture", id: plan.id, attempt, cut: { width: cut.width, height: cut.height, coverage: Math.round(cut.coverage * 1000) / 1000, edges: cut.edges, problem: cut.problem } });
@@ -245,6 +270,7 @@ export async function makeFilm(job: FilmJob): Promise<FilmFile> {
               }
               // The drawing as it came is kept beside the cut-out: another pose of this thing is redrawn from it.
               fs.writeFileSync(path.join(dir, `pictures/${plan.id}.drawn.png`), image.bytes);
+              tracer.name(image.bytes, `${base}/pictures/${plan.id}.drawn.png`);
               const file = `pictures/${plan.id}.png`;
               fs.writeFileSync(path.join(dir, file), cut.png);
               return { ...image, file, width: cut.width, height: cut.height };
@@ -258,17 +284,25 @@ export async function makeFilm(job: FilmJob): Promise<FilmFile> {
       }
       return drawing(async () => {
         progress("picture", "drawing", `Drawing ${plan.id}`, { id: plan.id });
-        try {
-          const image = await provider.draw(drawingPrompt(plan.brief, character, mode), reference, plan.id);
-          const size = imageSize(image.bytes);
-          if (!size) throw new Error("the drawing came back in a format that cannot be measured");
-          const file = `pictures/${plan.id}.${EXTENSIONS[image.type] ?? "png"}`;
-          fs.writeFileSync(path.join(dir, file), image.bytes);
-          return { ...image, file, width: size[0], height: size[1] };
-        } catch (error) {
-          progress("picture", "failed", `Could not draw ${plan.id}: ${String((error as Error).message ?? error)}`, { id: plan.id });
-          return null;
+        // A drawing can be refused or fail for no reason that holds a second time, and a step without its picture
+        // shows the wrong thing under the right words. So a background, like a cut-out, gets a second try.
+        let why = "";
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          try {
+            const image = await provider.draw(drawingPrompt(plan.brief, character, mode, P.look), reference, plan.id);
+            const size = imageSize(image.bytes);
+            if (!size) throw new Error("the drawing came back in a format that cannot be measured");
+            const file = `pictures/${plan.id}.${EXTENSIONS[image.type] ?? "png"}`;
+            fs.writeFileSync(path.join(dir, file), image.bytes);
+            tracer.name(image.bytes, `${base}/${file}`);
+            return { ...image, file, width: size[0], height: size[1] };
+          } catch (error) {
+            why = String((error as Error).message ?? error);
+            log({ stage: "picture", id: plan.id, attempt, error: why });
+          }
         }
+        progress("picture", "failed", `Could not draw ${plan.id}: ${why}`, { id: plan.id });
+        return null;
       });
     })();
     drawings.set(plan.id, drawn);
@@ -285,7 +319,7 @@ export async function makeFilm(job: FilmJob): Promise<FilmFile> {
             for (let attempt = 1; attempt <= 2; attempt++) {
               try {
                 const ids = plan.parts.map((p) => p.id);
-                const found = await provider.findParts(PARTS_SYSTEM, partsContext(plan.brief, image.width, image.height, plan.parts), image, plan.id, ids);
+                const found = await provider.findParts(P.parts, partsContext(plan.brief, image.width, image.height, plan.parts), image, plan.id, ids);
                 log({ stage: "picture", id: plan.id, attempt, found });
                 return hotspotsOf(found, ids, image.width, image.height);
               } catch (error) {
@@ -313,10 +347,11 @@ export async function makeFilm(job: FilmJob): Promise<FilmFile> {
       step.id,
       speaking(async () => {
         try {
-          const audio = await provider.speak(step.voice, VOICE_STYLE, step.id);
+          const audio = await provider.speak(step.voice, P.voice, step.id);
           if (!audio) return null;
           const file = `voice/${step.id}.${EXTENSIONS[audio.type] ?? "mp3"}`;
           fs.writeFileSync(path.join(dir, file), audio.bytes);
+          tracer.name(audio.bytes, `${base}/${file}`);
           const voice: SceneAudio = { src: `${base}/${file}` };
           // Word times let beats and subtitles land on the spoken word. Without them an even rate is assumed.
           try {
@@ -386,7 +421,13 @@ export async function makeFilm(job: FilmJob): Promise<FilmFile> {
     for (const [id, picture] of drawnHere) {
       const drawn = await drawings.get(id);
       if (!drawn || drawn.type !== "image/png") continue;
-      shown.push({ label: `The picture "${id}", ${picture.cutout ? "a cut-out, shown here on white before the white is removed" : "a background"}:`, image: { bytes: shrinkPng(drawn.bytes, SHOWN_WIDTH), type: "image/png" } });
+      shown.push({ label: `The picture "${id}", ${picture.cutout ? "a cut-out, shown here on white before the white is removed" : "a background"}:`, image: shownAs(drawn, `${base}/pictures/${id}${picture.cutout ? ".drawn" : ""}.png`) });
+    }
+
+    function shownAs(drawn: Drawn, src: string): ImageBytes {
+      const small = shrinkPng(drawn.bytes, SHOWN_WIDTH);
+      tracer.name(small, src);
+      return { bytes: small, type: "image/png" };
     }
 
     const verdict = await writing.run(place, async () => {
@@ -397,7 +438,7 @@ export async function makeFilm(job: FilmJob): Promise<FilmFile> {
       let raw: Record<string, unknown> | null = null;
       try {
         for (const attempt of ["write", "repair"] as const) {
-          const reply = await provider.write(SCENE_SYSTEM, messages, step.id);
+          const reply = await provider.write(P.scene, messages, step.id);
           // The whole reply is kept, so a beat the film later drops can still be read.
           log({ stage: "scene", id: step.id, attempt, chars: reply.length, reply });
           messages = [...messages, { role: "assistant", content: reply }];
@@ -412,7 +453,7 @@ export async function makeFilm(job: FilmJob): Promise<FilmFile> {
         if (checked.problems.length) {
           log({ stage: "scene", id: step.id, problems: checked.problems });
           const ids = rows.map((row) => row.cutout ? `- cut-out ${row.id}: placed and moved, never aimed at` : `- background ${row.id}: ${row.parts.length ? `its parts are ${row.parts.map((p) => `${row.id}.${p}`).join(", ")}` : "no part can be named, only the whole picture"}`).join("\n");
-          const reply = await provider.write(SCENE_SYSTEM, [...messages, { role: "user", content: sceneRetry(checked.problems, ids) }], step.id);
+          const reply = await provider.write(P.scene, [...messages, { role: "user", content: sceneRetry(checked.problems, ids) }], step.id);
           const fixed = jsonObject(reply);
           const again = fixed ? validateScene(fixed, rows, step.id, step.narration) : null;
           // Keep the correction only if it is playable and no worse than the first try.
@@ -488,7 +529,7 @@ export async function makeFilm(job: FilmJob): Promise<FilmFile> {
       void warmUp();
     });
     if (!tool) void warmUp();
-    await provider.plan(PLAN_SYSTEM, brief, take, tool);
+    await provider.plan(P.plan, brief, take, tool);
     fs.writeFileSync(path.join(dir, "plan.json"), buffer);
     progress("plan", "written", `Plan done: ${plans.size} pictures, ${steps.length} steps`);
   } catch (error) {
@@ -506,7 +547,14 @@ export async function makeFilm(job: FilmJob): Promise<FilmFile> {
   film.usage = meter.summary();
   // Only the folder's last two names are kept: enough to tell Lumen's own skills from another set, without a home path.
   const skillsAt = path.resolve(job.skillsDir ?? "");
-  film.made = { prompts: promptVersion(), skills: chosenSkills, skillsFrom: skills.length ? `${path.basename(path.dirname(skillsAt))}/${path.basename(skillsAt)}` : null };
+  film.made = {
+    prompts: promptVersion(P),
+    // Which prompts were a person's own rewrite, and what each stage ran on, so the film says how it was made.
+    edited: PROMPT_INFO.map((info) => info.key).filter((key) => P[key] !== DEFAULT_PROMPTS[key]),
+    stages: source.stages ?? {},
+    skills: chosenSkills,
+    skillsFrom: skills.length ? `${path.basename(path.dirname(skillsAt))}/${path.basename(skillsAt)}` : null,
+  };
   save();
   const error = film.status === "failed" ? (failure ?? "no scene could be made") : undefined;
   emit({ type: "film_done", run, status: film.status, scenes: film.scenes.length, ...(error ? { error } : {}) });

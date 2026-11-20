@@ -4,6 +4,7 @@
  * The key is read by the caller and is only ever sent to api.openai.com.
  */
 import { partsSchema } from "../prompts";
+import { noteExchange, readableBody, scrubbed } from "../trace";
 import { deliveryNotes, plainOf } from "../voice";
 import type { CallUsage } from "../usage";
 import type { ImageBytes, Message, PartsFound, Provider } from "./types";
@@ -28,6 +29,10 @@ export interface OpenAISettings {
   voiceModel: string;
   voice: string;
   hearModel: string;
+  /** Reasoning effort for the planner, the scene writer and the part finder. "" leaves it to the model. */
+  planEffort: string;
+  writeEffort: string;
+  inspectEffort: string;
   /** Mark the stable start of a scene writer's prompt as an explicit cache breakpoint, as AiRA does. */
   cacheBreakpoint: boolean;
   /** Optional cache lifetime: "30m" (the default) or "12h", passed as prompt_cache_options.ttl. */
@@ -45,6 +50,9 @@ export function openAISettings(env: Record<string, string | undefined>, key: str
     voiceModel: env.FILM_TTS_MODEL ?? "gpt-4o-mini-tts",
     voice: env.FILM_TTS_VOICE ?? "coral",
     hearModel: env.FILM_HEAR_MODEL ?? "whisper-1",
+    planEffort: env.FILM_PLAN_EFFORT ?? "medium",
+    writeEffort: env.FILM_WRITE_EFFORT ?? "medium",
+    inspectEffort: env.FILM_INSPECT_EFFORT ?? "low",
     cacheBreakpoint: env.FILM_CACHE_BREAKPOINT !== "0",
     cacheTtl: env.FILM_CACHE_TTL || undefined,
   };
@@ -94,14 +102,22 @@ export function openAIProvider(settings: OpenAISettings): Provider {
   /** One call with a timeout; 429 and 5xx are retried with a growing wait. */
   async function call(path: string, init: RequestInit, timeoutMs: number, retries: number): Promise<Response> {
     for (let attempt = 0; ; attempt++) {
+      const began = Date.now();
       try {
         const res = await fetch(`${BASE}${path}`, {
           ...init,
           headers: { ...auth, ...(init.headers as Record<string, string> | undefined) },
           signal: AbortSignal.timeout(timeoutMs),
         });
-        if (res.ok) return res;
+        if (res.ok) {
+          // The request as sent and the answer as it came, for the film's record. Picture and sound data are left out.
+          const kind = res.headers.get("content-type") ?? "";
+          const answer = kind.includes("json") ? scrubbed(await res.clone().json().catch(() => "<an answer that could not be read>")) : `<${kind || "data"}, left out>`;
+          noteExchange({ path, request: readableBody(init.body), status: res.status, response: answer, ms: Date.now() - began });
+          return res;
+        }
         const body = await res.text();
+        noteExchange({ path, request: readableBody(init.body), status: res.status, response: body.slice(0, 4000), ms: Date.now() - began });
         if ((res.status === 429 || res.status >= 500) && attempt < retries) {
           await new Promise((r) => setTimeout(r, 2000 * 2 ** attempt));
           continue;
@@ -171,8 +187,20 @@ export function openAIProvider(settings: OpenAISettings): Provider {
     }
   }
 
+  /** A reasoning field for a request, or nothing when the stage leaves effort to the model. */
+  const reasoning = (effort: string) => (effort ? { reasoning: { effort } } : {});
+
   const provider: Provider = {
     name: "openai",
+    stages: {
+      plan: { model: settings.planModel, effort: settings.planEffort || "model default" },
+      scene: { model: settings.writeModel, effort: settings.writeEffort || "model default" },
+      "warm-up": { model: settings.writeModel, effort: "low" },
+      parts: { model: settings.inspectModel, effort: settings.inspectEffort || "model default" },
+      picture: { model: settings.imageModel, settings: { quality: settings.imageQuality, size: "1536x1024" } },
+      voice: { model: settings.voiceModel, settings: { voice: settings.voice } },
+      timing: { model: settings.hearModel },
+    },
 
     async plan(system, brief, onText, skills) {
       const tools = skills
@@ -207,24 +235,26 @@ export function openAIProvider(settings: OpenAISettings): Provider {
         let idle = setTimeout(() => controller.abort(), 120_000);
         type Completed = { id?: string; usage?: ResponsesUsage; output?: { type: string; call_id?: string; arguments?: string }[] };
         const done: { response: Completed | null } = { response: null };
+        const began = Date.now();
+        // What this round sent and what it wrote, for the film's record.
+        let sent: unknown = null;
+        let wrote = "";
         try {
-          const send = () =>
-            fetch(`${BASE}/responses`, {
-              method: "POST",
-              headers: { ...auth, "Content-Type": "application/json" },
-              body: JSON.stringify({
-                model: settings.planModel,
-                reasoning: { effort: "medium" },
-                max_output_tokens: 128_000,
-                instructions: system,
-                input,
-                stream: true,
-                ...cacheFields("lumen_film_plan"),
-                ...(tools ? { tools } : {}),
-                ...(previous ? { previous_response_id: previous } : {}),
-              }),
-              signal: controller.signal,
-            });
+          const send = () => {
+            const body = {
+              model: settings.planModel,
+              ...reasoning(settings.planEffort),
+              max_output_tokens: 128_000,
+              instructions: system,
+              input,
+              stream: true,
+              ...cacheFields("lumen_film_plan"),
+              ...(tools ? { tools } : {}),
+              ...(previous ? { previous_response_id: previous } : {}),
+            };
+            sent = body;
+            return fetch(`${BASE}/responses`, { method: "POST", headers: { ...auth, "Content-Type": "application/json" }, body: JSON.stringify(body), signal: controller.signal });
+          };
           let res = await send();
           if (!res.ok) {
             const refusal = await res.text();
@@ -253,7 +283,10 @@ export function openAIProvider(settings: OpenAISettings): Provider {
                 .join("");
               if (!data || data === "[DONE]") continue;
               const event = JSON.parse(data) as { type: string; delta?: string; response?: Completed };
-              if (event.type === "response.output_text.delta" && event.delta) onText(event.delta);
+              if (event.type === "response.output_text.delta" && event.delta) {
+                wrote += event.delta;
+                onText(event.delta);
+              }
               else if (event.type === "response.completed") done.response = event.response ?? null;
               else if (event.type === "response.failed" || event.type === "error") throw new ApiError(500, data);
               // Cut off by the token limit: the steps so far are kept, and the film says it stopped early.
@@ -262,6 +295,14 @@ export function openAIProvider(settings: OpenAISettings): Provider {
           }
         } finally {
           clearTimeout(idle);
+          // Streamed, so there is no one answer to keep: the text it wrote, any tool it called, and its counts.
+          noteExchange({
+            path: "/responses (streamed)",
+            request: scrubbed(sent),
+            status: done.response ? 200 : 0,
+            response: { id: done.response?.id, text: wrote, calls: (done.response?.output ?? []).filter((item) => item.type === "function_call"), usage: done.response?.usage },
+            ms: Date.now() - began,
+          });
         }
         if (done.response?.usage) provider.report?.("plan", settings.planModel, counted(done.response.usage));
         const calls = (done.response?.output ?? []).filter((item) => item.type === "function_call");
@@ -302,7 +343,7 @@ export function openAIProvider(settings: OpenAISettings): Provider {
         "/responses",
         json({
           model: settings.inspectModel,
-          reasoning: { effort: "low" },
+          ...reasoning(settings.inspectEffort),
           max_output_tokens: 3000,
           instructions: system,
           input: [
@@ -337,7 +378,7 @@ export function openAIProvider(settings: OpenAISettings): Provider {
     },
 
     async write(system, messages: Message[]) {
-      const reply = await respond(system, messages, { reasoning: { effort: "medium" }, max_output_tokens: 16_000 });
+      const reply = await respond(system, messages, { ...reasoning(settings.writeEffort), max_output_tokens: 16_000 });
       provider.report?.("scene", settings.writeModel, counted(reply.usage));
       return outputText(reply);
     },

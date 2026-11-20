@@ -28,7 +28,7 @@ if (!brief) {
   process.exit(1);
 }
 
-const vite = await createServer({ root: code, configFile: false, logLevel: "error", appType: "custom", server: { middlewareMode: true }, optimizeDeps: { noDiscovery: true, include: [] } });
+const vite = await createServer({ root: code, configFile: false, logLevel: "error", appType: "custom", server: { middlewareMode: true, hmr: false, ws: false }, optimizeDeps: { noDiscovery: true, include: [] } });
 let status = 1;
 try {
   const { chooseProvider } = await vite.ssrLoadModule("/server/plugin.ts");
@@ -55,8 +55,11 @@ try {
   const run = `${new Date().toISOString().replace(/[-:T]/g, "").slice(0, 14)}-${slug(brief).slice(0, 28) || "film"}${tag ? `-${slug(tag)}` : ""}`;
   const dir = path.join(root, "runs", run);
   console.log(`${run}  (${provider.name}, code from ${path.relative(root, code) || "this checkout"})`);
+  const { loadSettings } = await vite.ssrLoadModule("/server/settings.ts").catch(() => ({ loadSettings: () => ({ prompts: {} }) }));
   const film = await makeFilm({
     provider,
+    // The prompts a person rewrote in the app are used here too, so both ways of making a film agree.
+    prompts: loadSettings(root).prompts,
     skillsDir: process.env.FILM_SKILLS_DIR || path.join(code, "skills"),
     brief,
     run,

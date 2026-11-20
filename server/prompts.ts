@@ -38,7 +38,9 @@ These are aims, not a checklist. Use your judgement about how each one applies t
 - It is true. Reason from how the world really works, with real quantities, including when the question is a
   hypothetical. A film that invents drama to be interesting has failed at its one job.
 - It is concrete. People understand a thing they can picture happening before they understand its name or its
-  rule. Assume the person knows everyday life and none of the subject's terms.
+  rule. Assume the person knows everyday life and none of the subject's terms. A real figure, said plainly, is
+  concrete too: "about five times as much" or "eight minutes" gives the person something to hold, where "much
+  more" or "a while" gives them nothing. Where the subject has real numbers, the voice says the few that matter.
 - It has pull. Interest should come from the subject itself: its stakes, its surprises, the gap between what
   seems obvious and what is so. A film that feels the same from start to finish goes flat.
 - It sounds like a person. The narration is heard, not read. It should sound like a thoughtful friend talking to
@@ -51,8 +53,10 @@ These are aims, not a checklist. Use your judgement about how each one applies t
   the eye. An arrow for a force or a direction, a thing cut open to show its inside, two things side by side to
   compare them, a scale or a gauge, the marks of weight, strain or speed. A plain view of a place with a person
   in it leaves the voice to do all the explaining.
-- A quantity is seen. When the voice gives a number, a multiple, an amount or a size, the viewer reads it on
-  the screen as it is said, beside the thing it measures. A number that is only heard is gone a moment later.
+- What is said is also read. When the voice gives a number, a multiple, an amount or a size, the viewer reads it
+  on the screen as it is said, beside the thing it measures: a number that is only heard is gone a moment later.
+  The same holds for a name the person is meeting for the first time, a thing, a part or a process: written
+  beside what it names as the voice says it, it stays with the picture.
 - It is one world. The same place, person or thing looks the same every time it appears, and when something
   changes the viewer sees that same thing changed, not an unrelated new drawing.
 - It ends well. The person leaves with the answer to the question they came with.
@@ -84,10 +88,12 @@ Pictures:
 What the film does with them:
 - It cuts between pictures. Within one, the camera moves to any part of it you named, and back out to the whole
   frame. It has nowhere else to go.
-- It puts these on top, at the moment the voice says them: short words; a number that counts up to its value; a
-  formula; a bar, pie or line chart of a few values; a name attached to a named part; a ring round a named
-  part, or everything but that part darkened; a short line of speech in a bubble beside a named part; a brief
-  shake or a white flash of the whole frame.
+- It puts these on top, at the moment the voice says them: large bold words; a large number that counts up to
+  its value; a formula; a bar, pie or line chart of a few values; a small name tag attached to a named part; a
+  ring round a named part, or everything but that part darkened; a short line of speech in a bubble beside a
+  named part; a brief shake or a white flash of the whole frame.
+- Writing comes in those two sizes for a reason. A small tag names a thing and stays beside it. Large words or
+  a large number are what the viewer reads first: they are for the figure or the few words a step turns on.
 - It can put nothing else on top: no line, arrow or shape, and nothing at a place where nothing is drawn.
 - Subtitles of the narration run along the bottom of the frame.
 
@@ -162,8 +168,9 @@ steps: the film in order. Aim for six to eight steps and 400 to 600 spoken words
 - show: your direction to the scene writer, who sees only this step and its pictures. Say what the step is meant
   to do for the viewer, and what the screen shows as the narration goes. Tie each thing to the narration words it
   belongs with by quoting those words exactly: that is how it is timed. Name pictures and parts by id, a part as
-  picture.part. Put in quotes whatever is to be written on the screen. It says what the voice says at that
-  moment and nothing the voice does not, though a number may be written in figures and with its unit or sign.
+  picture.part. Put in quotes whatever is to be written on the screen, and say whether it is a small tag on a
+  thing or large words. It says what the voice says at that moment and nothing the voice does not, though a
+  number may be written in figures and with its unit or sign.
   Ask only for what the screen section above describes.
 
 ## Voice marks
@@ -190,7 +197,11 @@ export function starsCharacter(brief: string, character: string): boolean {
 }
 
 /** The look every background is drawn in: a frame from a 2D animated film, with its whole setting. */
-export function drawingPrompt(brief: string, character: string, mode: "lead" | "styled" | "state"): string {
+export const BACKGROUND_LOOK =
+  "One frame from a 2D animated explainer film, composed like a wide film shot. Flat cartoon drawing with clean bold dark outlines, simple shapes and flat cel shading with one or two shadow tones. The whole frame is drawn edge to edge, with its full setting: walls, floor, sky, furniture, street, whatever the place has. Never an empty, white or plain background. Whatever the brief asks for to explain the idea is drawn in as part of the picture, in the same style: arrows, lines, a thing cut open, two things side by side. Cinematic, moody lighting from one clear light source, deep soft shadows, a strong atmospheric colour grade and a slight dark vignette.";
+
+/** `look` is the opening paragraph: how the film's pictures are drawn. The rest is what the pipeline needs of every frame. */
+export function drawingPrompt(brief: string, character: string, mode: "lead" | "styled" | "state", look: string = BACKGROUND_LOOK): string {
   // The character's look goes to the illustrator only when the brief asks for the character by those words. Given
   // it for every frame, the image model draws the character into frames that never asked for anyone.
   const cast = starsCharacter(brief, character)
@@ -204,7 +215,7 @@ export function drawingPrompt(brief: string, character: string, mode: "lead" | "
     mode === "styled"
       ? "\nThe image given is another frame of the same film. Match its drawing style, line weight and colour grade exactly, but draw this new scene, not that one. Take nothing else from it: no person and no thing in it appears here unless the brief asks for it."
       : "";
-  return `One frame from a 2D animated explainer film, composed like a wide film shot. Flat cartoon drawing with clean bold dark outlines, simple shapes and flat cel shading with one or two shadow tones. The whole frame is drawn edge to edge, with its full setting: walls, floor, sky, furniture, street, whatever the place has. Never an empty, white or plain background. Whatever the brief asks for to explain the idea is drawn in as part of the picture, in the same style: arrows, lines, a thing cut open, two things side by side. Cinematic, moody lighting from one clear light source, deep soft shadows, a strong atmospheric colour grade and a slight dark vignette.
+  return `${look.trim()}
 
 ${cast}
 
@@ -219,7 +230,10 @@ Write no text anywhere in the picture: no letters, numbers, captions, labels, si
  * place and move the thing over a background. Same drawing style as the frames, but lit evenly and with nothing
  * round it, because whatever is round it would be cut away or, worse, kept.
  */
-export function cutoutPrompt(brief: string, character: string, mode: "lead" | "styled" | "state"): string {
+export const CUTOUT_LOOK =
+  "One thing from a 2D animated explainer film, drawn alone so that it can be lifted out and placed into the film's scenes. Flat cartoon drawing with clean bold dark outlines, simple shapes and flat cel shading with one or two shadow tones.";
+
+export function cutoutPrompt(brief: string, character: string, mode: "lead" | "styled" | "state", look: string = CUTOUT_LOOK): string {
   const cast = starsCharacter(brief, character)
     ? `The thing to draw is the film's main character, the same in every picture: ${character} A person is a simple cartoon stick figure: a plain round white head with two dot eyes and a small mouth, thin black limbs, simple flat clothes, the whole body acting out what the brief says.`
     : "Draw only the one thing the brief describes, and no person unless that is what it describes. A person is a simple cartoon stick figure: a plain round white head with two dot eyes and a small mouth, thin black limbs, simple flat clothes.";
@@ -229,7 +243,7 @@ export function cutoutPrompt(brief: string, character: string, mode: "lead" | "s
       : mode === "styled"
         ? `The image given is a frame of the same film. Match its drawing style, line weight and character design exactly, but do not draw that scene. Draw only this one thing: ${brief}`
         : `Draw only this one thing: ${brief}`;
-  return `One thing from a 2D animated explainer film, drawn alone so that it can be lifted out and placed into the film's scenes. Flat cartoon drawing with clean bold dark outlines, simple shapes and flat cel shading with one or two shadow tones.
+  return `${look.trim()}
 
 ${cast}
 
@@ -332,10 +346,11 @@ Everything the step uses, each declared once with its own id (lowercase letters,
 - {"id": "<picture id>", "kind": "image"}: one of this step's pictures, background or cut-out. Add
   "initial": "hidden" to every background except the one the step opens on. A cut-out takes no "initial".
 - {"id": "...", "kind": "text", "text": "...", "zone": "...", "size": "small|medium|large",
-  "color": "white|accent|danger|good"}: bold words over the picture, at most 60 characters.
+  "color": "white|accent|danger|good"}: large bold words over the picture, at most 60 characters. They are the
+  first thing the viewer reads, so they suit the figure or the few words a step turns on.
 - {"id": "...", "kind": "equation", "value": "..."}: a formula, in simple TeX.
 - {"id": "...", "kind": "counter", "from": 0, "to": 100, "prefix": "...", "suffix": "...", "decimals": 0,
-  "label": "..."}: a number that counts from one value to another.
+  "label": "..."}: a large number that counts from one value to another.
 - {"id": "...", "kind": "chart", "chart": "bar|pie|line", "title": "...", "data": [{"label": "...", "value": 1}]}:
   a chart of 2 to 8 values.
 
@@ -363,8 +378,8 @@ leaves the screen as it was, such as the camera aimed where it already is, is no
   (detail). The movements are an instant jump (cut), a smooth travel (move), a push inward (push) and a curved
   swing (arc).
 {"do": "label", "target": "<background>" or "<background>.<part>", "text": "...", "id": "..."}
-  Attaches a short name to a thing, at most 32 characters. It stays until the background changes, or until you
-  hide it by its id.
+  Attaches a small name tag to a thing, at most 32 characters. It names the thing and stays beside it until the
+  background changes, or until you hide it by its id.
 {"do": "speak", "target": "<background>.<part>", "text": "..."}
   Shows a figure's own words in a speech bubble beside that part, at most 60 characters. One bubble at a time.
 {"do": "attention", "target": "<background>.<part>", "verb": "dim|encircle|pulse"}
@@ -469,3 +484,41 @@ export const VOICE_STYLE =
   "You are narrating an animated explainer film for one curious person. Sound like a thoughtful friend telling them " +
   "something worth knowing: warm, clear and natural, never a lecturer and never a salesperson. Let the feeling of " +
   "each passage come through, with a natural pause between sentences.";
+
+// ── The prompts a person may change ─────────────────────────────────────────────────────────────────
+/**
+ * Every prompt the app lets a person rewrite, by key. The parts of a prompt the pipeline depends on (the JSON
+ * shapes, the ids, how a later moment is redrawn) are in these texts too: change them and the film may stop
+ * playing, which is why each can be put back to what it was.
+ */
+export interface Prompts {
+  plan: string;
+  scene: string;
+  parts: string;
+  voice: string;
+  look: string;
+  cutoutLook: string;
+}
+
+export const DEFAULT_PROMPTS: Prompts = { plan: PLAN_SYSTEM, scene: SCENE_SYSTEM, parts: PARTS_SYSTEM, voice: VOICE_STYLE, look: BACKGROUND_LOOK, cutoutLook: CUTOUT_LOOK };
+
+/** What each prompt is, for the page where they are edited. In the order the film uses them. */
+export const PROMPT_INFO: { key: keyof Prompts; title: string; stage: string; about: string }[] = [
+  { key: "plan", title: "Planner", stage: "plan", about: "Turns the question into the whole film: the narration, every picture's brief and each step's direction. It decides what is said and what is shown." },
+  { key: "look", title: "Picture look", stage: "picture", about: "The opening paragraph of every background's drawing request: the drawing style, the light and the mood. The brief and the pipeline's own rules follow it." },
+  { key: "cutoutLook", title: "Cut-out look", stage: "picture", about: "The opening paragraph of every cut-out's drawing request. The rest tells the image model to draw one thing alone on plain white, which the cutting depends on." },
+  { key: "parts", title: "Part finder", stage: "parts", about: "Looks at one finished picture and boxes each part the plan named, so the camera and marks can aim at it." },
+  { key: "scene", title: "Scene writer", stage: "scene", about: "Directs one step: which picture is on screen at which words, where the camera goes, and what is written or moved on top." },
+  { key: "voice", title: "Voice style", stage: "voice", about: "How the narrator should sound. Sent with every step's words to the voice." },
+];
+
+/** The prompts a film is made with: each edited one in place of its default. An empty edit counts as none. */
+export function promptsWith(edited: Partial<Prompts> | undefined): Prompts {
+  const out = { ...DEFAULT_PROMPTS };
+  for (const { key } of PROMPT_INFO) {
+    const text = edited?.[key];
+    if (typeof text === "string" && text.trim()) out[key] = text;
+  }
+  return out;
+}
+

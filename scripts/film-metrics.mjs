@@ -25,7 +25,7 @@ if (folders.length === 0) {
 }
 
 // The metrics are TypeScript and share the engine's own timeline code, so Vite loads them (no build, no config).
-const vite = await createServer({ root, configFile: false, logLevel: "error", appType: "custom", server: { middlewareMode: true }, optimizeDeps: { noDiscovery: true, include: [] } });
+const vite = await createServer({ root, configFile: false, logLevel: "error", appType: "custom", server: { middlewareMode: true, hmr: false, ws: false }, optimizeDeps: { noDiscovery: true, include: [] } });
 const read = (file) => {
   try {
     return JSON.parse(fs.readFileSync(file, "utf8"));

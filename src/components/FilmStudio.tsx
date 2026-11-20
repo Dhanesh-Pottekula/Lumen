@@ -150,7 +150,7 @@ function UsagePanel({ usage, live }: { usage: FilmUsage | null; live: boolean })
 
 const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, "0")}`;
 
-export function FilmStudio() {
+export function FilmStudio({ wanted, onInspect }: { wanted?: string | null; onInspect?: (run: string) => void } = {}) {
   const film = useSyncExternalStore(store.subscribe, store.getSnapshot);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -334,6 +334,14 @@ export function FilmStudio() {
     }
   };
 
+  // Another page may ask for a film: the runs page's "Watch the film".
+  const asked = useRef<string | null>(null);
+  useEffect(() => {
+    if (!wanted || wanted === asked.current) return;
+    asked.current = wanted;
+    if (wanted !== openRun) open(wanted);
+  });
+
   const toggle = () => {
     const c = cursor.current;
     if (film.playable === 0) return;
@@ -436,6 +444,11 @@ export function FilmStudio() {
 
           <div className="now">
             <h1>{film.header?.title ?? (busy ? "Planning your film…" : "Lumen")}</h1>
+            {film.run && onInspect && (
+              <button type="button" className="inspect-link" onClick={() => onInspect(film.run!)}>
+                See how this film {busy ? "is being" : "was"} made →
+              </button>
+            )}
             <p>
               {film.playable > 0
                 ? `Scene ${Math.min(sceneIndex + 1, film.playable)} of ${total}${busy ? ` · ${film.playable} ready` : ""}`
