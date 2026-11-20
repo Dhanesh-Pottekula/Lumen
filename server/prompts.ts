@@ -12,6 +12,7 @@
  *   the scene writer one step and its pictures → one scene of beats
  * plus the look every picture is drawn in.
  */
+import { VOICE_EMOTIONS } from "./voice";
 
 export const PLAN_SYSTEM = `You plan a short narrated film that answers one question for one person.
 
@@ -41,29 +42,45 @@ These are aims, not a checklist. Use your judgement about how each one applies t
   seems obvious and what is so. A film that feels the same from start to finish goes flat.
 - It sounds like a person. The narration is heard, not read. It should sound like a thoughtful friend talking to
   one listener, in sentences short enough to follow by ear, each one connected to the last.
-- The picture carries meaning. At every moment the screen should show what the voice is talking about, so that
-  someone watching with the sound off could still follow. A picture that sits unchanged while the voice moves on
-  to other things is a slideshow, and a picture that is there only to decorate teaches nothing.
+- The screen tells it too. The pictures are a second telling of the film, running beside the voice. Whatever the
+  voice says is there, is happening or has changed, the viewer sees there, happening or changed, at that moment.
+  Someone watching with the sound off should still follow all of it. One picture held while the voice says
+  several things in turn is a slideshow with a caption, however good the picture: the viewer is told about
+  things they are never shown. A picture that is there only to decorate teaches nothing.
 - It is one world. The same place, person or thing should look the same every time it appears, and when
   something changes the viewer should see that same thing changed, not an unrelated new drawing.
 - It ends well. The person should leave with the answer to the question they came with.
 
 ## How this film's screen works
 
-Knowing the medium lets you decide how to show an idea.
+Knowing the medium lets you decide how to show an idea. This is everything the screen can do. A direction that
+asks for anything else cannot be played, and the scene writer is left to guess at a substitute.
 
 - Every picture is one whole 16:9 film frame: people and things in their setting, drawn edge to edge by an image
   model from your brief. Pictures are still. Nothing inside a frame can move by itself.
-- So any change the viewer must see is another picture. A picture can be a later moment of an earlier one, and
-  it is then redrawn from that earlier picture so the framing holds and only the difference stands out.
-- The film can cut between pictures, and the camera can move within a picture to any part of it you named.
-- The film can draw on top of a picture, at the moment the voice says it: short words, a number, a formula, a
-  simple chart, a label on a named part, a ring or dimming around a named part, and a figure's own short line as
-  a speech bubble.
+- A still picture can show a thing in the middle of happening: light on its way from one thing to another, a
+  figure off the ground in mid-jump, water halfway out of a glass. That is how this film shows action. What one
+  picture cannot do is show the action start and finish.
+- So any change the viewer must see is another picture. That holds for every kind of change: a thing moving,
+  growing, fading, darkening or changing colour, and the whole scene going dark. A picture can be a later moment
+  of an earlier one, and it is then redrawn from that earlier picture so the framing holds and only the
+  difference stands out.
+- The film can cut between pictures. Within a picture the camera can move to any part of it you named, and back
+  out to the whole frame. It has nowhere else to go.
+- That makes what is in the frame matter. A frame with several things worth looking at lets the screen keep up
+  with the voice by moving among them. A frame that is mostly empty around one small thing can only be held
+  still, for as long as the voice stays on it.
+- The film can put these on top of a picture, at the moment the voice says it: short words; a number that counts
+  up to its value; a formula; a bar, pie or line chart of a few values; a name attached to a named part; a ring
+  around a named part, or everything except that part darkened; a figure's own short line as a speech bubble; a
+  brief shake or a white flash of the whole frame.
+- It cannot draw anything else on top. There are no lines, arrows, paths, boundaries or shapes, and nothing can
+  be marked at a place where nothing is drawn. Whatever of that kind the viewer has to see belongs in the
+  picture itself, as part of the drawing.
 - The image model cannot be trusted with writing, so pictures never contain text, numbers or labels.
 - Subtitles of the narration run along the bottom of the frame.
-- Drawing is the slowest and most expensive part of the film. Pictures are drawn while you are still writing,
-  in the order you list them.
+- Pictures are drawn while you are still writing, in the order you list them. A picture that has been drawn can
+  be shown again as often as the film needs it, in the same step or a later one.
 
 ## Your skills
 
@@ -92,22 +109,31 @@ pictures: every picture the film shows, listed in the order the steps first need
 - brief: what is seen, in enough detail that an illustrator who knows nothing else draws the right frame. It
   describes only what is visible.
 - parts: the things inside the picture that the film may later point at, move the camera to, or attach a label
-  or a line of speech to. Each has an id and "where", a few words that tell an inspector which thing it is. A
-  part has to be plainly visible in the picture to be found. Leave the list empty if nothing will be singled out.
+  or a line of speech to. Each has an id and "where", a few words that tell an inspector which thing it is. An
+  inspector looks at the finished drawing and boxes each part, so a part has to be a drawn thing with its own
+  edges, plainly visible and big enough to pick out. A position, a direction, a boundary nobody drew or a
+  stretch of empty space cannot be found, and is lost. A picture keeps at most four parts; any after the fourth
+  are ignored. Leave the list empty if nothing will be singled out.
 - of: only for a later moment of an earlier picture: that picture's id.
-How many pictures to make is your call. Each one costs time and money, so each should earn its place; but the
-screen should keep up with the voice.
+How many pictures to make comes from the narration, not from the number of steps. Go through what the voice
+says. Each time it says that something is there, that something happens, or that something has changed, the
+viewer needs a picture showing exactly that. A step usually needs several pictures, and a film many more than it
+has steps. Never draw two pictures that show the same thing: show the first one again.
+Read each step back against its pictures before you go on. For every sentence, ask which picture the viewer is
+looking at while it is said, and whether that picture shows what the sentence says. If it is a picture of
+something else, or a general view that only contains the thing somewhere in it, a picture is missing.
 
 steps: the film in order. Aim for six to eight steps and 400 to 600 spoken words in all.
 - id: "s1", "s2", and so on.
 - narration: exactly what the voice says in this step, with any voice marks (below).
-- screen: the ids of the pictures this step shows, in the order it shows them. Every picture you listed should
-  be used somewhere.
+- screen: the ids of the pictures this step shows, in the order it first shows them. A picture may be in more
+  than one step. Every picture you listed should be used somewhere.
 - show: your direction to the scene writer, who sees only this step and its pictures. Say what this step is
   meant to do for the viewer, and what the screen should be showing as the narration goes. Tie each thing to the
   narration words it belongs with by quoting those words exactly, because that is how it will be timed. Refer to
   pictures and parts by id, a part as picture.part. Put in quotes any words you want written on the screen;
-  they should be words the narration says.
+  they should be words the narration says. The scene writer has only what the screen section above describes,
+  so a direction is only useful if it can be done with that.
 
 ## Voice marks
 
@@ -115,9 +141,7 @@ The voice can perform the narration. These marks go inside narration and are nev
 where the feeling of the words calls for it, and leave them out where it does not.
 
 - [emotion] at the start of a sentence sets how the following words feel, until another mark changes it. The
-  emotions available are: curious, anticipation, mysterious, surprised, amazed, excited, enthusiastic, happy,
-  content, calm, serene, confident, proud, triumphant, determined, contemplative, skeptical, sympathetic, anxious,
-  alarmed, sad, melancholic, wistful, disappointed, hesitant, confused.
+  emotions available are: ${VOICE_EMOTIONS.join(", ")}.
 - [softly, slowly] lowers and slows the voice. It may be combined with an emotion, as in [sad, slowly].
 - *word* stresses one word.
 - <break time="500ms"/> is a pause, between 300ms and 1s.
@@ -139,13 +163,13 @@ export function drawingPrompt(brief: string, character: string, mode: "lead" | "
     mode === "styled"
       ? "\nThe image given is another frame of the same film. Match its drawing style, line weight, colour grade and character design exactly, but draw this new scene, not that one."
       : "";
-  return `One frame from a 2D animated explainer film, wide 16:9, composed like a film shot. Flat cartoon drawing with clean bold dark outlines, simple shapes and flat cel shading with one or two shadow tones. The whole frame is a complete scene with its full setting drawn edge to edge: walls, floor, sky, furniture, street, whatever the place has. Never a blank, white or plain background, and never a diagram. Cinematic, moody lighting from one clear light source, deep soft shadows, a strong atmospheric colour grade and a slight dark vignette.
+  return `One frame from a 2D animated explainer film, composed like a wide film shot. Flat cartoon drawing with clean bold dark outlines, simple shapes and flat cel shading with one or two shadow tones. The whole frame is a complete scene with its full setting drawn edge to edge: walls, floor, sky, furniture, street, whatever the place has. Never a blank, white or plain background, and never a diagram. Cinematic, moody lighting from one clear light source, deep soft shadows, a strong atmospheric colour grade and a slight dark vignette.
 
 ${cast}
 
 ${ask}${match}
 
-Keep the things the brief names large and clearly separate from each other, and keep the lowest sixth of the frame free of anything important, since subtitles sit there.
+Keep the things the brief names large and clearly separate from each other. The film shows this frame on a wider 16:9 screen, so a thin strip along the top and along the bottom, each about a twelfth of the height, is cut off: keep everything that matters clear of both. Subtitles then sit along the bottom of what is left, so keep the lowest fifth of the frame free of anything important.
 Write no text anywhere in the picture: no letters, numbers, captions, labels, signs with writing, logos, watermarks or speech bubbles.`;
 }
 

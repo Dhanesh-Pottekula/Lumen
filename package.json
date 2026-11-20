@@ -9,7 +9,9 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "export": "node scripts/export-film.mjs"
+    "export": "node scripts/export-film.mjs",
+    "metrics": "node scripts/film-metrics.mjs",
+    "film": "node scripts/make-film.mjs"
   },
   "dependencies": {
     "react": "^19.2.0",

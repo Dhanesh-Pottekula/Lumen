@@ -1,0 +1,11 @@
+{
+  "about": "The fixed briefs every prompt change is measured on: two for each kind of film. Keep them unchanged between runs, or the numbers stop being comparable. The two 'movie' briefs repeat films already saved in runs/, so old and new can be set side by side.",
+  "briefs": [
+    { "kind": "study", "brief": "Why is the sky blue?" },
+    { "kind": "study", "brief": "How does a vaccine teach the body to fight a virus?" },
+    { "kind": "story", "brief": "How did the Berlin Wall come down?" },
+    { "kind": "story", "brief": "How was penicillin discovered?" },
+    { "kind": "movie", "brief": "What would happen if you fell into a black hole?" },
+    { "kind": "movie", "brief": "What if gravity doubled overnight?" }
+  ]
+}

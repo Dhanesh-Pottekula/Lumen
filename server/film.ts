@@ -11,6 +11,7 @@
  *
  * Everything the player needs is sent as events through `emit`; the same film is saved to `film.json`.
  */
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import type { FilmEvent, FilmFile, FilmHeader, FilmScene, Hotspot, ImageObject, PictureRow, ProgressStage, ProgressStatus, SceneAudio } from "../src/film/types";
@@ -115,6 +116,15 @@ export function hotspotsOf(found: { parts: { part: string; box: number[] }[]; mi
     hotspots[id] = [x0, y0, x1 - x0, y1 - y0].map((n) => Math.round(n * 10000) / 10000) as Hotspot;
   }
   return hotspots;
+}
+
+/**
+ * A short fingerprint of the prompts a film was made with. Two films with the same value were written by the
+ * same planner, scene writer, part finder and look, so their numbers can be compared.
+ */
+export function promptVersion(): string {
+  const text = [PLAN_SYSTEM, SCENE_SYSTEM, PARTS_SYSTEM, VOICE_STYLE, drawingPrompt("", "none", "lead"), drawingPrompt("", "x", "state"), drawingPrompt("", "x", "styled")].join("\u0000");
+  return createHash("sha256").update(text).digest("hex").slice(0, 12);
 }
 
 export async function makeFilm(job: FilmJob): Promise<FilmFile> {
@@ -333,7 +343,8 @@ export async function makeFilm(job: FilmJob): Promise<FilmFile> {
       try {
         for (const attempt of ["write", "repair"] as const) {
           const reply = await provider.write(SCENE_SYSTEM, messages, step.id);
-          log({ stage: "scene", id: step.id, attempt, chars: reply.length });
+          // The whole reply is kept, so a beat the film later drops can still be read.
+          log({ stage: "scene", id: step.id, attempt, chars: reply.length, reply });
           messages = [...messages, { role: "assistant", content: reply }];
           raw = jsonObject(reply);
           if (raw) break;
@@ -348,11 +359,11 @@ export async function makeFilm(job: FilmJob): Promise<FilmFile> {
           const ids = rows.map((row) => `- picture ${row.id}: ${row.parts.length ? `its parts are ${row.parts.map((p) => `${row.id}.${p}`).join(", ")}` : "no part can be named, only the whole picture"}`).join("\n");
           const reply = await provider.write(SCENE_SYSTEM, [...messages, { role: "user", content: sceneRetry(checked.problems, ids) }], step.id);
           const fixed = jsonObject(reply);
-          if (fixed) {
-            const again = validateScene(fixed, rows, step.id, step.narration);
-            // Keep the correction only if it is playable and no worse than the first try.
-            if (again.valid && (again.problems.length <= checked.problems.length || !checked.valid)) checked = again;
-          }
+          const again = fixed ? validateScene(fixed, rows, step.id, step.narration) : null;
+          // Keep the correction only if it is playable and no worse than the first try.
+          const kept = !!again && again.valid && (again.problems.length <= checked.problems.length || !checked.valid);
+          log({ stage: "scene", id: step.id, attempt: "retry", chars: reply.length, reply, problems: again?.problems ?? ["not one JSON object"], kept });
+          if (kept && again) checked = again;
         }
         return checked;
       } catch (error) {
@@ -438,6 +449,9 @@ export async function makeFilm(job: FilmJob): Promise<FilmFile> {
 
   film.status = film.scenes.length ? "ready" : "failed";
   film.usage = meter.summary();
+  // Only the folder's last two names are kept: enough to tell Lumen's own skills from another set, without a home path.
+  const skillsAt = path.resolve(job.skillsDir ?? "");
+  film.made = { prompts: promptVersion(), skills: chosenSkills, skillsFrom: skills.length ? `${path.basename(path.dirname(skillsAt))}/${path.basename(skillsAt)}` : null };
   save();
   const error = film.status === "failed" ? (failure ?? "no scene could be made") : undefined;
   emit({ type: "film_done", run, status: film.status, scenes: film.scenes.length, ...(error ? { error } : {}) });

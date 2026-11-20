@@ -202,4 +202,6 @@ export interface FilmFile {
   scenes: FilmScene[];
   /** What making the film consumed. Absent on films made before usage was recorded. */
   usage?: FilmUsage;
+  /** What the film was made with, so its numbers can be set beside other films'. Absent on older films. */
+  made?: { prompts: string; skills: string[]; skillsFrom: string | null };
 }

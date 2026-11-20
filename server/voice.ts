@@ -8,6 +8,26 @@
  * marks in the form it understands.
  */
 
+/** Every feeling the voice can be asked for. The planner's prompt lists these; anything else is not a mark the voice knows. */
+export const VOICE_EMOTIONS = [
+  "curious", "anticipation", "mysterious", "surprised", "amazed", "excited", "enthusiastic", "happy", "content", "calm", "serene",
+  "confident", "proud", "triumphant", "determined", "contemplative", "skeptical", "sympathetic", "anxious", "alarmed", "sad",
+  "melancholic", "wistful", "disappointed", "hesitant", "confused",
+] as const;
+/** The two words that lower and slow the voice. They may stand alone or follow an emotion. */
+export const VOICE_MANNERS = ["softly", "slowly"] as const;
+
+/** The bracketed marks in a narration that the voice does not know, in the order they appear. */
+export function unknownMarks(marked: string): string[] {
+  const known = new Set<string>([...VOICE_EMOTIONS, ...VOICE_MANNERS]);
+  const unknown: string[] = [];
+  for (const match of marked.matchAll(BRACKET)) {
+    const words = match[1].split(",").map((w) => w.trim().toLowerCase()).filter(Boolean);
+    if (words.some((w) => !known.has(w))) unknown.push(match[1].trim());
+  }
+  return unknown;
+}
+
 const BRACKET = /\[([^\[\]]{1,40})\]/g;
 const BREAK = /<break\s+time\s*=\s*["'](\d+(?:\.\d+)?)\s*(ms|s)["']\s*\/?>/gi;
 const TAG = /<[^<>]*>/g;

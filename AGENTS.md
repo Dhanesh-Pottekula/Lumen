@@ -20,6 +20,7 @@ npm install
 npm run dev      # player + film server on one port
 npm test         # vitest
 npm run build    # tsc --noEmit && vite build
+npm run metrics  # numbers read off the films in runs/ (no model call); -- <run> for one, -- --json for all
 ```
 From the workspace, the browser pane entry is `lumen-dev` (port 5199) in `GFV/.claude/launch.json`.
 
@@ -91,6 +92,19 @@ runs/                      generated films (git-ignored): film.json, plan.json, 
 - AiRA's skills are written the other way, with many specific rules. Setting `FILM_SKILLS_DIR` to AiRA's
   folder loads those instead of Lumen's own. It is not set by default.
 
+## Measuring a prompt change
+- `npm run metrics` reads `film.json`, `plan.json` and `log.jsonl` and prints what can be counted: seconds per
+  picture, the longest time nothing changes, cameras that aim where they already are, on-screen words the
+  narration does not say, text used as drawing, voice marks the voice does not know, parts not found, dropped
+  beats, time and cost. It uses `resolveScene`, so its times are the film's own. It measures; it does not judge.
+- "text not spoken" also catches a number written in digits where the voice says words ("1 day"). "text with
+  new words" is the stricter signal: a word the narration never uses.
+- `scripts/baseline/briefs.json` holds six fixed briefs, two per kind of film. Make them again after a prompt
+  change and compare; change one thing at a time. They have not been run yet under the current prompts.
+- Each film records `made.prompts`, a fingerprint of the prompt texts, and the skills it loaded. Two films with
+  the same fingerprint were written by the same prompts. Films made before 2026-11-20 show "unknown".
+- The log keeps every scene writer reply in full, and the retry's reply, its problems and whether it was kept.
+
 ## Usage, cost and the prompt cache
 - Every model call reports what it consumed (`provider.report`). `server/usage.ts` adds the calls up by stage
   and model, estimates cost from the list prices in `RATES`, and the total is sent as `film_usage` events and
@@ -140,3 +154,21 @@ runs/                      generated films (git-ignored): film.json, plan.json, 
   cut-out pictures that are placed, sized and moved on one screen (Lumen's pictures are whole frames), question
   cards, categories and found photos. The Cartesia voice is written from its public API and has not been run:
   AiRA's speech keys are in a key vault, not on this machine.
+- 2026-11-20: compared with the `creator-generalist` skill pack. Its script advice matches what `PLAN_SYSTEM`
+  already aims for; what it has and Lumen lacks is checks on the result. From the black hole film (the only one
+  made by the intent-based prompts): the planner asked for a dashed line, a gradual dim and a fade to black,
+  none of which the screen has, and named an undrawn boundary as a part; the scene writer built the line from
+  text characters. So `PLAN_SYSTEM` now says everything the screen can do and that nothing else exists, what a
+  part must be, and the limit of four; the look prompt says the frame is cropped top and bottom (pictures are
+  drawn 3:2 and cover a 16:9 view). These are facts about the medium, not rules for cases. Not yet tested on a
+  real film.
+- 2026-11-20, Dhanesh after watching that film: it still felt like a carousel, one picture held per sentence
+  or more. He wants the screen to show each thing as the voice says it (rays on their way, the Sun dimmer, a
+  figure mid-jump), with as many pictures as that takes and pictures reused. `PLAN_SYSTEM` now says the pictures
+  are a second telling beside the voice, that a still can show a thing in the middle of happening, that the
+  number of pictures comes from the narration and not from the steps, and that a drawn picture can be shown
+  again. The line that each picture "costs time and money" is gone: it was asking for fewer. Same brief, before
+  and after: 8 pictures to 18, 22 s to 10 s per showing, cost $0.61 to $1.19, 170 s to 252 s to make. Idle
+  cameras rose from 2 to 8, which is the next thing to check.
+- `npm run film -- "<brief>"` makes a film without the app; `--plan-only` runs just the planner (a few cents)
+  to read a plan before paying for pictures; `--code <checkout>` uses another checkout's prompts.
