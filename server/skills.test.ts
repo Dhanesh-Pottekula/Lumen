@@ -75,9 +75,12 @@ describe("voice marks", () => {
     expect(plainOf(marked)).toBe("You wake before dawn. Your arm feels twice as heavy. Nothing else has changed.");
   });
 
-  it("keeps only the pause for Cartesia", () => {
-    expect(forCartesia(marked)).toBe('You wake before dawn. <break time="500ms"/> Your arm feels twice as heavy. Nothing else has changed.');
+  it("writes the marks as Cartesia's own tags, and drops what that voice does not know", () => {
+    expect(forCartesia(marked)).toBe(
+      '<emotion value="curious"/> You wake before dawn. <break time="500ms"/> <emotion value="surprised"/> Your arm feels twice as heavy. <speed ratio="0.9"/> <volume ratio="0.8"/> Nothing else has changed.',
+    );
     expect(forCartesia('One. <break time="5s"/> Two.')).toBe("One. Two.");
+    expect(forCartesia("[somber] It ended. [sad, slowly] Quietly.")).toBe('It ended. <emotion value="sad"/> <speed ratio="0.9"/> Quietly.');
   });
 
   it("turns the marks into delivery notes for a voice that takes directions", () => {

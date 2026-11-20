@@ -9,7 +9,7 @@ import { barChart, lineChart, makePlot, pie } from "../render/charts";
 import { drawMath, measureMath } from "../render/mathtext";
 import { clamp01, easeInOutCubic, easeOutBack, easeOutCubic, lerp } from "../render/motion";
 import { formatNumber } from "../render/type-motion";
-import { backdropAt, type CameraKey, type ResolvedScene } from "./resolve";
+import { backdropAt, cutoutAt, cutoutBox, type CameraKey, type ResolvedScene } from "./resolve";
 import type { Hotspot, ImageObject, OverlayObject, Shot, Zone } from "./types";
 
 export const VIEW_W = 960;
@@ -210,48 +210,144 @@ function drawBackdrop(ctx: CanvasRenderingContext2D, image: ImageObject | undefi
   ctx.restore();
 }
 
+/**
+ * The cut-outs standing on `picture`, drawn in the picture's own space so the camera moves them with it.
+ * One lower in the frame is nearer, so it is drawn later, in front. A cut-out that stands on something gets a
+ * soft shadow at its feet; the shadow stays on the ground while an arc or a hop lifts the cut-out off it.
+ */
+function drawCutouts(ctx: CanvasRenderingContext2D, scene: ResolvedScene, t: number, picture: string | undefined, view: View) {
+  if (!picture || scene.cutouts.length === 0) return;
+  const shown = [];
+  for (const track of scene.cutouts) {
+    if (track.picture !== picture) continue;
+    const now = cutoutAt(track, t);
+    if (now && now.state.alpha > 0.01) shown.push(now);
+  }
+  if (shown.length === 0) return;
+  shown.sort((a, b) => a.state.y - b.state.y);
+  ctx.save();
+  ctx.translate(VIEW_W / 2 + view.dx, VIEW_H / 2 + view.dy);
+  ctx.scale(view.zoom, view.zoom);
+  ctx.translate(-view.px, -view.py);
+  ctx.imageSmoothingQuality = "high";
+  for (const { state, image, lift } of shown) {
+    const object = scene.images.get(image);
+    const bitmap = object?.src ? cache.get(object.src) : undefined;
+    if (!bitmap) continue;
+    // The size is fitted to the cut-out's own shape, so a long thing is never wider than the frame.
+    const box = cutoutBox(state.size, bitmap.naturalWidth / Math.max(1, bitmap.naturalHeight));
+    const h = box.h * VIEW_H;
+    const w = box.w * VIEW_W;
+    const x = view.rect.x + state.x * view.rect.w;
+    const ground = view.rect.y + state.y * view.rect.h;
+    // A floating cut-out is never quite still: it bobs a little, each one at its own beat.
+    const bob = (1 - state.feet) * Math.sin(t * 1.4 + state.x * 9) * h * 0.012;
+    const middle = ground - lift * view.rect.h - (h / 2) * state.feet + bob;
+    if (state.feet > 0.5) {
+      ctx.globalAlpha = 0.34 * state.alpha * Math.max(0.35, 1 - lift * 5);
+      ctx.fillStyle = "#000000";
+      ctx.beginPath();
+      ctx.ellipse(x, ground, w * 0.36, Math.max(2, h * 0.04), 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.save();
+    ctx.globalAlpha = state.alpha;
+    ctx.translate(x, middle);
+    if (state.tilt) ctx.rotate((state.tilt * Math.PI) / 180);
+    ctx.scale(state.flip, 1);
+    ctx.drawImage(bitmap, -w / 2, -h / 2, w, h);
+    ctx.restore();
+  }
+  ctx.restore();
+}
+
+/**
+ * A mark that draws the eye to a part. Each is meant to read as something a person did to the picture, not as
+ * a shape laid on it by a program:
+ *   encircle  a marker ring drawn round the part by hand: a little uneven, ending just past where it began
+ *   dim       a soft spotlight: the part stays lit and everything else falls away into shadow, with no hard edge
+ *   pulse     two quiet ripples out from the part, which then settle to a faint ring
+ */
 function drawAttention(ctx: CanvasRenderingContext2D, verb: "dim" | "encircle" | "pulse", box: Rect, age: number, left: number) {
-  const fade = clamp01(age / 0.45) * clamp01(left / 0.35);
-  if (fade <= 0) return;
+  const leaving = clamp01(left / 0.35);
+  if (age <= 0 || leaving <= 0) return;
   const cx = box.x + box.w / 2;
   const cy = box.y + box.h / 2;
+  // Room round the part: a share of its size, so a small part is not swamped and a large one is not hugged.
+  const pad = Math.max(8, Math.min(22, Math.min(box.w, box.h) * 0.16));
+  const rx = box.w / 2 + pad;
+  const ry = box.h / 2 + pad;
   ctx.save();
   if (verb === "dim") {
-    // Darken everything except the part: one path with a hole in it.
-    const pad = 10;
-    ctx.beginPath();
-    ctx.rect(-20, -20, VIEW_W + 40, VIEW_H + 40);
-    ctx.roundRect(box.x - pad, box.y - pad, box.w + pad * 2, box.h + pad * 2, 18);
-    ctx.fillStyle = `rgba(4, 6, 12, ${0.62 * fade})`;
-    ctx.fill("evenodd");
-    ctx.beginPath();
-    ctx.roundRect(box.x - pad, box.y - pad, box.w + pad * 2, box.h + pad * 2, 18);
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = `rgba(255, 210, 74, ${0.9 * fade})`;
-    ctx.stroke();
+    const fade = easeOutCubic(clamp01(age / 0.6)) * leaving;
+    // Dark everywhere, clear over the part, and a wide soft edge between: drawn as one gradient in the
+    // part's own oval, so the pool of light has the part's shape.
+    ctx.translate(cx, cy);
+    ctx.scale(rx, ry);
+    const pool = ctx.createRadialGradient(0, 0, 0.95, 0, 0, 1.9);
+    pool.addColorStop(0, "rgba(4, 6, 12, 0)");
+    pool.addColorStop(1, `rgba(4, 6, 12, ${0.68 * fade})`);
+    ctx.fillStyle = pool;
+    const far = (Math.hypot(VIEW_W, VIEW_H) * 2) / Math.min(rx, ry);
+    ctx.fillRect(-far, -far, far * 2, far * 2);
   } else if (verb === "encircle") {
-    // A hand-drawn ring that draws itself on, slightly past a full turn.
-    const p = easeOutCubic(clamp01(age / 0.8));
-    ctx.globalAlpha = clamp01(left / 0.35);
-    ctx.beginPath();
-    ctx.ellipse(cx, cy, box.w / 2 + 14, box.h / 2 + 14, -0.06, -Math.PI * 0.6, -Math.PI * 0.6 + Math.PI * 2.08 * p);
+    const p = easeOutCubic(clamp01(age / 0.7));
+    // The same part always gets the same ring: its unevenness comes from where it is, not from chance.
+    const seed = cx * 0.013 + cy * 0.029;
+    const turn = Math.PI * 2 * 1.07;
+    const start = -Math.PI * 0.62;
+    const steps = 72;
+    const point = (k: number) => {
+      const a = start + (turn * k) / steps;
+      // A slow wobble, and a slight spiral outward so the end passes outside the beginning.
+      const r = 1 + 0.03 * Math.sin(a * 2 + seed) + 0.018 * Math.sin(a * 5 + seed * 3) + 0.05 * (k / steps);
+      return [cx + Math.cos(a) * rx * r, cy + Math.sin(a) * ry * r] as const;
+    };
+    const upTo = Math.max(1, Math.round(steps * p));
+    const trace = () => {
+      ctx.beginPath();
+      for (let k = 0; k <= upTo; k++) {
+        const [x, y] = point(k);
+        if (k === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+    };
+    ctx.globalAlpha = leaving;
     ctx.lineCap = "round";
-    ctx.lineWidth = 9;
-    ctx.strokeStyle = INK;
+    ctx.lineJoin = "round";
+    // A soft dark edge keeps the ring readable on a bright picture; the ring itself carries a faint glow.
+    trace();
+    ctx.lineWidth = 6.5;
+    ctx.strokeStyle = "rgba(8, 10, 16, 0.38)";
     ctx.stroke();
-    ctx.lineWidth = 5;
+    ctx.shadowColor = "rgba(255, 210, 74, 0.55)";
+    ctx.shadowBlur = 10;
+    ctx.lineWidth = 3.4;
     ctx.strokeStyle = COLORS.accent;
     ctx.stroke();
   } else {
+    // Two ripples, one after the other, each widening and thinning as it goes.
     for (let ring = 0; ring < 2; ring++) {
-      const p = (age * 0.8 + ring * 0.5) % 1;
-      ctx.globalAlpha = (1 - p) * fade;
+      const p = (age - ring * 0.32) / 0.95;
+      if (p <= 0 || p >= 1) continue;
+      const grow = easeOutCubic(p);
+      ctx.globalAlpha = (1 - p) ** 1.6 * 0.9 * leaving;
       ctx.beginPath();
-      ctx.ellipse(cx, cy, (box.w / 2) * (0.7 + p * 0.7) + 8, (box.h / 2) * (0.7 + p * 0.7) + 8, 0, 0, Math.PI * 2);
-      ctx.lineWidth = 4;
+      ctx.ellipse(cx, cy, rx * (0.72 + grow * 0.6), ry * (0.72 + grow * 0.6), 0, 0, Math.PI * 2);
+      ctx.lineWidth = 5 * (1 - p) + 1;
+      ctx.shadowColor = "rgba(255, 210, 74, 0.6)";
+      ctx.shadowBlur = 12;
       ctx.strokeStyle = COLORS.accent;
       ctx.stroke();
     }
+    // What is left once the ripples have gone: a thin ring, enough to say "this one".
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = 0.5 * clamp01((age - 0.5) / 0.5) * leaving;
+    ctx.beginPath();
+    ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+    ctx.lineWidth = 1.6;
+    ctx.strokeStyle = COLORS.accent;
+    ctx.stroke();
   }
   ctx.restore();
 }
@@ -553,6 +649,7 @@ export function drawScene(ctx: CanvasRenderingContext2D, scene: ResolvedScene, t
   } else {
     drawBackdrop(ctx, image, view);
   }
+  drawCutouts(ctx, scene, t, picture, view);
 
   const spotOf = (part?: string) => (part ? image?.hotspots?.[part] : undefined);
   for (const mark of scene.attentions) {

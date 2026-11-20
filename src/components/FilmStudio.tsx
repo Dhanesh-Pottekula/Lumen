@@ -165,6 +165,8 @@ export function FilmStudio() {
   const [provider, setProvider] = useState<string | null>(null);
   const [saved, setSaved] = useState<SavedFilm[] | null>(null);
   const [openRun, setOpenRun] = useState<string | null>(null);
+  /** The film whose remove button was pressed once and is waiting for the second press. */
+  const [removing, setRemoving] = useState<string | null>(null);
   const [soundBlocked, setSoundBlocked] = useState(false);
 
   /** Speak scene `index` from `at` seconds. If the browser refuses, say so instead of playing silently. */
@@ -312,6 +314,24 @@ export function FilmStudio() {
     setOpenRun(run);
     void store.open(run);
     window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  /** Remove a saved film for good. If it was the one on screen, the next film takes its place. */
+  const remove = async (run: string) => {
+    setRemoving(null);
+    const res = await fetch(`/api/films/${run}`, { method: "DELETE" }).catch(() => null);
+    if (!res?.ok) return;
+    const films = await refreshSaved();
+    if (run !== openRun) return;
+    cursor.current.playing = false;
+    voice.pause();
+    if (films.length > 0) {
+      setOpenRun(films[0].run);
+      void store.open(films[0].run);
+    } else {
+      setOpenRun(null);
+      store.reset();
+    }
   };
 
   const toggle = () => {
@@ -491,13 +511,24 @@ export function FilmStudio() {
           <h2>Your films</h2>
           <div className="shelf">
             {saved.map((item) => (
-              <button key={item.run} className={`card-film${item.run === openRun ? " on" : ""}`} onClick={() => open(item.run)}>
-                <span className="poster">{item.poster ? <img src={item.poster} alt="" loading="lazy" /> : null}</span>
-                <strong>{item.title}</strong>
-                <small>
-                  {item.scenes} scenes · about {Math.max(1, Math.round((item.words * 0.42) / 60))} min
-                </small>
-              </button>
+              <div key={item.run} className="shelf-item" onMouseLeave={() => removing === item.run && setRemoving(null)}>
+                <button className={`card-film${item.run === openRun ? " on" : ""}`} onClick={() => open(item.run)}>
+                  <span className="poster">{item.poster ? <img src={item.poster} alt="" loading="lazy" /> : null}</span>
+                  <strong>{item.title}</strong>
+                  <small>
+                    {item.scenes} scenes · about {Math.max(1, Math.round((item.words * 0.42) / 60))} min
+                  </small>
+                </button>
+                {/* Two presses: the first asks, the second removes. Moving away cancels. */}
+                <button
+                  className={`remove-film${removing === item.run ? " asking" : ""}`}
+                  aria-label={removing === item.run ? `Confirm: delete ${item.title}` : `Delete ${item.title}`}
+                  onClick={() => (removing === item.run ? void remove(item.run) : setRemoving(item.run))}
+                  onBlur={() => removing === item.run && setRemoving(null)}
+                >
+                  {removing === item.run ? "Delete film?" : "×"}
+                </button>
+              </div>
             ))}
           </div>
         </section>

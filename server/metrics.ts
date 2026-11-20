@@ -37,6 +37,10 @@ export interface FilmMetrics {
   secondsPerShowing: number;
   /** Narration sentences for each time the picture changes. Near 1 or above means one picture per sentence or fewer. */
   sentencesPerShowing: number;
+  /** Cut-outs put on screen, how many times one was moved, and the seconds something was travelling. */
+  cutouts: number;
+  moves: number;
+  secondsMoving: number;
   /** Moments at which something visibly changes, and the seconds between them on average. */
   changes: number;
   secondsPerChange: number;
@@ -80,7 +84,7 @@ function floorFor(scene: FilmScene): number {
 }
 
 /** The seconds, within one scene, at which the viewer sees something change. */
-function changeTimes(scene: FilmScene): { times: number[]; idle: number; duration: number; showings: number } {
+function changeTimes(scene: FilmScene): { times: number[]; idle: number; duration: number; showings: number; moving: number } {
   const resolved = resolveScene(scene, floorFor(scene), scene.audio?.wordTimes);
   const times: number[] = [];
   let idle = 0;
@@ -99,9 +103,18 @@ function changeTimes(scene: FilmScene): { times: number[]; idle: number; duratio
       if (Number.isFinite(item.until)) times.push(item.until);
     }
   }
+  // A cut-out changing is something to watch for as long as the change lasts, so a long move is not a still.
+  let moving = 0;
+  for (const track of resolved.cutouts) {
+    for (const key of track.keys) {
+      for (let at = key.at; at < key.at + key.dur; at += 1) times.push(at);
+      times.push(key.at + key.dur);
+      if (key !== track.keys[0] && (key.to.x !== undefined) && key.dur > 0) moving += key.dur;
+    }
+  }
   for (const shake of resolved.shakes) times.push(shake.at);
   times.push(...resolved.flashes);
-  return { times: [...new Set(times.map((t) => round(t, 2)))].filter((t) => t > 0 && t < resolved.floor).sort((a, b) => a - b), idle, duration: resolved.duration, showings: resolved.backdrops.length };
+  return { times: [...new Set(times.map((t) => round(t, 2)))].filter((t) => t > 0 && t < resolved.floor).sort((a, b) => a - b), idle, duration: resolved.duration, showings: resolved.backdrops.length, moving };
 }
 
 export function filmMetrics(film: FilmFile, plan: PlanFile | null = null, log: LogEntry[] = []): FilmMetrics {
@@ -117,6 +130,9 @@ export function filmMetrics(film: FilmFile, plan: PlanFile | null = null, log: L
   let idleCameras = 0;
   let showings = 0;
   let sentences = 0;
+  let moves = 0;
+  let secondsMoving = 0;
+  const cutoutsUsed = new Set<string>();
   let words = 0;
   let longestStill = { seconds: 0, scene: "" };
 
@@ -135,6 +151,9 @@ export function filmMetrics(film: FilmFile, plan: PlanFile | null = null, log: L
       for (const action of beat.actions) {
         bump(actions, action.do);
         if (action.do === "label") written.push(action.text);
+        if (action.do === "move") moves++;
+        if (action.do === "place") cutoutsUsed.add(action.what);
+        if (action.do === "swap") cutoutsUsed.add(action.to);
       }
     }
     for (const text of written) {
@@ -147,8 +166,9 @@ export function filmMetrics(film: FilmFile, plan: PlanFile | null = null, log: L
       if (narrationWords(text).some((word) => !/^\d/.test(word) && !spoken.includes(word))) textsWithNewWords.push(text);
     }
 
-    const { times, idle, duration, showings: here } = changeTimes(scene);
+    const { times, idle, duration, showings: here, moving } = changeTimes(scene);
     showings += here;
+    secondsMoving += moving;
     sentences += scene.narration.split(/[.!?]+(?:\s|$)/).filter((part) => narrationWords(part).length > 0).length;
     idleCameras += idle;
     changes += times.length;
@@ -203,6 +223,9 @@ export function filmMetrics(film: FilmFile, plan: PlanFile | null = null, log: L
     showings,
     secondsPerShowing: showings ? round(seconds / showings) : 0,
     sentencesPerShowing: showings ? round(sentences / showings, 2) : 0,
+    cutouts: cutoutsUsed.size,
+    moves,
+    secondsMoving: round(secondsMoving),
     changes,
     secondsPerChange: changes ? round(seconds / changes) : 0,
     longestStill,

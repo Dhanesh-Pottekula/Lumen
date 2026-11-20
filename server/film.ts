@@ -17,12 +17,16 @@ import path from "node:path";
 import type { FilmEvent, FilmFile, FilmHeader, FilmScene, Hotspot, ImageObject, PictureRow, ProgressStage, ProgressStatus, SceneAudio } from "../src/film/types";
 import { alignWords } from "../src/film/words";
 import { validateScene, withPictures } from "../src/film/validate";
-import { PARTS_SYSTEM, PLAN_SYSTEM, SCENE_REPAIR, SCENE_SYSTEM, VOICE_STYLE, drawingPrompt, partsContext, sceneContext, sceneRetry, sceneStable } from "./prompts";
+import { cutOutPng, shrinkPng } from "./cutout";
+import { PARTS_SYSTEM, PLAN_SYSTEM, SCENE_REPAIR, SCENE_SYSTEM, VOICE_STYLE, cutoutPrompt, drawingPrompt, partsContext, sceneContext, sceneRetry, sceneStable } from "./prompts";
 import { createMeter } from "./usage";
 import type { ImageBytes, Message, Provider } from "./providers/types";
 import { loadSkills, skillTool } from "./skills";
-import { plainOf } from "./voice";
+import { knownMarksOnly, plainOf } from "./voice";
 import { PICTURES_KEY, STEPS_KEY, entriesClosed, imageSize, jsonObject, lanes, planHeader, slug, writingLanes } from "./text";
+
+/** How wide a picture is when it is shown to the scene writer: enough to see what is where, at a fraction of the bytes. */
+const SHOWN_WIDTH = 768;
 
 export const LANES = { drawing: 4, measuring: 4, writing: 4, voice: 3 } as const;
 
@@ -31,6 +35,8 @@ interface PicturePlan {
   brief: string;
   parts: { id: string; where: string }[];
   of: string | null;
+  /** True for one thing drawn alone on white, to be cut out and laid over a background. */
+  cutout: boolean;
 }
 
 interface Step {
@@ -48,7 +54,7 @@ interface Drawn extends ImageBytes {
   height: number;
 }
 
-type Picture = Required<Pick<ImageObject, "src" | "aspect" | "hotspots">>;
+type Picture = Required<Pick<ImageObject, "src" | "aspect" | "hotspots">> & { cutout?: boolean };
 
 export interface FilmJob {
   provider: Provider;
@@ -63,7 +69,7 @@ export interface FilmJob {
   emit: (event: FilmEvent) => void;
 }
 
-const EXTENSIONS: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/svg+xml": "svg", "audio/mpeg": "mp3" };
+const EXTENSIONS: Record<string, string> = { "image/png": "png", "image/jpeg": "jpg", "image/webp": "webp", "image/svg+xml": "svg", "audio/mpeg": "mp3", "audio/wav": "wav" };
 
 
 function picturePlanOf(entry: unknown, known: Map<string, PicturePlan>): PicturePlan | null {
@@ -71,15 +77,19 @@ function picturePlanOf(entry: unknown, known: Map<string, PicturePlan>): Picture
   const raw = entry as Record<string, unknown>;
   const id = slug(raw.id ?? "");
   if (!id || known.has(id) || typeof raw.brief !== "string" || !raw.brief.trim()) return null;
+  const cutout = raw.kind === "cutout";
   const parts: PicturePlan["parts"] = [];
-  for (const part of Array.isArray(raw.parts) ? raw.parts : []) {
+  // A cut-out is moved as one piece and nothing is aimed at it, so it has no parts to find.
+  for (const part of !cutout && Array.isArray(raw.parts) ? raw.parts : []) {
     const record = typeof part === "string" ? { id: part, where: part } : (part as Record<string, unknown> | null);
     const partId = slug(record?.id ?? "");
     if (!partId || parts.some((p) => p.id === partId) || parts.length >= 4) continue;
     parts.push({ id: partId, where: typeof record?.where === "string" && record.where.trim() ? record.where.trim() : partId });
   }
-  const of = typeof raw.of === "string" && known.has(slug(raw.of)) ? slug(raw.of) : null;
-  return { id, brief: raw.brief.trim(), parts, of };
+  // "of" joins two pictures of one kind: a later moment of a background, or another pose of a cut-out.
+  const earlier = typeof raw.of === "string" ? known.get(slug(raw.of)) : undefined;
+  const of = earlier && earlier.cutout === cutout ? earlier.id : null;
+  return { id, brief: raw.brief.trim(), parts, of, cutout };
 }
 
 function stepOf(entry: unknown): Step | null {
@@ -90,7 +100,7 @@ function stepOf(entry: unknown): Step | null {
   if (!id || !narration) return null;
   return {
     id,
-    voice: String(raw.narration).trim(),
+    voice: knownMarksOnly(String(raw.narration)),
     narration,
     show: typeof raw.show === "string" ? raw.show.trim() : "",
     screen: (Array.isArray(raw.screen) ? raw.screen : []).filter((s): s is string => typeof s === "string").map(slug),
@@ -123,7 +133,7 @@ export function hotspotsOf(found: { parts: { part: string; box: number[] }[]; mi
  * same planner, scene writer, part finder and look, so their numbers can be compared.
  */
 export function promptVersion(): string {
-  const text = [PLAN_SYSTEM, SCENE_SYSTEM, PARTS_SYSTEM, VOICE_STYLE, drawingPrompt("", "none", "lead"), drawingPrompt("", "x", "state"), drawingPrompt("", "x", "styled")].join("\u0000");
+  const text = [PLAN_SYSTEM, SCENE_SYSTEM, PARTS_SYSTEM, VOICE_STYLE, drawingPrompt("", "none", "lead"), drawingPrompt("the main character", "x", "state"), drawingPrompt("", "x", "styled"), cutoutPrompt("the main character", "x", "styled"), cutoutPrompt("", "x", "state")].join("\u0000");
   return createHash("sha256").update(text).digest("hex").slice(0, 12);
 }
 
@@ -201,7 +211,8 @@ export async function makeFilm(job: FilmJob): Promise<FilmFile> {
 
   // ── Pictures ────────────────────────────────────────────────────────────────────────────────────────
   function startPicture(plan: PicturePlan) {
-    if (!leadId && !plan.of) leadId = plan.id;
+    // The lead sets the film's drawing style, so it is a whole frame, never a cut-out.
+    if (!leadId && !plan.of && !plan.cutout) leadId = plan.id;
     const lead = leadId;
     progress("picture", "planned", plan.brief, { id: plan.id });
 
@@ -216,6 +227,34 @@ export async function makeFilm(job: FilmJob): Promise<FilmFile> {
       if (!reference && lead && lead !== plan.id) {
         reference = (await drawings.get(lead)) ?? null;
         if (reference) mode = "styled";
+      }
+      if (plan.cutout) {
+        return drawing(async () => {
+          progress("picture", "drawing", `Drawing ${plan.id}`, { id: plan.id });
+          let why = "";
+          // One redraw: the image model sometimes adds a floor, a shadow or a whole scene, and the cut says so.
+          for (let attempt = 1; attempt <= 2; attempt++) {
+            try {
+              const prompt = cutoutPrompt(plan.brief, character, mode) + (why ? `\n\nThe last drawing could not be used: ${why}. Draw it again as asked.` : "");
+              const image = await provider.draw(prompt, reference, plan.id);
+              const cut = cutOutPng(image.bytes);
+              log({ stage: "picture", id: plan.id, attempt, cut: { width: cut.width, height: cut.height, coverage: Math.round(cut.coverage * 1000) / 1000, edges: cut.edges, problem: cut.problem } });
+              if (cut.problem) {
+                why = cut.problem;
+                continue;
+              }
+              // The drawing as it came is kept beside the cut-out: another pose of this thing is redrawn from it.
+              fs.writeFileSync(path.join(dir, `pictures/${plan.id}.drawn.png`), image.bytes);
+              const file = `pictures/${plan.id}.png`;
+              fs.writeFileSync(path.join(dir, file), cut.png);
+              return { ...image, file, width: cut.width, height: cut.height };
+            } catch (error) {
+              why = String((error as Error).message ?? error);
+            }
+          }
+          progress("picture", "failed", `Could not make the cut-out ${plan.id}: ${why}`, { id: plan.id });
+          return null;
+        });
       }
       return drawing(async () => {
         progress("picture", "drawing", `Drawing ${plan.id}`, { id: plan.id });
@@ -257,8 +296,8 @@ export async function makeFilm(job: FilmJob): Promise<FilmFile> {
           });
         }
         const found = Object.keys(hotspots);
-        progress("picture", "ready", found.length ? `${plan.id} is ready: ${found.join(", ")}` : `${plan.id} is ready`, { id: plan.id, src });
-        return { src, aspect: Math.round((image.width / image.height) * 1000) / 1000, hotspots };
+        progress("picture", "ready", found.length ? `${plan.id} is ready: ${found.join(", ")}` : plan.cutout ? `${plan.id} is cut out and ready` : `${plan.id} is ready`, { id: plan.id, src });
+        return { src, aspect: Math.round((image.width / image.height) * 1000) / 1000, hotspots, ...(plan.cutout ? { cutout: true } : {}) };
       }),
     );
   }
@@ -281,7 +320,8 @@ export async function makeFilm(job: FilmJob): Promise<FilmFile> {
           const voice: SceneAudio = { src: `${base}/${file}` };
           // Word times let beats and subtitles land on the spoken word. Without them an even rate is assumed.
           try {
-            const heard = await provider.hear(audio, step.narration);
+            // A voice that says when each word starts needs no listener; otherwise the clip is transcribed.
+            const heard = audio.words?.length && audio.duration ? { words: audio.words, duration: audio.duration } : await provider.hear(audio, step.narration);
             if (heard) voice.wordTimes = alignWords(step.narration, heard.words, heard.duration);
           } catch (error) {
             log({ stage: "voice", id: step.id, error: String((error as Error).message ?? error) });
@@ -306,39 +346,54 @@ export async function makeFilm(job: FilmJob): Promise<FilmFile> {
       const picture = await pictures.get(id);
       if (picture) drawnHere.set(id, picture);
     }
-    // If every picture of this step failed, stay on the nearest earlier picture that was drawn.
-    for (let back = place - 1; drawnHere.size === 0 && back >= 0; back--) {
+    // If every background of this step failed, stay on the nearest earlier one that was drawn. Cut-outs alone
+    // cannot make a scene: they need a background to stand on.
+    const grounded = () => [...drawnHere.values()].some((picture) => !picture.cutout);
+    for (let back = place - 1; !grounded() && back >= 0; back--) {
       for (const id of steps[back].screen) {
         const picture = await pictures.get(id);
-        if (picture) {
+        if (picture && !picture.cutout) {
           drawnHere.set(id, picture);
           break;
         }
       }
     }
-    if (drawnHere.size === 0) {
+    if (!grounded()) {
       writing.withdraw(place);
       progress("scene", "dropped", `Step ${place + 1} has no picture and is left out`, { id: step.id, index: place });
       return null;
     }
 
-    const rows: PictureRow[] = [...drawnHere].map(([id, picture]) => ({ id, parts: Object.keys(picture.hotspots) }));
+    const rows: PictureRow[] = [...drawnHere].map(([id, picture]) => ({ id, parts: Object.keys(picture.hotspots), ...(picture.cutout ? { cutout: true } : {}) }));
     const table = [...drawnHere].map(([id, picture]) => {
       const planned = plans.get(id)?.parts ?? [];
       const missing = planned.filter((p) => !(p.id in picture.hotspots)).map((p) => p.id);
       return {
         id,
+        kind: picture.cutout ? "cutout" : "background",
         shows: plans.get(id)?.brief,
-        parts: planned.filter((p) => p.id in picture.hotspots).map((p) => ({ id: `${id}.${p.id}`, is: p.where })),
+        // Each found part with its box in the drawing, [left, top, width, height] as shares of the picture.
+        parts: planned.filter((p) => p.id in picture.hotspots).map((p) => ({ id: `${id}.${p.id}`, is: p.where, box: picture.hotspots[p.id].map((n) => Math.round(n * 100) / 100) })),
+        // A cut-out's own shape, width over height, now that it is cropped to the thing.
+        ...(picture.cutout ? { shape: Math.round(picture.aspect * 100) / 100 } : {}),
         ...(missing.length ? { not_found: missing } : {}),
       };
     });
+
+    // The scene writer is shown the pictures themselves, small: where things are and how big they came out is
+    // easier to see than to read. A cut-out is shown as it was drawn, on white.
+    const shown: NonNullable<Message["images"]> = [];
+    for (const [id, picture] of drawnHere) {
+      const drawn = await drawings.get(id);
+      if (!drawn || drawn.type !== "image/png") continue;
+      shown.push({ label: `The picture "${id}", ${picture.cutout ? "a cut-out, shown here on white before the white is removed" : "a background"}:`, image: { bytes: shrinkPng(drawn.bytes, SHOWN_WIDTH), type: "image/png" } });
+    }
 
     const verdict = await writing.run(place, async () => {
       progress("scene", "writing", `Writing scene ${place + 1}`, { id: step.id, index: place });
       // Wait for the shared prompt to be cached (at most 20 s), then send it first and unchanged.
       await Promise.race([warmUp(), new Promise((resolve) => setTimeout(resolve, 20_000))]);
-      let messages: Message[] = [{ role: "user", stable: stableText(), content: sceneContext(table, { id: step.id, narration: step.narration, show: step.show }) }];
+      let messages: Message[] = [{ role: "user", stable: stableText(), content: sceneContext(table, { id: step.id, narration: step.narration, show: step.show }), ...(shown.length ? { images: shown } : {}) }];
       let raw: Record<string, unknown> | null = null;
       try {
         for (const attempt of ["write", "repair"] as const) {
@@ -356,7 +411,7 @@ export async function makeFilm(job: FilmJob): Promise<FilmFile> {
         let checked = validateScene(raw, rows, step.id, step.narration);
         if (checked.problems.length) {
           log({ stage: "scene", id: step.id, problems: checked.problems });
-          const ids = rows.map((row) => `- picture ${row.id}: ${row.parts.length ? `its parts are ${row.parts.map((p) => `${row.id}.${p}`).join(", ")}` : "no part can be named, only the whole picture"}`).join("\n");
+          const ids = rows.map((row) => row.cutout ? `- cut-out ${row.id}: placed and moved, never aimed at` : `- background ${row.id}: ${row.parts.length ? `its parts are ${row.parts.map((p) => `${row.id}.${p}`).join(", ")}` : "no part can be named, only the whole picture"}`).join("\n");
           const reply = await provider.write(SCENE_SYSTEM, [...messages, { role: "user", content: sceneRetry(checked.problems, ids) }], step.id);
           const fixed = jsonObject(reply);
           const again = fixed ? validateScene(fixed, rows, step.id, step.narration) : null;

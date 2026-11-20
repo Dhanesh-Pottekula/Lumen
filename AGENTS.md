@@ -35,7 +35,8 @@ Two optional settings in `.env`:
   The skills are read at run time and are not copied into this repo. On this Mac it points at
   `aira-api/prompts/film_skills`.
 - `CARTESIA_API_KEY`: use AiRA's voice (Cartesia `sonic-3.6`, AiRA's "female" voice id; override with
-  `FILM_CARTESIA_MODEL`, `FILM_CARTESIA_VOICE`). Without it, or if a Cartesia call fails, the OpenAI voice speaks.
+  `FILM_CARTESIA_MODEL`, `FILM_CARTESIA_VOICE`). Without it, or if a Cartesia call fails, the OpenAI voice speaks
+  and the server prints why. The key is set here since 2026-11-20, taken from AiRA's key vault (`cartesia-api-key`).
 Editing `.env` restarts the dev server, which cuts any film stream that is open; the film itself still finishes
 and is saved, and can be opened from Saved films.
 
@@ -46,6 +47,7 @@ server/                    the film server (Node, mounted on Vite's dev server)
   film.ts                    the pipeline: streamed plan → parallel pictures → scene lanes → in-order release
   prompts.ts                 planner, part finder, scene writer and the picture look
   text.ts                    read a JSON plan while it streams; lanes; image sizes
+  cutout.ts                  remove the white round a drawing (AiRA's method, no dependency); PNG read and write
   skills.ts                  loads AiRA film skills and answers the load_film_skills tool
   voice.ts                   voice marks: plain words, Cartesia form, delivery notes
   providers/                 openai.ts (real), offline.ts (canned, misbehaves on purpose), types.ts
@@ -68,13 +70,19 @@ runs/                      generated films (git-ignored): film.json, plan.json, 
 ```
 
 ## Rules that keep it working
-- The scene writer never writes a coordinate, a time or a picture address. It names pictures and
-  `picture.part` by id; the server fills in `src`, `aspect` and `hotspots`.
+- The scene writer never writes a pixel, a time or a picture address. It names pictures and `picture.part` by
+  id; the server fills in `src`, `aspect` and `hotspots`. Since 2026-11-20 it is shown the step's pictures and
+  each part's box, and it may put a cut-out at a point, `{"x", "y"}` as shares of the background picture.
 - Plan key order is fixed (`title`, `character`, `pictures`, `steps`) so pictures start drawing while the
   steps are still being written.
 - Scenes are released strictly in step order. A scene that cannot be made is dropped; indexes stay dense.
 - Scenes join with hard cuts, so adding a scene never changes a frame that already existed.
-- Pictures are full film frames. Nothing is cut out and no background is removed.
+- There are two kinds of picture. A background is a full film frame. A cut-out is one thing drawn alone on
+  plain white; `server/cutout.ts` removes the white and the film lays the thing over a background, where it
+  can be placed, moved, swapped for another pose, resized, turned and removed.
+- A cut-out is only ever put somewhere by name: a found part of the background on screen, a zone, or just
+  outside an edge. It belongs to that background and leaves with it. The camera, labels, marks and speech aim
+  at backgrounds only.
 
 ## How the prompts are written
 - Dhanesh's rule (2026-11-17): prompts explain the intention and the medium, then leave the choices to the
@@ -172,3 +180,92 @@ runs/                      generated films (git-ignored): film.json, plan.json, 
   cameras rose from 2 to 8, which is the next thing to check.
 - `npm run film -- "<brief>"` makes a film without the app; `--plan-only` runs just the planner (a few cents)
   to read a plan before paying for pictures; `--code <checkout>` uses another checkout's prompts.
+- 2026-11-20, Cartesia now runs, the way `aira-api` uses it (`app/adapters/speech/cartesia.py`): the clip is
+  asked for with `add_timestamps`, so the voice says when each word starts and `whisper-1` is not called. That
+  needs Cartesia's event stream (`/tts/sse`), which sends raw sound, so a Cartesia clip is saved as a 24 kHz
+  WAV, about 48 KB a second. The marks go to it as its own tags: `<emotion value="…"/>`, `<speed ratio="0.9"/>`
+  for "slowly", `<volume ratio="0.8"/>` for "softly", `<break>`. Checked on one clip: 26 of 26 words timed, the
+  tags are not counted as words, 1.2 s to make 9.4 s of speech. `whisper-1` still times the OpenAI voice when
+  that is the one speaking. Not yet heard inside a whole film.
+- 2026-11-20, Dhanesh: make the film more dynamic by moving things over a background, with the white removed
+  by code as AiRA does. Built as cut-outs. The cut follows `film_picture_ent.py` `_Helper.ready`: read the
+  ground's colour from the border, then spread inward from the border through that colour, so white closed
+  inside an outline is kept. One step is Lumen's own: the rim where outline meets ground is made partly
+  see-through with the white taken out of it, because Lumen's backgrounds are dark and a pale rim would show.
+- First real cut (two drawings, about $0.11): a white-suited figure with a clear helmet and a silver ship both
+  came out clean, with no gap in the outline. The known weak spot is an outline with a gap: the white inside
+  leaks out. A test pins that behaviour. If it shows up in films, draw cut-outs on a colour no subject uses.
+- The cut reports three things and the picture is redrawn once on any of them: nothing drawn, a whole scene
+  drawn, or the thing running off the picture. This is the first check any drawing gets.
+- Not built: the camera following a cut-out, labels or speech attached to one, and limbs that move. A cut-out
+  slides as one piece; another pose is another cut-out. `scripts/try-cutout.mjs` draws and cuts one thing to
+  look at; `--cut <png>` cuts a saved drawing for nothing.
+- The first two cut-out films showed the main character twice: once drawn into the background, once as the
+  cut-out laid over it. The cause was in `drawingPrompt`, which gave the character's description to every
+  frame; the image model drew the character even into a frame whose brief asked for nobody. Now the description
+  is given only to a picture whose brief contains the words "the main character" (`starsCharacter`), the
+  planner is told to use exactly those words, and every other frame is told it has no person unless its brief
+  describes one. Telling the planner not to mention the character in a background's brief did not fix it alone.
+- Third film (same brief): one character throughout, 8 cut-outs, 11 moves, 7 pose swaps, every cut good on the
+  first try, no scene or beat dropped, $1.07. Seen in its frames and still open: a cut-out placed "huge" can
+  run off the frame, and cameras that aim where they already are (4).
+- Cut-out sizes (2026-11-20): a size is the cut-out's height, but a thing much wider than tall is fitted by its
+  width (`cutoutBox`), and every placed, moved, swapped or resized cut-out is nudged so the whole of it is inside
+  the frame and above the subtitles (`keptInFrame`). Only a place just outside an edge is exempt. This is in the
+  player, so it applies to saved films too. Sizes between things (a person beside a ship) are still the scene
+  writer's choice from five named steps; nothing knows real proportions.
+- Measured sizes (2026-11-20, Dhanesh's idea): a cut-out's size can be `{"of": "<picture>.<part>", "times": n}`,
+  n times as tall as that part's box in the drawing (`sizeShare`), or a number, its share of the frame's height.
+  A move can carry a size, so a thing shrinks on its way to a far part. The five names still play. A size is
+  capped at 0.8 of the frame so the whole cut-out always fits above the subtitles.
+- First film with it ("What if gravity doubled overnight?"): the planner and scene writer used measured sizes
+  where there was furniture and shares in open sky. A figure at 1.8 times a mattress and a cup at 0.18 times a
+  counter came out in proportion. Two faults seen in its frames, both about where "on" puts a thing, not about
+  the boxes: drawn over the pictures, the part finder's boxes were tight. (An earlier note here blamed the
+  counter's box for taking in the cupboards. That was wrong.) The counter is near the viewer, so it is tall in
+  the picture, and a figure 1.7 times it is rightly large; but "on the floor" stood that figure at the top of
+  the floor's box, which is the floor's far end, where a near-sized figure looks giant. And "on the sofa" stood
+  a lying figure on the top of the sofa's box, its backrest.
+- So "on" now reads the part's box three ways (`placeOf`): a wide part reaching the bottom of the picture is
+  ground, and a thing stands in the middle of it; a thing about as wide as the part is lying or sitting in it,
+  and rests at seat height; anything else stands a tenth of the way down the box, on the upper surface a table
+  or counter shows when seen slightly from above. The writers are told that a measured size holds only at the
+  depth of the part measured. Re-rendered on that film: the figure lies on the sofa's seat and stands in the
+  kitchen's foreground. Depth itself is still not modelled: nothing shrinks a thing as it moves up a floor.
+- Cut-outs are cropped to the thing plus two pixels, not AiRA's 3% of the picture: that margin was 7% to 21%
+  of a thing's height, so every size came out small by a different amount and feet hung above the ground. Also: the camera zooming in scales cut-outs with the picture, so a large one can
+  leave the frame during a close shot.
+- 2026-11-20, Dhanesh: show the pictures to the scene writer so it can judge sizes and places, and the rings
+  look bad. Done: each scene writer request now carries its step's pictures at 768 pixels wide (`shrinkPng`), a
+  cut-out as drawn on white, after the text so the cached prefix is unchanged; the list gives each part's box
+  and each cut-out's shape. A place may be a point in the picture. Re-asked on two saved steps: with the
+  pictures it put a figure at a point on the floor and took a cup to the counter's edge, over it and down to
+  the floor, which named parts alone could not say. This is why the scene writer waits for its pictures: it
+  needs them now, so the idea of starting it before they are drawn no longer applies.
+- Attention marks redrawn (`drawAttention`): encircle is a thin marker ring with a slight wobble that ends just
+  past where it began; dim is a soft pool of light in the part's own oval with no border; pulse is two ripples
+  that settle to a faint ring. The old ones were a heavy double ring, a hard yellow box, and rings that never
+  stopped.
+- 2026-11-20, Dhanesh after watching the latest film: it is good; use movement only when it is actually needed,
+  and more connected pictures (the same scene again with one thing changed: standing, then bent to the floor);
+  put more information into the pictures and show a number when the voice says it; keep the hand-drawn look.
+  `PLAN_SYSTEM` now says the film is told mainly in connected pictures and that a cut-out is for when the
+  movement itself is what the voice describes; two aims were added, "a picture explains" and "a quantity is
+  seen". Planner check on the gravity brief: 19 pictures of which 10 are later moments of another, no
+  cut-outs, arrows and cut-aways drawn into 15 of them, and the spoken numbers quoted for the screen. Not yet
+  made as a film. Numbers are still written by the film on top, not drawn by the image model.
+- 2026-11-20, Dhanesh liked the connected-pictures film, in particular the words, numbers and information put
+  on the pictures, and asked for the prompts to be made stronger with anything unnecessary removed. Both were
+  rewritten: the planner's screen section is grouped (pictures, what the film does with them, things that
+  move) and its six cut-out bullets are four; the scene writer's places and sizes are each described once in
+  their own list, not inside the `place` action. Planner 2,589 to 2,308 words, scene writer 1,880 to 1,749.
+  Added, each from a fault seen in the day's films: a beat is a change the viewer sees, and the camera aimed
+  where it already is is not one; what is written on screen says what the voice says, though a number may be
+  in figures with its unit or sign (which is what he liked); a voice mark outside the list is thrown away
+  (`knownMarksOnly` now does that before the voice speaks). Removed a contradiction: the picture look said
+  "never a diagram" while the planner was asked for arrows, cut-open views and comparisons.
+- Checked without a new film. Planner: 21 pictures, 10 later moments, no cut-outs, numbers quoted, only valid
+  voice marks. Scene writer, re-asked on all seven steps of the saved film with the same pictures: cameras
+  aimed where they already were fell from 13 to 1, the one caption the voice never says was gone, and the
+  number captions stayed. One run of each, so some of that is chance.
+

@@ -4,6 +4,7 @@
  *   POST /api/films            {brief} → a text/event-stream of film_progress, film_scene and film_done events
  *   GET  /api/films            the saved films, newest first
  *   GET  /api/films/<run>      one saved film (also the resync source when a stream is cut)
+ *   DELETE /api/films/<run>    remove one saved film: its folder of pictures, voice and film.json
  *   GET  /api/provider         which provider films are made with
  *   GET  /film-runs/<run>/...  a run's pictures and voice files
  */
@@ -26,6 +27,7 @@ const TYPES: Record<string, string> = {
   ".webp": "image/webp",
   ".svg": "image/svg+xml",
   ".mp3": "audio/mpeg",
+  ".wav": "audio/wav",
   ".json": "application/json",
 };
 
@@ -64,7 +66,11 @@ export function chooseProvider(root: string): Provider | null {
           provider.report?.("voice", cartesia.model, { characters: forCartesia(text).length });
           return audio;
         },
-        () => openai.speak(text, style, stepId),
+        (error) => {
+          // Say why, once per clip, so a wrong key or a refused request is not mistaken for the voice of choice.
+          console.warn(`Cartesia could not speak ${stepId}; using the OpenAI voice. ${String((error as Error).message ?? error)}`);
+          return openai.speak(text, style, stepId);
+        },
       ),
   };
   // The OpenAI calls report through their own object: pass each report on to whoever listens to this one.
@@ -90,6 +96,8 @@ async function readBody(req: IncomingMessage): Promise<string> {
 export function filmServer(): Plugin {
   let root = process.cwd();
   const runsDir = () => path.join(root, "runs");
+  /** Films being made right now. Their folders are still being written to, so they cannot be removed. */
+  const making = new Set<string>();
 
   const savedFilm = (run: string): FilmFile | null => {
     const file = path.join(runsDir(), run, "film.json");
@@ -148,10 +156,13 @@ export function filmServer(): Plugin {
       const emit = (event: FilmEvent) => {
         if (!res.writableEnded && !res.destroyed) res.write(`data: ${JSON.stringify(event)}\n\n`);
       };
+      making.add(run);
       try {
         await makeFilm({ provider, skillsDir: { ...readEnv(path.join(root, ".env")), ...process.env }.FILM_SKILLS_DIR || path.join(root, "skills"), brief, run, dir: path.join(runsDir(), run), base: `/film-runs/${run}`, emit });
       } catch (error) {
         emit({ type: "film_done", run, status: "failed", scenes: 0, error: String((error as Error).message ?? error) });
+      } finally {
+        making.delete(run);
       }
       res.end();
       return;
@@ -161,6 +172,16 @@ export function filmServer(): Plugin {
     if (one && req.method === "GET") {
       const film = savedFilm(one[1]);
       return film ? send(res, 200, film) : send(res, 404, { error: "no such film" });
+    }
+
+    if (one && req.method === "DELETE") {
+      const run = one[1];
+      // The run name is letters, digits and hyphens only (the route's own pattern), so it cannot leave runs/.
+      const dir = path.join(runsDir(), run);
+      if (!fs.existsSync(path.join(dir, "film.json"))) return send(res, 404, { error: "no such film" });
+      if (making.has(run)) return send(res, 409, { error: "this film is still being made" });
+      fs.rmSync(dir, { recursive: true, force: true });
+      return send(res, 200, { removed: run });
     }
 
     if (route.startsWith("/film-runs/") && req.method === "GET") {

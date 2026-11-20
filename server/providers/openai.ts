@@ -150,6 +150,11 @@ export function openAIProvider(settings: OpenAISettings): Provider {
               // Not marked: this film's skill rules, then this step's own pictures and words.
               { type: "input_text", text: message.stable },
               { type: "input_text", text: message.content },
+              // The step's own pictures, each named just before it. They come last, so the cached part is unchanged.
+              ...(message.images ?? []).flatMap(({ label, image }) => [
+                { type: "input_text", text: label },
+                { type: "input_image", image_url: `data:${image.type};base64,${Buffer.from(image.bytes).toString("base64")}` },
+              ]),
             ],
           },
     );

@@ -23,7 +23,30 @@ export interface ImageObject {
   src?: string;
   aspect?: number;
   hotspots?: Record<string, Hotspot>;
+  /**
+   * True for a cut-out: one thing with a see-through ground, placed over a background and moved. Set by the
+   * server from the plan; a cut-out never fills the frame and is never the picture a scene opens on.
+   */
+  cutout?: boolean;
 }
+
+/** How big a cut-out stands, by name. Kept so that films made before sizes were measured still play. */
+export type CutoutSize = "tiny" | "small" | "medium" | "large" | "huge";
+/**
+ * How big a cut-out stands. Measured against a part of the background on screen: `times` as tall as that part's
+ * box in the drawing (1 when left out). Or a number: its height as a share of the frame's height. Or a name.
+ */
+export type SizeSpec = CutoutSize | number | { of: string; times?: number };
+/** Where a cut-out goes relative to a named part of the background. */
+export type Relation = "at" | "on" | "before" | "left-of" | "right-of";
+/**
+ * Somewhere a cut-out can go: a place by name (a part of the background, a zone, or just outside an edge), or a
+ * point in the background picture, as shares of its width and height from its top-left corner.
+ */
+export type Place = string | { x: number; y: number };
+/** How a cut-out travels to its next place. */
+export type Path = "straight" | "arc" | "hop";
+export type Tilt = "upright" | "left" | "right" | "over";
 
 export interface TextObject {
   id: string;
@@ -73,6 +96,12 @@ export type Action =
   | { do: "attention"; target: string; verb: "dim" | "encircle" | "pulse" }
   | { do: "show"; targets: string[]; entrance?: "fade" | "slam" | "word-by-word" }
   | { do: "hide"; targets: string[] }
+  | { do: "place"; what: string; at: Place; where?: Relation; size?: SizeSpec; mirror?: boolean; entrance?: "appear" | "fade" | "pop" }
+  | { do: "move"; what: string; to: Place; where?: Relation; size?: SizeSpec; path?: Path; lasts?: "pace" | "until-next" }
+  | { do: "swap"; what: string; to: string }
+  | { do: "resize"; what: string; size: SizeSpec }
+  | { do: "turn"; what: string; mirror?: boolean; tilt?: Tilt }
+  | { do: "remove"; what: string; exit?: "cut" | "fade" | "shrink" }
   | { do: "shake"; strength?: "subtle" | "normal" | "strong" }
   | { do: "flash" };
 
@@ -108,6 +137,8 @@ export interface FilmHeader {
 export interface PictureRow {
   id: string;
   parts: string[];
+  /** True when the picture is a cut-out and not a background. */
+  cutout?: boolean;
 }
 
 // ── Stream events (mirrors AiRA's omni.film_progress / omni.film_scene) ─────────────────────────────

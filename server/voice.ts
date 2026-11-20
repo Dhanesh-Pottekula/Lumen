@@ -28,6 +28,12 @@ export function unknownMarks(marked: string): string[] {
   return unknown;
 }
 
+/** The narration with every bracketed mark the voice does not know taken out, so only real marks reach it. */
+export function knownMarksOnly(marked: string): string {
+  const known = new Set<string>([...VOICE_EMOTIONS, ...VOICE_MANNERS]);
+  return marked.replace(BRACKET, (whole, inside: string) => (inside.split(",").every((w) => known.has(w.trim().toLowerCase())) ? whole : "")).replace(/[ \t]{2,}/g, " ").trim();
+}
+
 const BRACKET = /\[([^\[\]]{1,40})\]/g;
 const BREAK = /<break\s+time\s*=\s*["'](\d+(?:\.\d+)?)\s*(ms|s)["']\s*\/?>/gi;
 const TAG = /<[^<>]*>/g;
@@ -39,16 +45,26 @@ export function plainOf(marked: string): string {
   return tidy(marked.replace(BREAK, " ").replace(TAG, " ").replace(BRACKET, " ").replace(/\*/g, ""));
 }
 
-/** For Cartesia: pauses are kept in its own tag; feeling and stress marks, which it would read aloud, are removed. */
+/**
+ * For Cartesia, in the tags AiRA's planner writes for the same voice: a feeling becomes <emotion value="…"/>,
+ * "slowly" becomes <speed ratio="0.9"/>, "softly" becomes <volume ratio="0.8"/>, and a pause keeps its own tag.
+ * A feeling the voice does not know, and the stress stars, which it would read aloud, are removed.
+ */
 export function forCartesia(marked: string): string {
-  const pauses: string[] = [];
-  const held = marked.replace(BREAK, (_m, amount: string, unit: string) => {
-    const ms = Math.round(Number(amount) * (unit.toLowerCase() === "s" ? 1000 : 1));
-    if (ms < 300 || ms > 1000) return " ";
-    pauses.push(`<break time="${ms}ms"/>`);
-    return ` @@${pauses.length - 1}@@ `;
-  });
-  return tidy(held.replace(TAG, " ").replace(BRACKET, " ").replace(/\*/g, "")).replace(/@@(\d+)@@/g, (_m, i: string) => pauses[Number(i)]);
+  const tags: string[] = [];
+  const hold = (tag: string) => ` @@${tags.push(tag) - 1}@@ `;
+  const known = new Set<string>(VOICE_EMOTIONS);
+  const held = marked
+    .replace(BREAK, (_m, amount: string, unit: string) => {
+      const ms = Math.round(Number(amount) * (unit.toLowerCase() === "s" ? 1000 : 1));
+      return ms < 300 || ms > 1000 ? " " : hold(`<break time="${ms}ms"/>`);
+    })
+    .replace(BRACKET, (_m, inside: string) => {
+      const words = inside.split(",").map((w) => w.trim().toLowerCase());
+      const emotion = words.find((w) => known.has(w));
+      return [emotion ? hold(`<emotion value="${emotion}"/>`) : "", words.includes("slowly") ? hold('<speed ratio="0.9"/>') : "", words.includes("softly") ? hold('<volume ratio="0.8"/>') : ""].join("");
+    });
+  return tidy(held.replace(TAG, " ").replace(/\*/g, "")).replace(/@@(\d+)@@/g, (_m, i: string) => tags[Number(i)]);
 }
 
 /** For a voice that takes written directions: the marks, in order, as plain delivery notes. */

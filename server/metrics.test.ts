@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { FilmFile } from "../src/film/types";
 import { promptVersion } from "./film";
 import { filmMetrics } from "./metrics";
+import { readEvents, wavOf } from "./providers/cartesia";
 import { unknownMarks } from "./voice";
 
 const film: FilmFile = {
@@ -81,5 +82,33 @@ describe("the prompt fingerprint", () => {
   it("is stable from call to call", () => {
     expect(promptVersion()).toMatch(/^[0-9a-f]{12}$/);
     expect(promptVersion()).toBe(promptVersion());
+  });
+});
+
+describe("Cartesia's voice", () => {
+  it("joins the sound and reads each word's time from the stream", () => {
+    const sound = (bytes: number[]) => Buffer.from(bytes).toString("base64");
+    const { pcm, words } = readEvents([
+      { type: "chunk", data: sound([1, 2]) },
+      { type: "timestamps", word_timestamps: { words: ["You're", "falling."], start: [0.1, 0.3], end: [0.3, 0.7] } },
+      { type: "chunk", data: sound([3, 4]) },
+      { type: "done" },
+    ]);
+    expect([...pcm]).toEqual([1, 2, 3, 4]);
+    expect(words).toEqual([
+      { word: "You're", start: 0.1, end: 0.3 },
+      { word: "falling.", start: 0.3, end: 0.7 },
+    ]);
+  });
+
+  it("fails on an error event, so the other voice can take over", () => {
+    expect(() => readEvents([{ type: "error", title: "bad voice" }])).toThrow("bad voice");
+  });
+
+  it("wraps raw sound as a WAV file of the right length", () => {
+    const wav = wavOf(new Uint8Array(48_000), 24_000);
+    expect(wav.length).toBe(48_044);
+    expect(String.fromCharCode(...wav.slice(0, 4), ...wav.slice(8, 12))).toBe("RIFFWAVE");
+    expect(new DataView(wav.buffer).getUint32(24, true)).toBe(24_000);
   });
 });

@@ -14,6 +14,13 @@ export interface ImageBytes {
   type: string;
 }
 
+/** A spoken narration. A voice that reports when it says each word gives `words`, and nothing has to listen to the clip. */
+export interface SpokenAudio extends ImageBytes {
+  words?: { word: string; start: number; end: number }[];
+  /** The clip's length in seconds. */
+  duration?: number;
+}
+
 export interface Message {
   role: "user" | "assistant";
   content: string;
@@ -22,6 +29,8 @@ export interface Message {
    * skills). It is sent as its own part with a cache breakpoint, so every later call reads it from the cache.
    */
   stable?: string;
+  /** Pictures shown with the message, each after a line of text naming it, in this order. */
+  images?: { label: string; image: ImageBytes }[];
 }
 
 export interface PartsFound {
@@ -50,7 +59,7 @@ export interface Provider {
   /** One reply from the scene writer, given the conversation so far. */
   write(system: string, messages: Message[], stepId: string): Promise<string>;
   /** Speak a narration; null when this provider has no voice. */
-  speak(text: string, style: string, stepId: string): Promise<ImageBytes | null>;
+  speak(text: string, style: string, stepId: string): Promise<SpokenAudio | null>;
   /** The words heard in a voice clip with their times, and the clip's length; null when it cannot be measured. */
   hear(audio: ImageBytes, text: string): Promise<{ words: { word: string; start: number; end: number }[]; duration: number } | null>;
 }
