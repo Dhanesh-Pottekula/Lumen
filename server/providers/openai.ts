@@ -195,7 +195,6 @@ export function openAIProvider(settings: OpenAISettings): Provider {
     stages: {
       plan: { model: settings.planModel, effort: settings.planEffort || "model default" },
       scene: { model: settings.writeModel, effort: settings.writeEffort || "model default" },
-      "warm-up": { model: settings.writeModel, effort: "low" },
       parts: { model: settings.inspectModel, effort: settings.inspectEffort || "model default" },
       picture: { model: settings.imageModel, settings: { quality: settings.imageQuality, size: "1536x1024" } },
       voice: { model: settings.voiceModel, settings: { voice: settings.voice } },
@@ -381,12 +380,6 @@ export function openAIProvider(settings: OpenAISettings): Provider {
       const reply = await respond(system, messages, { ...reasoning(settings.writeEffort), max_output_tokens: 16_000 });
       provider.report?.("scene", settings.writeModel, counted(reply.usage));
       return outputText(reply);
-    },
-
-    async warm(system, stable) {
-      // The same fixed prompt and stable text the scene writers will send, with almost nothing to answer.
-      const reply = await respond(system, [{ role: "user", stable, content: "Reply with the one word: ready" }], { reasoning: { effort: "low" }, max_output_tokens: 64 });
-      provider.report?.("warm-up", settings.writeModel, counted(reply.usage));
     },
 
     async speak(text, style): Promise<ImageBytes> {

@@ -45,11 +45,6 @@ export interface Provider {
   /** Set by the pipeline: called once per model call with what it consumed. */
   report?: (stage: UsageStage, model: string, usage: CallUsage) => void;
   /**
-   * Write the scene writer's fixed prompt and the film's stable text to the prompt cache before the scene
-   * writers start, so that all of them read it instead of several writing it at once.
-   */
-  warm?(system: string, stable: string): Promise<void>;
-  /**
    * Stream the plan as text. `onText` sees every delta as it arrives. When `skills` is given, the model must
    * call that tool first; its answer is fed back and the plan is then written.
    */

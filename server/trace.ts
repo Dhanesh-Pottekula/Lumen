@@ -241,13 +241,6 @@ export function createTracer(options: TracerOptions) {
         write: (system, messages, stepId) =>
           call("scene", stepId, messages.length > 1 ? `Correct scene ${stepId}` : `Write scene ${stepId}`, [text("System prompt", system), ...messageParts(messages)], () => provider.write(system, messages, stepId), (reply) => [text("The reply", reply)]),
 
-        ...(provider.warm
-          ? {
-              warm: (system: string, stable: string) =>
-                call("warm-up", "", "Warm the scene writer's cache", [text("System prompt", system), text("The film's stable text", stable), text("The request", "Reply with the one word: ready")], () => provider.warm!(system, stable), () => []),
-            }
-          : {}),
-
         speak: (words, style, stepId) =>
           call(
             "voice",

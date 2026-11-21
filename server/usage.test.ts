@@ -79,32 +79,13 @@ describe("caching in the pipeline", () => {
     expect(sceneContext([], {})).not.toContain("visual skills");
   });
 
-  it("warms the cache once, before any scene is written", async () => {
-    const base = offlineProvider({ tick: 1 });
-    const order: string[] = [];
-    const provider: Provider = {
-      ...base,
-      warm: async (system, stable) => {
-        order.push("warm");
-        await base.warm?.(system, stable);
-      },
-      write: (system, messages, stepId) => {
-        order.push(`write:${stepId}`);
-        return base.write(system, messages, stepId);
-      },
-    };
-    await run(provider);
-    expect(order.filter((entry) => entry === "warm")).toHaveLength(1);
-    expect(order[0]).toBe("warm");
-  });
-
   it("reports usage as it grows and saves the total with the film", async () => {
     const { film, events, dir } = await run(offlineProvider({ tick: 1 }));
     const reports = events.filter((e): e is FilmUsageEvent => e.type === "film_usage");
     expect(reports.length).toBeGreaterThan(10);
     const last = reports.at(-1)!.usage;
     expect(film.usage).toEqual(last);
-    expect(last.lines.map((line) => line.stage)).toEqual(["plan", "warm-up", "scene", "parts", "picture"]);
+    expect(last.lines.map((line) => line.stage)).toEqual(["plan", "scene", "parts", "picture"]);
     expect(last.images).toBe(4); // the fifth picture fails to draw
     expect(last.cacheHitRate).toBeGreaterThan(0.5);
     expect(last.unpriced).toContain("offline-text");

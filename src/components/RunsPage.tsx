@@ -74,6 +74,34 @@ function Status({ status }: { status: string }) {
   );
 }
 
+/**
+ * Whether a call found its prompt in the provider's cache. The numbers are the ones the provider sent back with
+ * the reply (cached_tokens and cache_write_tokens); nothing here is worked out by Lumen.
+ */
+function CacheCell({ call }: { call: CallSummary }) {
+  if (!["plan", "scene", "parts", "warm-up"].includes(call.stage) || call.status !== "ok") return <span className="quiet">—</span>;
+  const { input, cached, cacheWrite } = call.usage;
+  if (cached > 0)
+    return (
+      <span className="pill good" title={`The provider reported ${count(cached)} of ${count(input)} input tokens read from its cache`}>
+        Hit · {count(cached)}
+        {cacheWrite > 0 ? ` · wrote ${count(cacheWrite)}` : ""}
+      </span>
+    );
+  if (cacheWrite > 0)
+    return (
+      <span className="pill live" title={`Nothing was read from the cache. The provider reported ${count(cacheWrite)} tokens written to it for later calls`}>
+        Wrote · {count(cacheWrite)}
+      </span>
+    );
+  if (call.stage === "parts") return <span className="quiet" title="The part finder sends nothing that repeats, so it does not use the cache">not used</span>;
+  return (
+    <span className="pill bad" title="The provider reported no tokens read from its cache and none written to it">
+      Miss · 0
+    </span>
+  );
+}
+
 function CopyButton({ text, label = "Copy" }: { text: string; label?: string }) {
   const [done, setDone] = useState(false);
   return (
@@ -240,7 +268,7 @@ function CallDetail({ run, n, onClose, live }: { run: string; n: number; onClose
 
             <div className="tiles compact">
               <Tile label="Input tokens" value={count(usage.input)} />
-              <Tile label="Read from cache" value={count(usage.cached)} hint={usage.input ? `${Math.round((usage.cached / usage.input) * 100)}% of input` : undefined} />
+              <Tile label="Read from cache" value={count(usage.cached)} hint={usage.input ? `${Math.round((usage.cached / usage.input) * 100)}% of input, as the provider reported` : undefined} />
               <Tile label="Written to cache" value={count(usage.cacheWrite)} />
               <Tile label="Output tokens" value={count(usage.output)} hint={usage.reasoning ? `${count(usage.reasoning)} of them reasoning` : undefined} />
               {usage.images > 0 && <Tile label="Pictures" value={count(usage.images)} />}
@@ -569,6 +597,9 @@ export function RunsPage({ run, onPick, onOpenInStudio }: { run: string | null; 
                     const done = list.filter((c) => c.status === "ok").length;
                     const cost = list.reduce((sum, c) => sum + (c.cost ?? 0), 0);
                     const tokens = list.reduce((sum, c) => sum + c.usage.input + c.usage.output, 0);
+                    // Calls of this stage that could read the cache, and how many the provider says did.
+                    const cacheable = s.stage === "plan" || s.stage === "scene" ? list.filter((c) => c.status === "ok") : [];
+                    const hits = cacheable.filter((c) => c.usage.cached > 0).length;
                     const about = film?.made?.stages?.[s.stage];
                     const state = running ? "running" : list.length === 0 ? "idle" : failed && !done ? "failed" : "done";
                     return (
@@ -589,6 +620,11 @@ export function RunsPage({ run, onPick, onOpenInStudio }: { run: string | null; 
                             {tokens > 0 ? `${count(tokens)} tokens · ` : ""}
                             {list.length ? money(cost) : ""}
                           </span>
+                          {cacheable.length > 0 && (
+                            <span className={`stage-cache ${hits === cacheable.length ? "good" : hits === 0 && !cacheable.some((c) => c.usage.cacheWrite > 0) ? "bad" : ""}`}>
+                              Cache hit on {hits} of {cacheable.length}
+                            </span>
+                          )}
                         </button>
                       </li>
                     );
@@ -638,7 +674,7 @@ export function RunsPage({ run, onPick, onOpenInStudio }: { run: string | null; 
                         <th>When</th>
                         <th className="num">Took</th>
                         <th className="num">Input</th>
-                        <th className="num">Cached</th>
+                        <th>Cache</th>
                         <th className="num">Output</th>
                         <th className="num">Cost</th>
                       </tr>
@@ -668,7 +704,9 @@ export function RunsPage({ run, onPick, onOpenInStudio }: { run: string | null; 
                           </td>
                           <td className="num">{call.status === "running" ? "…" : took(call.ms)}</td>
                           <td className="num">{call.usage.input ? count(call.usage.input) : "—"}</td>
-                          <td className="num">{call.usage.cached ? count(call.usage.cached) : "—"}</td>
+                          <td>
+                            <CacheCell call={call} />
+                          </td>
                           <td className="num">{call.usage.output ? count(call.usage.output) : "—"}</td>
                           <td className="num">{call.status === "ok" ? money(call.cost) : "—"}</td>
                         </tr>

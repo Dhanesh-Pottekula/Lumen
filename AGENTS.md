@@ -165,11 +165,14 @@ runs/                      generated films (git-ignored): film.json, plan.json, 
   the cached part is the system prompt, the tool and that line: the same for every user and film.
 - The part finder sends explicit mode with no mark, which means no caching and no write at all: each of its
   requests is a short prompt and a new picture, so nothing could be read back.
-- One small warm-up call writes the scene writers' shared prompt before they start. Four writers start
-  together; without it each would pay to write the same text. An entry is not readable in the first seconds
-  after it is written, which is another reason to warm it early.
-- Measured after the fix: scene calls read 1,571 tokens from the cache and write 0; a cold warm-up writes only
-  the 1,581-token prefix; the part finder writes 0 (it wrote all 17,900 input tokens in the film before).
+- There is no separate warm-up call (removed 2026-11-21, to match AiRA, which never had one). Each scene
+  request carries the mark itself: the first to arrive writes the entry and later ones read it. Up to four
+  writers start together, so the first few of a film may miss. Dhanesh's decision: accept that.
+- Cache numbers on the Runs page are the provider's own (`cached_tokens`, `cache_write_tokens` in each
+  reply's usage). Never work them out. Each call shows Hit, Wrote or Miss, and the Plan and Scenes cards
+  show how many of their calls hit. Runs made before the removal still show their warm-up call.
+- Measured with the warm-up in place: scene calls read 1,571 tokens from the cache and wrote 0; the part
+  finder writes 0 (it wrote all 17,900 input tokens in the film before). Not yet measured without it.
 - `FILM_CACHE_BREAKPOINT=0` turns all of this off; it also turns itself off if the API refuses the fields.
   `FILM_CACHE_TTL=12h` keeps entries for twelve hours instead of thirty minutes, at 2.5 times the write rate.
 - Do not put anything that changes per step (ids, times, the step's text) before the stable text, and do not

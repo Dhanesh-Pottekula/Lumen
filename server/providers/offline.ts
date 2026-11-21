@@ -293,10 +293,6 @@ export function offlineProvider(options: OfflineOptions = {}): Provider {
     async hear() {
       return null;
     },
-
-    async warm() {
-      provider.report?.("warm-up", "offline-text", { input: 3010, cached: 0, cacheWrite: 3000, output: 4 });
-    },
   };
   return provider;
 }

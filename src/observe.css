@@ -477,6 +477,20 @@ a.brand {
   font-variant-numeric: tabular-nums;
 }
 
+.stage-cache {
+  color: var(--dim);
+  font-size: 0.74rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.stage-cache.good {
+  color: var(--good);
+}
+
+.stage-cache.bad {
+  color: var(--red);
+}
+
 /* ── Runs: the table of calls ── */
 .filters {
   align-items: center;
