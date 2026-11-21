@@ -50,7 +50,7 @@ export interface Provider {
    */
   plan(system: string, brief: string, onText: (delta: string) => void, skills?: SkillTool | null): Promise<void>;
   /** Draw one picture. `reference` is the film's lead picture, or the earlier moment this one redraws. */
-  draw(prompt: string, reference: ImageBytes | null, pictureId: string): Promise<ImageBytes>;
+  draw(prompt: string, reference: ImageBytes | null, pictureId: string, size?: string): Promise<ImageBytes>;
   /** Find parts in a finished picture. Boxes are in the picture's own pixels. */
   findParts(system: string, context: string, image: ImageBytes, pictureId: string, partIds: string[]): Promise<PartsFound>;
   /** One reply from the scene writer, given the conversation so far. */

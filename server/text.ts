@@ -100,6 +100,23 @@ export function jsonObject(text: string): Record<string, unknown> | null {
   const a = text.indexOf("{");
   const b = text.lastIndexOf("}");
   if (a >= 0 && b > a) tries.push(text.slice(a, b + 1));
+  // The first object that closes, with anything after it left off: a model sometimes adds a bracket too many.
+  if (a >= 0) {
+    let depth = 0;
+    let quoted = false;
+    for (let i = a; i < text.length; i++) {
+      const c = text[i];
+      if (quoted) {
+        if (c === "\\") i++;
+        else if (c === '"') quoted = false;
+      } else if (c === '"') quoted = true;
+      else if (c === "{" || c === "[") depth++;
+      else if ((c === "}" || c === "]") && --depth === 0) {
+        tries.push(text.slice(a, i + 1));
+        break;
+      }
+    }
+  }
   for (const t of tries) {
     try {
       const value: unknown = JSON.parse(t);

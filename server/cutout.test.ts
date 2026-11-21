@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import type { FilmEvent, ImageObject } from "../src/film/types";
-import { type Pixels, cutOut, cutOutPng, decodePng, encodePng, shrinkPng } from "./cutout";
+import { type Pixels, cutOut, cutOutPng, cutSheet, decodePng, encodePng, sheetLayout, shrinkPng } from "./cutout";
 import { makeFilm } from "./film";
 import { offlineProvider } from "./providers/offline";
 import type { ImageBytes, Message, Provider } from "./providers/types";
@@ -170,7 +170,16 @@ describe("a film with cut-outs, end to end", () => {
     return encodePng(p);
   };
 
-  async function run() {
+  /** Both cut-outs on one sheet: a large ring, then a small one. */
+  const both = () => {
+    const p = canvas(400, 200);
+    ring(p, 100, 100, 60);
+    ring(p, 300, 100, 30);
+    return encodePng(p);
+  };
+
+  /** `sheet` is what the drawing of both cut-outs together comes back as; null makes that drawing fail. */
+  async function run(sheet: (() => Uint8Array) | null = both) {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "lumen-cutout-"));
     const drawn: { id: string; prompt: string; reference: ImageBytes | null }[] = [];
     const found: string[] = [];
@@ -182,9 +191,11 @@ describe("a film with cut-outs, end to end", () => {
       },
       async draw(prompt, reference, id) {
         drawn.push({ id, prompt, reference });
-        // The first try at the ball comes back as empty white, as an image model sometimes does.
-        const blank = id === "ball" && drawn.filter((d) => d.id === "ball").length === 1;
-        return { bytes: id === "field" ? encodePng(canvas(120, 80, [40, 120, 60])) : blank ? encodePng(canvas(120, 90)) : disc(), type: "image/png" };
+        if (id.startsWith("sheet")) {
+          if (!sheet) throw new Error("the sheet could not be drawn");
+          return { bytes: sheet(), type: "image/png" };
+        }
+        return { bytes: id === "field" ? encodePng(canvas(120, 80, [40, 120, 60])) : disc(), type: "image/png" };
       },
       async findParts(_system, _context, _image, id, ids) {
         found.push(id);
@@ -219,7 +230,7 @@ describe("a film with cut-outs, end to end", () => {
 
     // Only the background is searched for parts, even though the plan gave the cut-out one.
     expect(found).toEqual(["field"]);
-    expect(drawn.find((d) => d.id === "ball")!.prompt).toContain("pure white");
+    expect(drawn.find((d) => d.id === "sheet-1")!.prompt).toContain("pure white");
     expect(drawn.find((d) => d.id === "field")!.prompt).not.toContain("pure white");
   });
 
@@ -239,24 +250,40 @@ describe("a film with cut-outs, end to end", () => {
     expect(told[1].shape).toBeCloseTo(1, 1);
   });
 
-  it("redraws a cut-out once when the cut says the drawing cannot be used", async () => {
-    const { drawn } = await run();
-    const tries = drawn.filter((d) => d.id === "ball");
-    expect(tries).toHaveLength(2);
-    expect(tries[1].prompt).toContain("could not be used: nothing but the plain ground was drawn");
+  it("draws every cut-out of a film in one drawing and cuts them apart", async () => {
+    const { film, dir, drawn } = await run();
+    expect(film.status).toBe("ready");
+    // One drawing for the two things, and none for either alone.
+    expect(drawn.map((d) => d.id)).toEqual(["field", "sheet-1"]);
+    const sheet = drawn[1];
+    expect(sheet.prompt).toContain("1. A round ball.");
+    expect(sheet.prompt).toContain("2. The same ball, gone flat. This is the very same thing as number 1");
+    // The sheet is drawn in the style of the film's first background.
+    expect(decodePng(sheet.reference!.bytes).height).toBe(80);
+    const ball = decodePng(new Uint8Array(fs.readFileSync(path.join(dir, "pictures/ball.png"))));
+    const flat = decodePng(new Uint8Array(fs.readFileSync(path.join(dir, "pictures/ball-flat.png"))));
+    expect(ball.width).toBeGreaterThan(110);
+    expect(flat.width).toBeLessThan(70);
+    expect(fs.existsSync(path.join(dir, "pictures/sheet-1.png"))).toBe(true);
   });
 
-  it("draws another pose from the first pose's own drawing, and styles a first pose from the lead frame", async () => {
-    const { drawn } = await run();
-    const flat = drawn.find((d) => d.id === "ball-flat")!;
-    expect(flat.prompt).toContain("another pose");
-    // The reference is the ball as drawn on white, not the cut-out and not the field.
-    expect(decodePng(flat.reference!.bytes).data[3]).toBe(255);
-    expect(decodePng(flat.reference!.bytes).width).toBe(120);
-    expect(decodePng(flat.reference!.bytes).height).toBe(90);
-    const ball = drawn.find((d) => d.id === "ball")!;
-    expect(decodePng(ball.reference!.bytes).height).toBe(80);
-    expect(ball.prompt).toContain("frame of the same film");
+  it("draws nothing again when the sheet leaves a thing out, and marks the run failed", async () => {
+    const one = () => {
+      const p = canvas(400, 200);
+      ring(p, 100, 100, 60);
+      return encodePng(p);
+    };
+    const { film, drawn } = await run(one);
+    expect(drawn.map((d) => d.id)).toEqual(["field", "sheet-1"]);
+    expect(film.status).toBe("failed");
+    expect(film.error).toContain("ball-flat: nothing was found in its place on the sheet");
+  });
+
+  it("draws nothing again when the sheet cannot be drawn, and marks the run failed", async () => {
+    const { film, drawn } = await run(null);
+    expect(drawn.map((d) => d.id)).toEqual(["field", "sheet-1"]);
+    expect(film.status).toBe("failed");
+    expect(film.error).toContain("sheet-1: the sheet could not be drawn");
   });
 
   it("leaves a scene on its background when a cut-out cannot be made", async () => {
@@ -268,7 +295,7 @@ describe("a film with cut-outs, end to end", () => {
         onText(JSON.stringify(plan));
       },
       async draw(_prompt, _reference, id) {
-        // Every cut-out comes back as a whole scene, twice: it is given up on.
+        // The sheet comes back as a whole scene, so no cut-out can be taken from it.
         return { bytes: encodePng(canvas(120, 80, id === "field" ? [40, 120, 60] : [200, 60, 60])), type: "image/png" };
       },
       async findParts(_s, _c, _i, _id, ids) {
@@ -283,7 +310,9 @@ describe("a film with cut-outs, end to end", () => {
       },
     };
     const film = await makeFilm({ provider, brief: "The ball", run: "t", dir, base: "/film-runs/t", emit: () => {} });
-    expect(film.status).toBe("ready");
+    // The run is marked failed, but the scenes that could be made are kept.
+    expect(film.status).toBe("failed");
+    expect(film.scenes).toHaveLength(1);
     // The scene writer is told only about the picture that exists.
     expect(asked[0]).toContain('"id":"field"');
     expect(asked[0]).not.toContain('"id":"ball"');
@@ -302,5 +331,29 @@ describe("who gets the character's look", () => {
     expect(cutoutPrompt("the main character, walking, facing right", look, "styled")).toContain("red coat");
     expect(cutoutPrompt("A small silver wrench.", look, "styled")).not.toContain("red coat");
     expect(drawingPrompt("The main character waits.", "none", "lead")).not.toContain("same in every frame");
+  });
+});
+
+describe("a sheet of things", () => {
+  it("gives each thing its own cut-out, in reading order, and null for an empty place", () => {
+    const p = canvas(600, 400);
+    ring(p, 100, 100, 70);
+    // The second thing leans over the line into the third place, and is still kept whole.
+    ring(p, 330, 100, 80);
+    ring(p, 100, 300, 40);
+    const things = cutSheet(encodePng(p), 3, 2, 5);
+    expect(things.map((t) => (t ? t.cut.problem : "empty"))).toEqual([null, null, "empty", null, "empty"]);
+    expect(things[0]!.cut.width).toBeGreaterThan(138);
+    expect(things[1]!.cut.width).toBeGreaterThan(158);
+    expect(things[3]!.cut.width).toBeLessThan(90);
+    // What is kept beside the cut-out is the thing alone on white.
+    expect(decodePng(things[0]!.drawn).data[3]).toBe(255);
+  });
+
+  it("asks for a larger drawing once there are more than six things", () => {
+    expect(sheetLayout(2)).toEqual({ cols: 2, rows: 1, size: "1536x1024" });
+    expect(sheetLayout(6)).toEqual({ cols: 3, rows: 2, size: "1536x1024" });
+    expect(sheetLayout(12)).toEqual({ cols: 4, rows: 3, size: "3072x2048" });
+    expect(sheetLayout(18)).toEqual({ cols: 6, rows: 3, size: "3072x2048" });
   });
 });

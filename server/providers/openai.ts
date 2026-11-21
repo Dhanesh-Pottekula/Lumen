@@ -42,8 +42,8 @@ export interface OpenAISettings {
 export function openAISettings(env: Record<string, string | undefined>, key: string): OpenAISettings {
   return {
     key,
-    planModel: env.FILM_PLAN_MODEL ?? "gpt-6.1-sol",
-    writeModel: env.FILM_WRITE_MODEL ?? "gpt-6.1-sol",
+    planModel: env.FILM_PLAN_MODEL ?? "gpt-6-luna",
+    writeModel: env.FILM_WRITE_MODEL ?? "gpt-6-luna",
     imageModel: env.FILM_IMAGE_MODEL ?? "gpt-image-2",
     imageQuality: env.FILM_IMAGE_QUALITY ?? "medium",
     inspectModel: env.FILM_INSPECT_MODEL ?? "gpt-6-luna",
@@ -319,8 +319,8 @@ export function openAIProvider(settings: OpenAISettings): Provider {
       }
     },
 
-    async draw(prompt, reference) {
-      const common = { model: settings.imageModel, prompt, size: "1536x1024", quality: settings.imageQuality };
+    async draw(prompt, reference, _pictureId, size = "1536x1024") {
+      const common = { model: settings.imageModel, prompt, size, quality: settings.imageQuality };
       let res: Response;
       if (reference) {
         const form = new FormData();

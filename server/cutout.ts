@@ -371,3 +371,221 @@ export function shrinkPng(bytes: Uint8Array, widest: number): Uint8Array {
 export function cutOutPng(bytes: Uint8Array): CutOut {
   return cutOut(decodePng(bytes));
 }
+
+// ── A sheet of things ───────────────────────────────────────────────────────────────────────────────
+/** How a number of things is laid out on one sheet, and the size of drawing that leaves each about 512 px. */
+export function sheetLayout(count: number): { cols: number; rows: number; size: string } {
+  const cols = count <= 1 ? 1 : count <= 2 ? 2 : count <= 6 ? 3 : count <= 8 ? 4 : count <= 12 ? 4 : count <= 15 ? 5 : 6;
+  const rows = Math.max(1, Math.ceil(count / cols));
+  // A drawing four times the area costs about 2.3 times as much (measured: 3,184 output tokens against 1,372).
+  return { cols, rows, size: cols <= 3 && rows <= 2 ? "1536x1024" : "3072x2048" };
+}
+
+/** The most things one sheet holds. */
+export const SHEET_MOST = 18;
+
+export interface SheetThing {
+  /** The thing alone on white, as it was drawn: what a model is shown, and what another pose is redrawn from. */
+  drawn: Uint8Array;
+  cut: CutOut;
+}
+
+/**
+ * Split one drawing of many things, laid out on plain white, into its things, in reading order.
+ *
+ * The things are found by what is drawn, not by where the grid's lines would be: pieces of drawing that lie
+ * close together are one thing (the shards of a broken cup, a sun and its rays), and the things are then read
+ * row by row, left to right. So a last row that the image model spread out or centred still comes out in
+ * order. When fewer things are found than were asked for, there is no telling which is missing, and each is
+ * taken from its grid cell instead: an empty cell gives null, and the caller draws that thing on its own.
+ */
+export function cutSheet(bytes: Uint8Array, cols: number, rows: number, count: number): (SheetThing | null)[] {
+  const source = decodePng(bytes);
+  const { width, height, data } = source;
+  const total = width * height;
+  const ground = groundOf(source);
+  const isGround = (i: number) => Math.max(Math.abs(data[i * 4] - ground[0]), Math.abs(data[i * 4 + 1] - ground[1]), Math.abs(data[i * 4 + 2] - ground[2])) <= REACH;
+
+  // Ground that reaches the border is the sheet's white. White closed inside an outline stays part of its thing.
+  const open = new Uint8Array(total);
+  const queue = new Int32Array(total);
+  let head = 0;
+  let tail = 0;
+  const seed = (i: number) => {
+    if (!open[i] && isGround(i)) {
+      open[i] = 1;
+      queue[tail++] = i;
+    }
+  };
+  for (let x = 0; x < width; x++) {
+    seed(x);
+    seed((height - 1) * width + x);
+  }
+  for (let y = 0; y < height; y++) {
+    seed(y * width);
+    seed(y * width + width - 1);
+  }
+  while (head < tail) {
+    const i = queue[head++];
+    const x = i % width;
+    if (x > 0) seed(i - 1);
+    if (x < width - 1) seed(i + 1);
+    if (i >= width) seed(i - width);
+    if (i < total - width) seed(i + width);
+  }
+
+  // Each connected piece of drawing: its box, its size, and its label on every pixel of it.
+  interface Piece {
+    left: number;
+    top: number;
+    right: number;
+    bottom: number;
+    size: number;
+    /** The thing this piece belongs to: an index into `pieces`, followed to its root. */
+    thing: number;
+  }
+  const label = new Int32Array(total).fill(-1);
+  const pieces: Piece[] = [];
+  const speck = (total / (cols * rows)) * EMPTY * 0.1;
+  for (let start = 0; start < total; start++) {
+    if (open[start] || label[start] >= 0) continue;
+    const id = pieces.length;
+    head = tail = 0;
+    queue[tail++] = start;
+    label[start] = id;
+    const piece: Piece = { left: width, top: height, right: -1, bottom: -1, size: 0, thing: id };
+    while (head < tail) {
+      const i = queue[head++];
+      const x = i % width;
+      const y = (i - x) / width;
+      if (x < piece.left) piece.left = x;
+      if (x > piece.right) piece.right = x;
+      if (y < piece.top) piece.top = y;
+      if (y > piece.bottom) piece.bottom = y;
+      for (const next of [x > 0 ? i - 1 : -1, x < width - 1 ? i + 1 : -1, i >= width ? i - width : -1, i < total - width ? i + width : -1]) {
+        if (next >= 0 && !open[next] && label[next] < 0) {
+          label[next] = id;
+          queue[tail++] = next;
+        }
+      }
+    }
+    piece.size = tail;
+    pieces.push(piece);
+  }
+  // Stray dots are nobody's.
+  const real = pieces.map((piece, id) => (piece.size >= speck ? id : -1)).filter((id) => id >= 0);
+
+  const root = (id: number): number => {
+    let top = id;
+    while (pieces[top].thing !== top) top = pieces[top].thing;
+    // Point everything on the way straight at the top, so the next look is short.
+    while (pieces[id].thing !== top) {
+      const next = pieces[id].thing;
+      pieces[id].thing = top;
+      id = next;
+    }
+    return top;
+  };
+  /** How far apart two boxes are: 0 when they touch or overlap. */
+  const apart = (a: Piece, b: Piece) => Math.max(0, a.left - b.right, b.left - a.right, a.top - b.bottom, b.top - a.bottom);
+  const join = (a: number, b: number) => {
+    const into = pieces[root(a)];
+    const from = pieces[root(b)];
+    if (into === from) return;
+    into.left = Math.min(into.left, from.left);
+    into.top = Math.min(into.top, from.top);
+    into.right = Math.max(into.right, from.right);
+    into.bottom = Math.max(into.bottom, from.bottom);
+    into.size += from.size;
+    from.thing = root(a);
+  };
+  const things = () => real.filter((id) => root(id) === id);
+
+  // Pieces a small step apart are one thing. Things on a sheet stand several times further apart than this.
+  const near = width * 0.025;
+  for (let changed = true; changed; ) {
+    changed = false;
+    const now = things();
+    for (let a = 0; a < now.length; a++) {
+      for (let b = a + 1; b < now.length; b++) {
+        if (root(now[a]) !== root(now[b]) && apart(pieces[root(now[a])], pieces[root(now[b])]) <= near) {
+          join(now[a], now[b]);
+          changed = true;
+        }
+      }
+    }
+  }
+  // Still too many: the two nearest are one thing drawn loosely. Join until the number is the one asked for.
+  for (let now = things(); now.length > count; now = things()) {
+    let best: [number, number] = [now[0], now[1]];
+    let least = Infinity;
+    for (let a = 0; a < now.length; a++) {
+      for (let b = a + 1; b < now.length; b++) {
+        const d = apart(pieces[now[a]], pieces[now[b]]);
+        if (d < least) {
+          least = d;
+          best = [now[a], now[b]];
+        }
+      }
+    }
+    join(best[0], best[1]);
+  }
+
+  /** One thing alone on white, with room round it, and its cut-out. `mine` says which pixels are its own. */
+  const lift = (box: { left: number; top: number; right: number; bottom: number }, mine: (i: number) => boolean): SheetThing => {
+    // Room round the thing, so the cutter sees white on every side and a boxy thing is not taken for a scene.
+    const room = Math.max(24, Math.round(Math.max(box.right - box.left, box.bottom - box.top) * 0.12));
+    const left = Math.max(0, box.left - room);
+    const top = Math.max(0, box.top - room);
+    const right = Math.min(width - 1, box.right + room);
+    const bottom = Math.min(height - 1, box.bottom + room);
+    const crop: Pixels = { width: right - left + 1, height: bottom - top + 1, data: new Uint8Array((right - left + 1) * (bottom - top + 1) * 4).fill(255) };
+    for (let y = top; y <= bottom; y++) {
+      for (let x = left; x <= right; x++) {
+        const i = y * width + x;
+        // Only this thing's own pieces are copied: a neighbour that leans in is left out.
+        if (label[i] < 0 || !mine(i)) continue;
+        const o = ((y - top) * crop.width + (x - left)) * 4;
+        crop.data[o] = data[i * 4];
+        crop.data[o + 1] = data[i * 4 + 1];
+        crop.data[o + 2] = data[i * 4 + 2];
+      }
+    }
+    return { drawn: encodePng(crop), cut: cutOut(crop) };
+  };
+
+  const found = things();
+  if (found.length === count) {
+    // Reading order: rows are told apart by the widest gaps between the things' middles, top to bottom.
+    const middleY = (id: number) => (pieces[id].top + pieces[id].bottom) / 2;
+    const middleX = (id: number) => (pieces[id].left + pieces[id].right) / 2;
+    const down = [...found].sort((a, b) => middleY(a) - middleY(b));
+    const gaps = down.slice(1).map((id, n) => ({ after: n, gap: middleY(id) - middleY(down[n]) }));
+    // A new row starts only at a real drop: more than a third of a row's height.
+    const breaks = new Set(gaps.filter((g) => g.gap > (height / rows) * 0.34).sort((a, b) => b.gap - a.gap).slice(0, Math.max(0, rows - 1)).map((g) => g.after));
+    const ordered: number[] = [];
+    let row: number[] = [];
+    down.forEach((id, n) => {
+      row.push(id);
+      if (breaks.has(n) || n === down.length - 1) {
+        ordered.push(...row.sort((a, b) => middleX(a) - middleX(b)));
+        row = [];
+      }
+    });
+    return ordered.map((id) => lift(pieces[id], (i) => pieces[label[i]].size >= speck && root(label[i]) === id));
+  }
+
+  // Fewer things than asked for: take each from the grid cell its middle is in.
+  const cellOf = (id: number) => {
+    const piece = pieces[id];
+    const col = Math.min(cols - 1, Math.floor(((piece.left + piece.right) / 2 / width) * cols));
+    const row = Math.min(rows - 1, Math.floor(((piece.top + piece.bottom) / 2 / height) * rows));
+    return row * cols + col;
+  };
+  return Array.from({ length: count }, (_, at) => {
+    const here = found.filter((id) => cellOf(id) === at);
+    if (!here.length) return null;
+    const box = here.map((id): { left: number; top: number; right: number; bottom: number } => pieces[id]).reduce((a, b) => ({ left: Math.min(a.left, b.left), top: Math.min(a.top, b.top), right: Math.max(a.right, b.right), bottom: Math.max(a.bottom, b.bottom) }));
+    return lift(box, (i) => pieces[label[i]].size >= speck && here.includes(root(label[i])));
+  });
+}

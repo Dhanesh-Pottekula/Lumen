@@ -19,11 +19,13 @@ import { type CallUsage, RATES, costOf } from "./usage";
 const running = new AsyncLocalStorage<CallRecord>();
 
 /** Long runs of picture or sound data are of no use to read and would swamp the record. */
-const BLOB = /^(data:[^;,]+;base64,)?[A-Za-z0-9+/=\r\n]{2000,}$/;
+const BLOB = /^(data:[^;,]+;base64,)?[A-Za-z0-9+/=\r\n]{2000}/;
+/** Only the start is tested: matching a regular expression against several megabytes overflows the engine's stack. */
+const isBlob = (value: string) => value.length >= 2000 && BLOB.test(value.slice(0, 2200));
 
 /** A copy of a request or an answer with picture and sound data replaced by a note of its size. */
 export function scrubbed(value: unknown, depth = 0): unknown {
-  if (typeof value === "string") return value.length >= 2000 && BLOB.test(value) ? `<${value.startsWith("data:") ? value.slice(5, value.indexOf(";")) : "data"}, ${value.length.toLocaleString("en")} characters, left out>` : value;
+  if (typeof value === "string") return isBlob(value) ? `<${value.startsWith("data:") ? value.slice(5, value.indexOf(";")) : "data"}, ${value.length.toLocaleString("en")} characters, left out>` : value;
   if (Array.isArray(value)) return depth > 12 ? "<too deep>" : value.map((item) => scrubbed(item, depth + 1));
   if (value && typeof value === "object") return depth > 12 ? "<too deep>" : Object.fromEntries(Object.entries(value).map(([key, item]) => [key, scrubbed(item, depth + 1)]));
   return value;
@@ -217,14 +219,14 @@ export function createTracer(options: TracerOptions) {
           );
         },
 
-        draw: (prompt, reference, pictureId) =>
+        draw: (prompt, reference, pictureId, asked) =>
           call(
             "picture",
             pictureId,
             // A second try at the same picture is listed as one.
             drawnBefore(pictureId) ? `Draw ${pictureId} again` : `Draw ${pictureId}`,
-            [text("Drawing prompt", prompt), ...(reference ? [media("image", "Reference picture sent with it", reference)] : [])],
-            () => provider.draw(prompt, reference, pictureId),
+            [text("Drawing prompt", prompt), ...(asked ? [text("Size asked for", asked)] : []), ...(reference ? [media("image", "Reference picture sent with it", reference)] : [])],
+            () => provider.draw(prompt, reference, pictureId, asked),
             (image) => [{ kind: "image", title: "The drawing that came back", src: options.outputSrc("picture", pictureId, image.type), note: `${image.type}, ${size(image.bytes)}` }],
           ),
 

@@ -92,3 +92,11 @@ describe("caching in the pipeline", () => {
     expect(JSON.parse(fs.readFileSync(path.join(dir, "film.json"), "utf8")).usage.images).toBe(4);
   });
 });
+
+describe("reading a model's JSON", () => {
+  it("takes the object that closes and leaves off a bracket too many", async () => {
+    const { jsonObject } = await import("./text");
+    expect(jsonObject('{"beats":[{"say":"a ] } \\" b","actions":[]}]}]}')).toEqual({ beats: [{ say: 'a ] } " b', actions: [] }] });
+    expect(jsonObject("no json here")).toBeNull();
+  });
+});

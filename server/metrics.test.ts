@@ -212,6 +212,12 @@ describe("the record of a film's making", () => {
     form.append("image[]", new Blob([new Uint8Array(10)], { type: "image/png" }), "reference.png");
     expect(readableBody(form)).toEqual({ prompt: "draw", "image[]": "<file reference.png, image/png, 10 bytes, left out>" });
   });
+
+  it("leaves out picture data of any size without failing", () => {
+    // A large sheet comes back as some ten million characters; matching all of it once overflowed the stack.
+    const huge = "QUJD".repeat(3_000_000);
+    expect(scrubbed({ b64_json: huge })).toEqual({ b64_json: "<data, 12,000,000 characters, left out>" });
+  });
 });
 
 describe("prompts a person rewrites", () => {
@@ -239,7 +245,7 @@ describe("settings a person chooses", () => {
 
   it("has every stage's default when nothing was chosen, and reads the environment", () => {
     expect(loadSettings(root())).toEqual({ stages: {}, prompts: {} });
-    expect(defaultStages({}).plan).toEqual({ model: "gpt-6.1-sol", effort: "medium" });
+    expect(defaultStages({}).plan).toEqual({ model: "gpt-6-luna", effort: "medium" });
     expect(defaultStages({ FILM_PLAN_MODEL: "x", FILM_PLAN_EFFORT: "high" }).plan).toEqual({ model: "x", effort: "high" });
   });
 
@@ -248,7 +254,7 @@ describe("settings a person chooses", () => {
     saveSettings(at, { stages: { scene: { model: "gpt-6-luna", effort: "high" } } });
     const inForce = stagesWith(loadSettings(at), {});
     expect(inForce.scene).toEqual({ model: "gpt-6-luna", effort: "high" });
-    expect(inForce.plan).toEqual({ model: "gpt-6.1-sol", effort: "medium" });
+    expect(inForce.plan).toEqual({ model: "gpt-6-luna", effort: "medium" });
   });
 
   it("keeps an effort left to the model, and drops what a stage does not have", () => {

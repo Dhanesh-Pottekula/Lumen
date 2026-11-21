@@ -16,6 +16,15 @@ export const VIEW_W = 960;
 export const VIEW_H = 540;
 
 const FONT = `-apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif`;
+/**
+ * Everything written on the picture is in a handwriting face, so it belongs to the hand-drawn pictures. The
+ * subtitles stay in the plain face: they are read fast and are not part of the drawing. Caveat's letters are
+ * smaller on their line than a plain face's, so its sizes are larger than they look.
+ */
+export const HAND_FACE = "Caveat";
+const HAND = `"${HAND_FACE}", "Bradley Hand", "Comic Sans MS", cursive`;
+/** The canvas falls back without a word when a face is not loaded, so ask for it as soon as this is used. */
+export const handReady: Promise<unknown> = typeof document !== "undefined" && document.fonts ? document.fonts.load(`700 48px "${HAND_FACE}"`).catch(() => null) : Promise.resolve();
 const INK = "#0b0d12";
 const COLORS = { white: "#ffffff", accent: "#ffd24a", danger: "#ff5a4f", good: "#6fe08a" } as const;
 
@@ -130,11 +139,11 @@ function onScreen(view: View, spot: Hotspot | undefined): Rect {
 // ── Drawing helpers ─────────────────────────────────────────────────────────────────────────────────
 /** Bold cartoon lettering: a colour fill inside a thick dark outline, readable over any picture. */
 function comicText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, size: number, color: string, align: CanvasTextAlign = "center") {
-  ctx.font = `900 ${size}px ${FONT}`;
+  ctx.font = `700 ${size}px ${HAND}`;
   ctx.textAlign = align;
   ctx.textBaseline = "middle";
   ctx.lineJoin = "round";
-  ctx.lineWidth = Math.max(4, size * 0.2);
+  ctx.lineWidth = Math.max(4, size * 0.16);
   ctx.strokeStyle = INK;
   ctx.strokeText(text, x, y);
   ctx.fillStyle = color;
@@ -362,7 +371,7 @@ function drawLabel(ctx: CanvasRenderingContext2D, text: string, box: Rect, age: 
   if (alpha <= 0) return;
 
   ctx.save();
-  ctx.font = `800 20px ${FONT}`;
+  ctx.font = `700 27px ${HAND}`;
   const w = ctx.measureText(text).width + 28;
   const h = 38;
   const reach = Math.min(box.h / 2, 90) + 34;
@@ -423,7 +432,7 @@ function drawSpeech(ctx: CanvasRenderingContext2D, text: string, box: Rect, age:
   const cx = box.x + box.w / 2;
   if (alpha <= 0 || cx < -60 || cx > VIEW_W + 60) return;
   ctx.save();
-  ctx.font = `800 21px ${FONT}`;
+  ctx.font = `700 28px ${HAND}`;
   const lines = wrap(ctx, text, 330);
   const w = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 34;
   const h = lines.length * 27 + 22;
@@ -471,8 +480,8 @@ function drawOverlay(ctx: CanvasRenderingContext2D, object: OverlayObject, entra
 
   switch (object.kind) {
     case "text": {
-      const size = object.size === "large" ? 78 : object.size === "small" ? 30 : 48;
-      ctx.font = `900 ${size}px ${FONT}`;
+      const size = object.size === "large" ? 104 : object.size === "small" ? 40 : 64;
+      ctx.font = `700 ${size}px ${HAND}`;
       const lines = wrap(ctx, object.text, VIEW_W - 120);
       const widest = Math.max(...lines.map((line) => ctx.measureText(line).width));
       const box = zoneBox(object.zone, widest, lines.length * size * 1.1);
@@ -496,7 +505,7 @@ function drawOverlay(ctx: CanvasRenderingContext2D, object: OverlayObject, entra
           return;
         }
         // Each word pops in turn, left to right.
-        ctx.font = `900 ${size}px ${FONT}`;
+        ctx.font = `700 ${size}px ${HAND}`;
         const space = ctx.measureText(" ").width;
         let x = -ctx.measureText(line).width / 2;
         for (const word of line.split(" ")) {
@@ -509,7 +518,7 @@ function drawOverlay(ctx: CanvasRenderingContext2D, object: OverlayObject, entra
             ctx.translate(x + width / 2, y + (1 - easeOutBack(p)) * 14);
             comicText(ctx, word, 0, 0, size, color);
             ctx.restore();
-            ctx.font = `900 ${size}px ${FONT}`;
+            ctx.font = `700 ${size}px ${HAND}`;
           }
           x += width + space;
         }
@@ -528,13 +537,13 @@ function drawOverlay(ctx: CanvasRenderingContext2D, object: OverlayObject, entra
       const value = lerp(object.from ?? 0, object.to, easeOutCubic(clamp01(age / Math.max(1.2, dur))));
       const shown = formatNumber(value, { decimals: object.decimals ?? 0, prefix: object.prefix ?? "", suffix: object.suffix ?? "" });
       const final = formatNumber(object.to, { decimals: object.decimals ?? 0, prefix: object.prefix ?? "", suffix: object.suffix ?? "" });
-      ctx.font = `900 60px ${FONT}`;
+      ctx.font = `700 78px ${HAND}`;
       const w = Math.max(ctx.measureText(final).width, object.label ? object.label.length * 11 : 0) + 56;
       const box = zoneBox(object.zone, w, object.label ? 124 : 96);
       panel(ctx, box.x, box.y, box.w, box.h);
-      comicText(ctx, shown, box.x + box.w / 2, box.y + 50, 60, COLORS.accent);
+      comicText(ctx, shown, box.x + box.w / 2, box.y + 50, 78, COLORS.accent);
       if (object.label) {
-        ctx.font = `700 18px ${FONT}`;
+        ctx.font = `700 25px ${HAND}`;
         ctx.fillStyle = "rgba(255, 255, 255, 0.86)";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
@@ -547,7 +556,7 @@ function drawOverlay(ctx: CanvasRenderingContext2D, object: OverlayObject, entra
       panel(ctx, box.x, box.y, box.w, box.h);
       const top = object.title ? 44 : 20;
       if (object.title) {
-        ctx.font = `800 18px ${FONT}`;
+        ctx.font = `700 25px ${HAND}`;
         ctx.fillStyle = "#ffffff";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";

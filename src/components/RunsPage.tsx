@@ -555,6 +555,7 @@ export function RunsPage({ run, onPick, onOpenInStudio }: { run: string | null; 
                 <p className="quiet">
                   “{selected.brief}” · started {startedOf(run)} · <code>{run}</code>
                 </p>
+                {film?.error && <p className="failure">{film.error}</p>}
               </div>
               <span className="grow" />
               <Status status={live ? "running" : selected.status} />

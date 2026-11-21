@@ -17,8 +17,8 @@ import path from "node:path";
 import type { FilmEvent, FilmFile, FilmHeader, FilmScene, Hotspot, ImageObject, PictureRow, ProgressStage, ProgressStatus, SceneAudio } from "../src/film/types";
 import { alignWords } from "../src/film/words";
 import { validateScene, withPictures } from "../src/film/validate";
-import { cutOutPng, shrinkPng } from "./cutout";
-import { DEFAULT_PROMPTS, PROMPT_INFO, type Prompts, SCENE_REPAIR, cutoutPrompt, drawingPrompt, partsContext, promptsWith, sceneContext, sceneRetry, sceneStable } from "./prompts";
+import { SHEET_MOST, cutSheet, sheetLayout, shrinkPng } from "./cutout";
+import { DEFAULT_PROMPTS, PROMPT_INFO, type Prompts, SCENE_REPAIR, cutoutPrompt, drawingPrompt, partsContext, promptsWith, sceneContext, sceneRetry, sceneStable, sheetPrompt } from "./prompts";
 import { createTracer } from "./trace";
 import { createMeter } from "./usage";
 import type { ImageBytes, Message, Provider } from "./providers/types";
@@ -146,6 +146,7 @@ export function promptVersion(prompts: Prompts = DEFAULT_PROMPTS): string {
     drawingPrompt("", "x", "styled", prompts.look),
     cutoutPrompt("the main character", "x", "styled", prompts.cutoutLook),
     cutoutPrompt("", "x", "state", prompts.cutoutLook),
+    sheetPrompt([{ brief: "the main character" }, { brief: "", sameAs: 1 }], "x", 2, 1, true, prompts.cutoutLook),
   ].join("\u0000");
   return createHash("sha256").update(text).digest("hex").slice(0, 12);
 }
@@ -228,14 +229,78 @@ export async function makeFilm(job: FilmJob): Promise<FilmFile> {
     }
   })();
 
+  // ── Cut-outs: drawn together ────────────────────────────────────────────────────────────────────────
+  // A drawing costs about the same however many things are in it, so a film's cut-outs wait until the plan has
+  // listed every picture and are then drawn on one sheet (two, past eighteen) and cut apart by code.
+  const sheetPlans: PicturePlan[] = [];
+  /** Why a sheet, or a thing on it, could not be used. Any entry here fails the run: nothing is drawn again. */
+  const sheetFailures: string[] = [];
+  let openSheets!: () => void;
+  const picturesListed = new Promise<void>((resolve) => (openSheets = resolve));
+  let sheets: Promise<Map<string, Drawn>> | null = null;
+  const sheetDrawings = () => (sheets ??= picturesListed.then(drawSheets));
+
+  async function drawSheets(): Promise<Map<string, Drawn>> {
+    const made = new Map<string, Drawn>();
+    if (!sheetPlans.length) return made;
+    const groups: PicturePlan[][] = [];
+    for (let at = 0; at < sheetPlans.length; at += SHEET_MOST) groups.push(sheetPlans.slice(at, at + SHEET_MOST));
+    // The lead picture sets the film's drawing style, so the sheet is drawn from it.
+    const lead = leadId ? ((await drawings.get(leadId)) ?? null) : null;
+    await Promise.all(
+      groups.map((group, g) =>
+        drawing(async () => {
+          const sheetId = `sheet-${g + 1}`;
+          const { cols, rows, size } = sheetLayout(group.length);
+          const items = group.map((plan) => {
+            const same = plan.of ? group.findIndex((other) => other.id === plan.of) + 1 : 0;
+            return { brief: plan.brief, ...(same ? { sameAs: same } : {}) };
+          });
+          progress("picture", "drawing", `Drawing ${group.length} cut-outs on one sheet: ${group.map((plan) => plan.id).join(", ")}`, { id: sheetId });
+          try {
+            const image = await provider.draw(sheetPrompt(items, character, cols, rows, Boolean(lead), P.cutoutLook), lead, sheetId, size);
+            fs.writeFileSync(path.join(dir, `pictures/${sheetId}.png`), image.bytes);
+            tracer.name(image.bytes, `${base}/pictures/${sheetId}.png`);
+            cutSheet(image.bytes, cols, rows, group.length).forEach((thing, n) => {
+              const plan = group[n];
+              log({ stage: "picture", id: plan.id, sheet: sheetId, place: n + 1, cut: thing ? { width: thing.cut.width, height: thing.cut.height, coverage: Math.round(thing.cut.coverage * 1000) / 1000, problem: thing.cut.problem } : "nothing was drawn in its place" });
+              if (!thing || thing.cut.problem) {
+                const why = thing?.cut.problem ?? "nothing was found in its place on the sheet";
+                sheetFailures.push(`${plan.id}: ${why}`);
+                progress("picture", "failed", `The cut-out ${plan.id} could not be used: ${why}`, { id: plan.id });
+                return;
+              }
+              fs.writeFileSync(path.join(dir, `pictures/${plan.id}.drawn.png`), thing.drawn);
+              tracer.name(thing.drawn, `${base}/pictures/${plan.id}.drawn.png`);
+              const file = `pictures/${plan.id}.png`;
+              fs.writeFileSync(path.join(dir, file), thing.cut.png);
+              made.set(plan.id, { bytes: thing.drawn, type: "image/png", file, width: thing.cut.width, height: thing.cut.height });
+            });
+            progress("picture", "drawing", `${group.filter((plan) => made.has(plan.id)).length} of ${group.length} cut-outs came off the sheet`, { id: sheetId });
+          } catch (error) {
+            // No second drawing and no drawing them one by one: the run is marked failed, with the reason.
+            const why = String((error as Error).message ?? error);
+            sheetFailures.push(`${sheetId}: ${why}`);
+            log({ stage: "picture", id: sheetId, error: why });
+            progress("picture", "failed", `The sheet of cut-outs could not be made: ${why}`, { id: sheetId });
+          }
+        }),
+      ),
+    );
+    return made;
+  }
+
   // ── Pictures ────────────────────────────────────────────────────────────────────────────────────────
   function startPicture(plan: PicturePlan) {
     // The lead sets the film's drawing style, so it is a whole frame, never a cut-out.
     if (!leadId && !plan.of && !plan.cutout) leadId = plan.id;
     const lead = leadId;
     progress("picture", "planned", plan.brief, { id: plan.id });
+    if (plan.cutout) sheetPlans.push(plan);
 
     const drawn = (async (): Promise<Drawn | null> => {
+      // A cut-out comes off the sheet or not at all: nothing is drawn a second time.
+      if (plan.cutout) return (await sheetDrawings()).get(plan.id) ?? null;
       // The reference is awaited outside the drawing lane, so a waiting picture never holds a lane idle.
       let reference: Drawn | null = null;
       let mode: "lead" | "styled" | "state" = "lead";
@@ -246,35 +311,6 @@ export async function makeFilm(job: FilmJob): Promise<FilmFile> {
       if (!reference && lead && lead !== plan.id) {
         reference = (await drawings.get(lead)) ?? null;
         if (reference) mode = "styled";
-      }
-      if (plan.cutout) {
-        return drawing(async () => {
-          progress("picture", "drawing", `Drawing ${plan.id}`, { id: plan.id });
-          let why = "";
-          // One redraw: the image model sometimes adds a floor, a shadow or a whole scene, and the cut says so.
-          for (let attempt = 1; attempt <= 2; attempt++) {
-            try {
-              const prompt = cutoutPrompt(plan.brief, character, mode, P.cutoutLook) + (why ? `\n\nThe last drawing could not be used: ${why}. Draw it again as asked.` : "");
-              const image = await provider.draw(prompt, reference, plan.id);
-              const cut = cutOutPng(image.bytes);
-              log({ stage: "picture", id: plan.id, attempt, cut: { width: cut.width, height: cut.height, coverage: Math.round(cut.coverage * 1000) / 1000, edges: cut.edges, problem: cut.problem } });
-              if (cut.problem) {
-                why = cut.problem;
-                continue;
-              }
-              // The drawing as it came is kept beside the cut-out: another pose of this thing is redrawn from it.
-              fs.writeFileSync(path.join(dir, `pictures/${plan.id}.drawn.png`), image.bytes);
-              tracer.name(image.bytes, `${base}/pictures/${plan.id}.drawn.png`);
-              const file = `pictures/${plan.id}.png`;
-              fs.writeFileSync(path.join(dir, file), cut.png);
-              return { ...image, file, width: cut.width, height: cut.height };
-            } catch (error) {
-              why = String((error as Error).message ?? error);
-            }
-          }
-          progress("picture", "failed", `Could not make the cut-out ${plan.id}: ${why}`, { id: plan.id });
-          return null;
-        });
       }
       return drawing(async () => {
         progress("picture", "drawing", `Drawing ${plan.id}`, { id: plan.id });
@@ -499,6 +535,7 @@ export async function makeFilm(job: FilmJob): Promise<FilmFile> {
         plans.set(plan.id, plan);
         startPicture(plan);
       }
+      if (picturesDone) openSheets();
     }
     // Steps are read only once every picture is known, so a step can never name a picture not yet planned.
     if (picturesDone) {
@@ -527,12 +564,15 @@ export async function makeFilm(job: FilmJob): Promise<FilmFile> {
     fs.writeFileSync(path.join(dir, "plan.json"), buffer);
     progress("plan", "failed", `The plan stopped early: ${failure}`);
   }
+  // A plan that ended without closing its list of pictures still gets the cut-outs it named.
+  openSheets();
 
   enqueue(null);
   await released;
   await Promise.allSettled([...pictures.values(), ...voices.values()]);
 
-  film.status = film.scenes.length ? "ready" : "failed";
+  film.status = film.scenes.length && !sheetFailures.length ? "ready" : "failed";
+  if (sheetFailures.length) film.error = `The cut-outs could not be made (${sheetFailures.join("; ")}). Nothing was drawn again.`;
   film.usage = meter.summary();
   // Only the folder's last two names are kept: enough to tell Lumen's own skills from another set, without a home path.
   const skillsAt = path.resolve(job.skillsDir ?? "");
@@ -545,7 +585,7 @@ export async function makeFilm(job: FilmJob): Promise<FilmFile> {
     skillsFrom: skills.length ? `${path.basename(path.dirname(skillsAt))}/${path.basename(skillsAt)}` : null,
   };
   save();
-  const error = film.status === "failed" ? (failure ?? "no scene could be made") : undefined;
+  const error = film.status === "failed" ? (film.error ?? failure ?? "no scene could be made") : undefined;
   emit({ type: "film_done", run, status: film.status, scenes: film.scenes.length, ...(error ? { error } : {}) });
   return film;
 }

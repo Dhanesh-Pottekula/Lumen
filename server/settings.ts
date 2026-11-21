@@ -37,8 +37,8 @@ export const CHOICES = {
 /** Every stage's setting when nothing has been chosen: the environment's, else the code's own. */
 export function defaultStages(env: Record<string, string | undefined>): StageSettings {
   return {
-    plan: { model: env.FILM_PLAN_MODEL ?? "gpt-6.1-sol", effort: env.FILM_PLAN_EFFORT ?? "medium" },
-    scene: { model: env.FILM_WRITE_MODEL ?? "gpt-6.1-sol", effort: env.FILM_WRITE_EFFORT ?? "medium" },
+    plan: { model: env.FILM_PLAN_MODEL ?? "gpt-6-luna", effort: env.FILM_PLAN_EFFORT ?? "medium" },
+    scene: { model: env.FILM_WRITE_MODEL ?? "gpt-6-luna", effort: env.FILM_WRITE_EFFORT ?? "medium" },
     parts: { model: env.FILM_INSPECT_MODEL ?? "gpt-6-luna", effort: env.FILM_INSPECT_EFFORT ?? "low" },
     picture: { model: env.FILM_IMAGE_MODEL ?? "gpt-image-2", quality: env.FILM_IMAGE_QUALITY ?? "medium" },
     voice: { model: env.FILM_TTS_MODEL ?? "gpt-4o-mini-tts", voice: env.FILM_TTS_VOICE ?? "coral" },

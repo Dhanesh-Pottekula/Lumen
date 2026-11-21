@@ -327,3 +327,33 @@ runs/                      generated films (git-ignored): film.json, plan.json, 
   may not draw a named or real person and so drew none; one caption the voice never says; large words placed
   over the subject of the picture.
 
+
+
+## Cut-outs on one sheet, Luna, handwriting (2026-11-21)
+
+Dhanesh's decisions, in his words where it matters:
+- **Pictures were most of a film's cost** (17 backgrounds, about $0.94 of $1.27). So a film is now a few
+  backgrounds and many cut-outs, and every cut-out of a film is drawn in **one drawing** (`sheet-1`, up to 18
+  things, a second sheet past that) and cut apart by `cutSheet` in `server/cutout.ts`.
+- Measured: a 3072x2048 sheet costs 3,184 output tokens (about $0.11) against 1,372 (about $0.056) for a
+  1536x1024 picture. So a larger drawing is not free, but 18 things on it cost a ninth of 18 drawn alone.
+  Sheets of up to 6 things are 1536x1024, more are 3072x2048 (`sheetLayout`), about 512 px a thing either way.
+- **"There should not be any fallback."** A sheet that cannot be drawn or cut, or that leaves a thing out, is
+  not drawn again and its things are not drawn one by one. The run is marked failed with the reason
+  (`film.error`); scenes that could be made are kept. Do not add a retry here.
+- The splitter finds things by what is drawn, not by grid lines: pieces close together are one thing, and
+  things are read row by row. The image model spreads a short last row across the sheet, which grid cells get
+  wrong (seen in the first film).
+- **Plan and scenes run on `gpt-6-luna` at medium**, not Sol. Prompts are now tuned on Luna. Luna sometimes
+  closes its JSON with a bracket too many; `jsonObject` takes the first object that closes.
+- Writing on the picture is in a handwriting face (Caveat 700, self-hosted through `@fontsource/caveat`).
+  Subtitles stay plain. The export waits for the face to load (`handReady`).
+- The record-keeper tested a regular expression against whole base64 pictures; a large sheet overflowed the
+  stack and the call was recorded as failed after it had been paid for. It now tests only the start.
+
+Three films made on 2026-11-21 (Luna, sheets): gravity $0.67 (sheet lost 1 of 11 to the grid bug, fixed),
+vaccine $1.08 (the record-keeper crash above made all 12 be drawn alone, fixed), vaccine again $0.46 with
+3 backgrounds and one sheet of 10, all 10 cut. Scene cache: 6 of 7 calls hit with no warm-up call.
+
+Known and open: name tags, rings and the camera still cannot aim at a cut-out; white closed inside an outline
+(a mug's handle) stays white; cut-outs are flat cartoon while backgrounds are painted.

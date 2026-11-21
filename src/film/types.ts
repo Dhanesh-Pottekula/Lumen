@@ -231,6 +231,8 @@ export interface FilmFile {
   status: "generating" | "ready" | "failed";
   header: FilmHeader;
   scenes: FilmScene[];
+  /** Why the run is marked failed, when the reason is known. */
+  error?: string;
   /** What making the film consumed. Absent on films made before usage was recorded. */
   usage?: FilmUsage;
   /** What the film was made with, so its numbers can be set beside other films'. Absent on older films. */

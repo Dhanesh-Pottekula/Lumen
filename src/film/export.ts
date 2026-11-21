@@ -2,7 +2,7 @@
  * Frame export: the hook `scripts/export-film.mjs` drives from a headless browser to turn a film into a video
  * file. A film is a pure function of time, so a video is just that function sampled 24 times a second.
  */
-import { VIEW_H, VIEW_W } from "./render";
+import { VIEW_H, VIEW_W, handReady } from "./render";
 import { FilmStore } from "./store";
 
 export interface ExportInfo {
@@ -20,6 +20,8 @@ export function createExporter() {
     /** Load a saved film and wait until every scene's pictures and voice are ready. */
     async open(run: string): Promise<ExportInfo> {
       await store.open(run);
+      // A frame drawn before the handwriting face has loaded would be in the fallback face.
+      await handReady;
       for (let waited = 0; store.getSnapshot().status === "generating" && waited < 120_000; waited += 100) await new Promise((r) => setTimeout(r, 100));
       const film = store.getSnapshot();
       if (film.status !== "ready" || !store.compiler) throw new Error(film.error ?? "the film did not load");
