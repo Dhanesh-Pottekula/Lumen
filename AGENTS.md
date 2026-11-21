@@ -366,3 +366,19 @@ vaccine $1.08 (the record-keeper crash above made all 12 be drawn alone, fixed),
 
 Known and open: name tags, rings and the camera still cannot aim at a cut-out; white closed inside an outline
 (a mug's handle) stays white; cut-outs are flat cartoon while backgrounds are painted.
+
+## Three reviewed rounds on Luna medium (2026-11-21)
+
+Two briefs (gravity, sky), each made three times, each film reviewed frame by frame (one frame every 2.5 s)
+by a separate reviewer. Films cost $0.41 to $0.54 each.
+- Fixed by prompt: a person standing on a table (now stands before it), a cut-out bringing its own bedding,
+  dark arrows on dark walls, light beams drawn as cut-outs that could not reach from the sun to the air.
+- Fixed by code, because the prompt alone did not hold on Luna: more than 22 words with no beat is a checker
+  problem (`STILL_WORDS`), rings and ripples round a part that fills much of the frame are not drawn, a
+  formula may hold `\text{...}` (it had come out as run-together letters), bottom-zone words clear a two-line
+  subtitle.
+- Still open after round three, both reviewers' verdict "mostly follows from the pictures alone": arrows and
+  words put near the wrong thing or across the thing they name, a number tied to the wrong wave, an action
+  that is only its end state (a jump that never lands, a fall that is one swap), cut-outs clipped at the
+  frame edge after a camera move. These are placement by eye on a small model. A name tag or an arrow cannot
+  yet be attached to a cut-out, which would remove most of them.
