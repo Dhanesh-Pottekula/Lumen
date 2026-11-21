@@ -36,6 +36,16 @@ export interface Message {
 export interface PartsFound {
   parts: { part: string; box: number[] }[];
   missing: string[];
+  /** Other things the finder saw in the picture and named itself: an id, what it is, and its box. */
+  also?: { id: string; is: string; box: number[] }[];
+}
+
+/** One picture handed to the part finder: the note that goes before it, the picture, and the parts asked for in it. */
+export interface PartsAsk {
+  id: string;
+  note: string;
+  image: ImageBytes;
+  partIds: string[];
 }
 
 export interface Provider {
@@ -51,13 +61,16 @@ export interface Provider {
   plan(system: string, brief: string, onText: (delta: string) => void, skills?: SkillTool | null): Promise<void>;
   /** Draw one picture. `reference` is the film's lead picture, or the earlier moment this one redraws. */
   /**
-   * False when this provider's drawings cannot be cut apart (the offline one gives SVG): backgrounds are then
-   * drawn one to a drawing. Left out, backgrounds are drawn two to a drawing.
+   * False when this provider's drawings cannot be cut apart (the offline one gives SVG): each picture is then
+   * a drawing of its own. Left out, pictures are drawn up to eight to a drawing.
    */
-  pairs?: boolean;
+  sheets?: boolean;
   draw(prompt: string, reference: ImageBytes | null, pictureId: string, size?: string): Promise<ImageBytes>;
-  /** Find parts in a finished picture. Boxes are in the picture's own pixels. */
-  findParts(system: string, context: string, image: ImageBytes, pictureId: string, partIds: string[]): Promise<PartsFound>;
+  /**
+   * Find parts in several finished pictures at once: one call for all of them. The answer is keyed by picture
+   * id; a picture the answer leaves out has no entry. Boxes are in each picture's own pixels.
+   */
+  findParts(system: string, pictures: PartsAsk[], batchId: string): Promise<Record<string, PartsFound>>;
   /** One reply from the scene writer, given the conversation so far. */
   write(system: string, messages: Message[], stepId: string): Promise<string>;
   /** Speak a narration; null when this provider has no voice. */

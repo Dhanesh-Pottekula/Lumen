@@ -230,13 +230,13 @@ export function createTracer(options: TracerOptions) {
             (image) => [{ kind: "image", title: "The drawing that came back", src: options.outputSrc("picture", pictureId, image.type), note: `${image.type}, ${size(image.bytes)}` }],
           ),
 
-        findParts: (system, context, image, pictureId, partIds) =>
+        findParts: (system, pictures, batchId) =>
           call(
             "parts",
-            pictureId,
-            `Find parts in ${pictureId}`,
-            [text("System prompt", system), text("The request", context), media("image", "The picture to look at", image), text("Parts it may name", partIds.join(", "))],
-            () => provider.findParts(system, context, image, pictureId, partIds),
+            batchId,
+            pictures.length === 1 ? `Find parts in ${pictures[0].id}` : `Find parts in ${pictures.length} pictures: ${pictures.map((ask) => ask.id).join(", ")}`,
+            [text("System prompt", system), ...pictures.flatMap((ask) => [text(`Note for ${ask.id}`, ask.note), media("image", `The picture ${ask.id}`, ask.image)])],
+            () => provider.findParts(system, pictures, batchId),
             (found) => [text("The answer", JSON.stringify(found, null, 2))],
           ),
 

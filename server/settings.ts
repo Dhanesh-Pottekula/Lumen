@@ -19,8 +19,8 @@ export interface Settings {
 
 export const STAGES: { stage: SettingStage; title: string; about: string; has: ("effort" | "quality" | "voice")[] }[] = [
   { stage: "plan", title: "Planner", about: "Writes the whole plan: narration, picture briefs and directions. One call a film, and the one that matters most.", has: ["effort"] },
-  { stage: "picture", title: "Illustrator", about: "Draws every background and cut-out. Most of a film's cost and time.", has: ["quality"] },
-  { stage: "parts", title: "Part finder", about: "Looks at each background and boxes its named parts. A small, quick call per picture.", has: ["effort"] },
+  { stage: "picture", title: "Illustrator", about: "Draws the film's pictures, up to eight in one drawing. Most of a film's cost and time.", has: ["quality"] },
+  { stage: "parts", title: "Part finder", about: "Looks at all of a film's pictures together, boxes their named parts and adds what else it sees. One call per film.", has: ["effort"] },
   { stage: "scene", title: "Scene writer", about: "Directs each step from its pictures. One call a step, sometimes a second to correct it.", has: ["effort"] },
   { stage: "voice", title: "Voice", about: "Speaks each step's narration.", has: ["voice"] },
   { stage: "timing", title: "Listener", about: "Hears each clip back to find when every word is said, so the screen can keep time.", has: [] },

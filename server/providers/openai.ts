@@ -3,7 +3,7 @@
  * and the part finder (structured output); Images for drawing; Audio for the voice.
  * The key is read by the caller and is only ever sent to api.openai.com.
  */
-import { partsSchema } from "../prompts";
+import { partsAnswer, partsSchema } from "../prompts";
 import { noteExchange, readableBody, scrubbed } from "../trace";
 import { deliveryNotes, plainOf } from "../voice";
 import type { CallUsage } from "../usage";
@@ -336,32 +336,34 @@ export function openAIProvider(settings: OpenAISettings): Provider {
       return { bytes: new Uint8Array(Buffer.from(body.data[0].b64_json, "base64")), type: "image/png" };
     },
 
-    async findParts(system, context, image, _pictureId, partIds) {
+    async findParts(system, pictures) {
       const request = () =>
         call(
-        "/responses",
-        json({
-          model: settings.inspectModel,
-          ...reasoning(settings.inspectEffort),
-          max_output_tokens: 3000,
-          instructions: system,
-          input: [
-            {
-              role: "user",
-              content: [
-                { type: "input_text", text: context },
-                { type: "input_image", image_url: `data:${image.type};base64,${Buffer.from(image.bytes).toString("base64")}` },
-              ],
-            },
-          ],
-          text: { format: { type: "json_schema", name: "Parts", strict: true, schema: partsSchema(partIds) } },
-          // Each request is a short prompt and one new picture, so nothing would ever be read back. Without this
-          // the provider writes the whole request to the cache anyway and bills it at the write rate.
-          ...noCache(),
-        }),
-        120_000,
-        1,
-      );
+          "/responses",
+          json({
+            model: settings.inspectModel,
+            ...reasoning(settings.inspectEffort),
+            // Room for the thinking and for up to ten boxes a picture.
+            max_output_tokens: 6000 + 2500 * pictures.length,
+            instructions: system,
+            input: [
+              {
+                role: "user",
+                // Each picture comes straight after the note that names it, so the two cannot be told apart wrongly.
+                content: pictures.flatMap((ask) => [
+                  { type: "input_text", text: ask.note },
+                  { type: "input_image", image_url: `data:${ask.image.type};base64,${Buffer.from(ask.image.bytes).toString("base64")}` },
+                ]),
+              },
+            ],
+            text: { format: { type: "json_schema", name: "Parts", strict: true, schema: partsSchema(pictures) } },
+            // Each request is a short prompt and new pictures, so nothing would ever be read back. Without this
+            // the provider writes the whole request to the cache anyway and bills it at the write rate.
+            ...noCache(),
+          }),
+          180_000,
+          1,
+        );
       let res: Response;
       try {
         res = await request();
@@ -373,7 +375,7 @@ export function openAIProvider(settings: OpenAISettings): Provider {
       }
       const found = (await res.json()) as ResponsesOutput;
       provider.report?.("parts", settings.inspectModel, counted(found.usage));
-      return JSON.parse(outputText(found)) as PartsFound;
+      return partsAnswer(JSON.parse(outputText(found)), pictures);
     },
 
     async write(system, messages: Message[]) {

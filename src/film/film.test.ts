@@ -308,3 +308,121 @@ describe("a frame that stands still", () => {
     expect(check([{ id: "a", actions: [camera] }, { id: "b", say: "Nothing at all", actions: [camera] }, { id: "c", say: "very long while", actions: [camera] }, { id: "d", say: "lamp goes out", actions: [camera] }]).length).toBeLessThan(2);
   });
 });
+
+describe("marks drawn on the picture", () => {
+  const drawn = (actions: unknown[], objects: unknown[] = [{ id: "room", kind: "image" }]) =>
+    scene([{ id: "a", actions: [{ do: "camera", target: "room", shot: "wide" }] }, { id: "b", say: "the Moon", actions }], objects);
+
+  it("keeps an arrow, a line, a box, a pointer, a stamp and an effect aimed at parts or points", () => {
+    const verdict = drawn([
+      { do: "arrow", from: "room.bed", to: "room.moon", color: "danger", bend: "left", id: "pull" },
+      { do: "line", from: { x: 0.1, y: 0.2 }, to: "room.moon", dashed: true },
+      { do: "box", target: "room.moon", style: "highlight" },
+      { do: "box", target: { x: 0.1, y: 0.1, w: 0.3, h: 0.2 } },
+      { do: "point", at: "room.bed" },
+      { do: "stamp", icon: "cross", at: { x: 0.5, y: 0.5 }, size: "large" },
+      { do: "effect", kind: "fire", at: "room.bed" },
+      { do: "effect", kind: "rain" },
+    ]);
+    expect(verdict.problems).toEqual([]);
+    expect(verdict.scene.beats[1].actions.map((a) => a.do)).toEqual(["arrow", "line", "box", "box", "point", "stamp", "effect", "effect"]);
+  });
+
+  it("drops a mark aimed at a part that was not found, at another picture, or by a sign it does not have", () => {
+    const verdict = drawn([
+      { do: "arrow", from: "room.window", to: "room.moon" },
+      { do: "point", at: "street.lamp" },
+      { do: "stamp", icon: "skull", at: "room.moon" },
+      { do: "effect", kind: "fire" },
+      { do: "box", target: { x: 0.1, y: 2, w: 0.3, h: 0.2 } },
+    ]);
+    expect(verdict.problems.length).toBeGreaterThanOrEqual(5);
+    expect(verdict.scene.beats).toHaveLength(1);
+  });
+
+  it("puts each mark on the timeline, ends it when the picture changes, and hides it by id", () => {
+    const verdict = scene(
+      [
+        { id: "a", actions: [{ do: "arrow", from: "room.bed", to: "room.moon", id: "pull" }, { do: "effect", kind: "smoke", at: "room.bed" }, { do: "point", at: "room.moon" }] },
+        { id: "b", say: "darker than ever", actions: [{ do: "hide", targets: ["pull", "pointer"] }] },
+        { id: "c", say: "Nothing else", actions: [{ do: "cut", to: "street" }] },
+      ],
+      [{ id: "room", kind: "image" }, { id: "street", kind: "image", initial: "hidden" }],
+    );
+    expect(verdict.problems).toEqual([]);
+    const resolved = resolveScene(verdict.scene, 10);
+    const [arrow, smoke] = resolved.marks;
+    expect(arrow.item.kind).toBe("arrow");
+    expect(arrow.until).toBe(resolved.cues[0].at);
+    expect(resolved.pointers[0].until).toBe(resolved.cues[0].at);
+    // The smoke was never hidden: it leaves with its picture.
+    expect(smoke.until).toBe(resolved.cues[1].at);
+  });
+
+  it("keeps words set beside a thing, underlined, and a timeline of moments", () => {
+    const verdict = drawn(
+      [{ do: "show", targets: ["gone", "when"] }],
+      [
+        { id: "room", kind: "image" },
+        { id: "gone", kind: "text", text: "GONE", near: "room.moon", underline: true },
+        { id: "when", kind: "timeline", events: [{ when: 1969, label: "first landing" }, { when: "today", label: "still there" }] },
+      ],
+    );
+    expect(verdict.problems).toEqual([]);
+    expect(verdict.scene.objects[1]).toMatchObject({ near: "room.moon", underline: true });
+    expect(verdict.scene.objects[2]).toMatchObject({ kind: "timeline", events: [{ when: "1969", label: "first landing" }, { when: "today", label: "still there" }] });
+  });
+});
+
+describe("moving across and between pictures", () => {
+  const two = [{ id: "room", kind: "image" }, { id: "street", kind: "image", initial: "hidden" }];
+
+  it("pans the camera from one spot to another, for as long as the voice is on it", () => {
+    const verdict = scene([
+      { id: "a", actions: [{ do: "camera", target: "room", shot: "wide" }] },
+      { id: "b", say: "darker than ever", actions: [{ do: "pan", from: "room.bed", to: "room.moon", shot: "close", lasts: "until-next" }] },
+      { id: "c", say: "Nothing else", actions: [{ do: "camera", target: "room", shot: "overview" }] },
+    ]);
+    expect(verdict.problems).toEqual([]);
+    const resolved = resolveScene(verdict.scene, 10);
+    const [, first, second] = resolved.cameras;
+    expect(first.spot).toBe("room.bed");
+    expect(second.spot).toBe("room.moon");
+    // It arrives as the next beat begins.
+    expect(second.at + second.dur).toBeCloseTo(resolved.cues[1].at, 5);
+  });
+
+  it("sends a dot along a path of spots, and refuses a path of one", () => {
+    const good = scene([{ id: "a", actions: [{ do: "travel", path: ["room.bed", { x: 0.5, y: 0.2 }, "room.moon"], repeat: true, id: "light" }] }]);
+    expect(good.problems).toEqual([]);
+    expect(resolveScene(good.scene, 10).marks[0].item).toMatchObject({ kind: "travel", repeat: true });
+    const bad = scene([{ id: "a", actions: [{ do: "camera", target: "room" }, { do: "travel", path: ["room.bed"] }] }]);
+    expect(bad.problems).toHaveLength(1);
+  });
+
+  it("brings a picture on by a wipe, a push or a zoom", () => {
+    for (const entrance of ["wipe", "push", "zoom"]) {
+      const verdict = scene([{ id: "a", actions: [{ do: "camera", target: "room" }] }, { id: "b", say: "the Moon", actions: [{ do: "cut", to: "street", entrance }] }], two);
+      expect(verdict.problems).toEqual([]);
+      expect(resolveScene(verdict.scene, 10).backdrops[1].entrance).toBe(entrance);
+    }
+  });
+});
+
+describe("what leaves with a picture", () => {
+  it("takes words off when their picture goes, keeps ones shown for the new picture, and dissolves by default", () => {
+    const verdict = scene(
+      [
+        { id: "a", actions: [{ do: "show", targets: ["old"] }] },
+        { id: "b", say: "the Moon", actions: [{ do: "cut", to: "street" }, { do: "show", targets: ["new"] }] },
+      ],
+      [{ id: "room", kind: "image" }, { id: "street", kind: "image", initial: "hidden" }, { id: "old", kind: "text", text: "night" }, { id: "new", kind: "text", text: "gone" }],
+    );
+    expect(verdict.problems).toEqual([]);
+    const resolved = resolveScene(verdict.scene, 10);
+    expect(resolved.backdrops[1].entrance).toBe("fade");
+    const [old, fresh] = resolved.overlays;
+    expect(old.until).toBe(resolved.cues[0].at);
+    expect(fresh.until).toBe(Infinity);
+  });
+});

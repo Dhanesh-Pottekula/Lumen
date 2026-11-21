@@ -31,7 +31,7 @@ interface LogEvent {
 /** The stages in the order a film goes through them. */
 const STAGES: { stage: UsageStage; label: string; what: string }[] = [
   { stage: "plan", label: "Plan", what: "Writes the narration, every picture's brief and each step's direction" },
-  { stage: "picture", label: "Pictures", what: "Draws each background and cut-out" },
+  { stage: "picture", label: "Pictures", what: "Draws the pictures, eight to a drawing" },
   { stage: "parts", label: "Parts", what: "Finds the named parts in each picture" },
   { stage: "voice", label: "Voice", what: "Speaks each step" },
   { stage: "timing", label: "Timing", what: "Finds when each word is said" },
@@ -737,7 +737,7 @@ export function RunsPage({ run, onPick, onOpenInStudio }: { run: string | null; 
                   {log
                     .filter((event) => event.stage !== "usage")
                     .map((event, i) => {
-                      // An event without a sentence is a check's result: the parts found, a cut-out's cut, a scene's problems.
+                      // An event without a sentence is a check's result: the parts found, a scene's problems.
                       const { t, stage: at, status, text, id, index: _index, src: _src, ...rest } = event;
                       const problems = Array.isArray(rest.problems) ? (rest.problems as unknown[]) : null;
                       const bad = status === "failed" || status === "dropped" || Boolean(rest.error) || Boolean(problems?.length);

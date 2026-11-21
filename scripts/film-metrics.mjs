@@ -61,7 +61,7 @@ for (const m of rows) {
     ["length", `${m.seconds} s, ${m.words} words, ${m.scenes} of ${m.steps} steps on screen`],
     ["pictures", `${m.pictures}, one every ${m.secondsPerPicture} s`],
     ["on screen", `${m.showings} showings, ${m.secondsPerShowing} s each, ${m.sentencesPerShowing} sentences per showing`],
-    ["cut-outs", `${m.cutouts} used, ${m.moves} moves, ${m.secondsMoving} s with something changing`],
+    ["drawn marks", `${m.marks} (arrows, lines, boxes, signs, effects, dots, pointer moves)`],
     ["changes", `${m.changes}, one every ${m.secondsPerChange} s`],
     ["longest still", `${m.longestStill.seconds} s (in ${m.longestStill.scene})`],
     ["idle cameras", String(m.idleCameras)],

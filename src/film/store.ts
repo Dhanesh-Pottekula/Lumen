@@ -208,9 +208,9 @@ export class FilmStore {
     this.loading = this.loading.then(async () => {
       // The scene is checked again here, so nothing the server let through can break the renderer.
       const images = raw.objects.filter((o) => o.kind === "image");
-      const rows = images.map((o) => ({ id: o.id, parts: Object.keys(o.hotspots ?? {}), cutout: o.cutout }));
+      const rows = images.map((o) => ({ id: o.id, parts: Object.keys(o.hotspots ?? {}) }));
       const verdict = validateScene(raw, rows, raw.id, raw.narration);
-      const scene = withPictures(verdict.scene, Object.fromEntries(images.map((o) => [o.id, { src: o.src, aspect: o.aspect, hotspots: o.hotspots, cutout: o.cutout }])));
+      const scene = withPictures(verdict.scene, Object.fromEntries(images.map((o) => [o.id, { src: o.src, aspect: o.aspect, hotspots: o.hotspots }])));
       const [audio] = await Promise.all([
         raw.audio ? loadAudio(raw.audio.src) : Promise.resolve(null),
         ...images.map((o) => (o.src ? loadPicture(o.src) : Promise.resolve())),

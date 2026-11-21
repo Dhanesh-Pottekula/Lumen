@@ -252,7 +252,7 @@ export function offlineProvider(options: OfflineOptions = {}): Provider {
 
   const provider: Provider = {
     name: "offline",
-    pairs: false,
+    sheets: false,
 
     async plan(_system, _brief, onText) {
       const text = JSON.stringify(PLAN);
@@ -271,10 +271,10 @@ export function offlineProvider(options: OfflineOptions = {}): Provider {
       return { bytes: new TextEncoder().encode(svg), type: "image/svg+xml" };
     },
 
-    async findParts(_system, _context, _image, pictureId) {
+    async findParts(_system, pictures) {
       await wait(8);
-      provider.report?.("parts", "offline-text", { input: 900, output: 80 });
-      return PARTS[pictureId] ?? { parts: [], missing: [] };
+      provider.report?.("parts", "offline-text", { input: 900 * pictures.length, output: 80 * pictures.length });
+      return Object.fromEntries(pictures.map((ask) => [ask.id, PARTS[ask.id] ?? { parts: [], missing: [] }]));
     },
 
     async write(_system, messages: Message[], stepId) {

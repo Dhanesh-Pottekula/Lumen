@@ -9,8 +9,10 @@ import { barChart, lineChart, makePlot, pie } from "../render/charts";
 import { drawMath, measureMath } from "../render/mathtext";
 import { clamp01, easeInOutCubic, easeOutBack, easeOutCubic, lerp } from "../render/motion";
 import { formatNumber } from "../render/type-motion";
-import { backdropAt, cutoutAt, cutoutBox, type CameraKey, type ResolvedScene } from "./resolve";
-import type { Hotspot, ImageObject, OverlayObject, Shot, Zone } from "./types";
+import { drawIcon } from "../render/icons";
+import { confettiEmitter, dustEmitter, emit, energyEmitter, fireEmitter, rainEmitter, smokeEmitter, snowEmitter, sparksEmitter } from "../render/particles";
+import { backdropAt, type CameraKey, type Mark, type PointerTrack, type ResolvedScene } from "./resolve";
+import type { Hotspot, ImageObject, OverlayObject, Shot, Spot, Zone } from "./types";
 
 export const VIEW_W = 960;
 export const VIEW_H = 540;
@@ -73,6 +75,12 @@ function coverRect(aspect: number): Rect {
 
 function lensFor(key: CameraKey, image: ImageObject | undefined, rect: Rect): Lens {
   const [whole, most] = SHOT_ZOOM[key.shot];
+  if (key.spot !== undefined) {
+    // A pan's end: centred on a point, or on a part's middle, at the shot's own zoom.
+    const box = typeof key.spot === "string" ? image?.hotspots?.[key.spot.split(".")[1] ?? ""] : undefined;
+    const at = typeof key.spot === "string" ? (box ? { x: box[0] + box[2] / 2, y: box[1] + box[3] / 2 } : { x: 0.5, y: 0.5 }) : key.spot;
+    return { fx: at.x, fy: at.y, zoom: Math.max(1.3, (whole + most) / 2) };
+  }
   const spot = key.part ? image?.hotspots?.[key.part] : undefined;
   if (!spot || key.shot === "overview") return { fx: 0.5, fy: 0.5, zoom: whole };
   // Never zoom past the point where the part would no longer fit in the frame.
@@ -221,57 +229,6 @@ function drawBackdrop(ctx: CanvasRenderingContext2D, image: ImageObject | undefi
 }
 
 /**
- * The cut-outs standing on `picture`, drawn in the picture's own space so the camera moves them with it.
- * One lower in the frame is nearer, so it is drawn later, in front. A cut-out that stands on something gets a
- * soft shadow at its feet; the shadow stays on the ground while an arc or a hop lifts the cut-out off it.
- */
-function drawCutouts(ctx: CanvasRenderingContext2D, scene: ResolvedScene, t: number, picture: string | undefined, view: View) {
-  if (!picture || scene.cutouts.length === 0) return;
-  const shown = [];
-  for (const track of scene.cutouts) {
-    if (track.picture !== picture) continue;
-    const now = cutoutAt(track, t);
-    if (now && now.state.alpha > 0.01) shown.push(now);
-  }
-  if (shown.length === 0) return;
-  shown.sort((a, b) => a.state.y - b.state.y);
-  ctx.save();
-  ctx.translate(VIEW_W / 2 + view.dx, VIEW_H / 2 + view.dy);
-  ctx.scale(view.zoom, view.zoom);
-  ctx.translate(-view.px, -view.py);
-  ctx.imageSmoothingQuality = "high";
-  for (const { state, image, lift } of shown) {
-    const object = scene.images.get(image);
-    const bitmap = object?.src ? cache.get(object.src) : undefined;
-    if (!bitmap) continue;
-    // The size is fitted to the cut-out's own shape, so a long thing is never wider than the frame.
-    const box = cutoutBox(state.size, bitmap.naturalWidth / Math.max(1, bitmap.naturalHeight));
-    const h = box.h * VIEW_H;
-    const w = box.w * VIEW_W;
-    const x = view.rect.x + state.x * view.rect.w;
-    const ground = view.rect.y + state.y * view.rect.h;
-    // A floating cut-out is never quite still: it bobs a little, each one at its own beat.
-    const bob = (1 - state.feet) * Math.sin(t * 1.4 + state.x * 9) * h * 0.012;
-    const middle = ground - lift * view.rect.h - (h / 2) * state.feet + bob;
-    if (state.feet > 0.5) {
-      ctx.globalAlpha = 0.34 * state.alpha * Math.max(0.35, 1 - lift * 5);
-      ctx.fillStyle = "#000000";
-      ctx.beginPath();
-      ctx.ellipse(x, ground, w * 0.36, Math.max(2, h * 0.04), 0, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.save();
-    ctx.globalAlpha = state.alpha;
-    ctx.translate(x, middle);
-    if (state.tilt) ctx.rotate((state.tilt * Math.PI) / 180);
-    ctx.scale(state.flip, 1);
-    ctx.drawImage(bitmap, -w / 2, -h / 2, w, h);
-    ctx.restore();
-  }
-  ctx.restore();
-}
-
-/**
  * A mark that draws the eye to a part. Each is meant to read as something a person did to the picture, not as
  * a shape laid on it by a program:
  *   encircle  a marker ring drawn round the part by hand: a little uneven, ending just past where it began
@@ -362,6 +319,278 @@ function drawAttention(ctx: CanvasRenderingContext2D, verb: "dim" | "encircle" |
     ctx.strokeStyle = COLORS.accent;
     ctx.stroke();
   }
+  ctx.restore();
+}
+
+// ── Marks drawn by code ─────────────────────────────────────────────────────────────────────────────
+// Arrows, lines, boxes, signs and effects are drawn on top in screen space, at wherever the camera has put the
+// spot they belong to. So they follow the picture as it moves and stay sharp however far it is zoomed.
+
+interface Anchor {
+  x: number;
+  y: number;
+  /** The part's box on screen, when the spot is a part and not a point. */
+  box?: Rect;
+}
+
+/** Where a spot of the background is on screen now, or null when it names a part the picture does not have. */
+function anchorOf(view: View, image: ImageObject | undefined, spot: Spot): Anchor | null {
+  if (typeof spot !== "string") {
+    const at = onScreen(view, [spot.x, spot.y, 0, 0]);
+    return { x: at.x, y: at.y };
+  }
+  const hot = image?.hotspots?.[spot.split(".")[1] ?? ""];
+  if (!hot) return null;
+  const box = onScreen(view, hot);
+  return { x: box.x + box.w / 2, y: box.y + box.h / 2, box };
+}
+
+/** Where a stroke going to `other` leaves a part: on the edge of its box, a little outside it. A point is itself. */
+function edgeToward(end: Anchor, other: Anchor, gap: number): { x: number; y: number } {
+  if (!end.box) return end;
+  const dx = other.x - end.x;
+  const dy = other.y - end.y;
+  const k = Math.min(dx ? (end.box.w / 2 + gap) / Math.abs(dx) : Infinity, dy ? (end.box.h / 2 + gap) / Math.abs(dy) : Infinity);
+  return k >= 1 ? { x: end.x, y: end.y } : { x: end.x + dx * k, y: end.y + dy * k };
+}
+
+/** A stroke as a marker would leave it: the colour inside a dark edge, so it shows on a dark wall and a bright sky alike. */
+function inked(ctx: CanvasRenderingContext2D, points: (readonly [number, number])[], color: string, width: number, dashed = false) {
+  if (points.length < 2) return;
+  ctx.lineCap = "round";
+  ctx.lineJoin = "round";
+  ctx.setLineDash(dashed ? [width * 2.6, width * 2.4] : []);
+  for (const [w, style] of [[width + 5, INK], [width, color]] as const) {
+    ctx.beginPath();
+    points.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)));
+    ctx.lineWidth = w;
+    ctx.strokeStyle = style;
+    ctx.stroke();
+  }
+  ctx.setLineDash([]);
+}
+
+/** A hand-drawn line from a to b, bowed to one side, as far as `p` of the way. Returns the points drawn. */
+function handStroke(a: { x: number; y: number }, b: { x: number; y: number }, bow: number, p: number): [number, number][] {
+  const length = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+  const nx = -(b.y - a.y) / length;
+  const ny = (b.x - a.x) / length;
+  // The same line always wobbles the same way: its unevenness comes from where it is.
+  const seed = a.x * 0.017 + b.y * 0.023;
+  const steps = 32;
+  const points: [number, number][] = [];
+  for (let k = 0; k <= Math.max(1, Math.round(steps * p)); k++) {
+    const u = k / steps;
+    const off = Math.sin(Math.PI * u) * bow * length + Math.sin(u * 9 + seed) * Math.min(2.4, length * 0.01) * Math.sin(Math.PI * u);
+    points.push([lerp(a.x, b.x, u) + nx * off, lerp(a.y, b.y, u) + ny * off]);
+  }
+  return points;
+}
+
+/** An arrow, a line or a dot's path shorter than this on screen is a smudge, not a mark, and is left out. */
+const SHORTEST_STROKE = 44;
+
+function drawMark(ctx: CanvasRenderingContext2D, mark: Mark, view: View, image: ImageObject | undefined, age: number, left: number) {
+  const leaving = clamp01(left / 0.3);
+  if (age < 0 || leaving <= 0) return;
+  ctx.save();
+  ctx.globalAlpha = leaving;
+  switch (mark.kind) {
+    case "arrow":
+    case "line": {
+      const from = anchorOf(view, image, mark.from);
+      const to = anchorOf(view, image, mark.to);
+      if (!from || !to) break;
+      const a = edgeToward(from, to, 10);
+      const b = edgeToward(to, from, mark.kind === "arrow" ? 14 : 10);
+      if (Math.hypot(b.x - a.x, b.y - a.y) < SHORTEST_STROKE) break;
+      const p = easeInOutCubic(clamp01(age / mark.dur));
+      const bow = mark.kind === "line" ? 0 : mark.bend === "straight" ? 0 : mark.bend === "left" ? -0.14 : 0.14;
+      const points = handStroke(a, b, bow, p);
+      const color = COLORS[mark.color];
+      const width = mark.kind === "arrow" ? 6 : 5;
+      inked(ctx, points, color, width, mark.kind === "line" && mark.dashed);
+      if (mark.kind === "arrow" && p > 0.2 && points.length > 3) {
+        // The head: two short strokes back from the tip, opening as the line arrives.
+        const [tx, ty] = points[points.length - 1];
+        const [bx, by] = points[Math.max(0, points.length - 4)];
+        const angle = Math.atan2(ty - by, tx - bx);
+        const reach = 24 * clamp01((p - 0.2) / 0.5);
+        for (const side of [-1, 1]) {
+          inked(ctx, [[tx, ty], [tx - Math.cos(angle + side * 0.5) * reach, ty - Math.sin(angle + side * 0.5) * reach]], color, width);
+        }
+      }
+      break;
+    }
+    case "box": {
+      const box = typeof mark.target === "string" ? anchorOf(view, image, mark.target)?.box : onScreen(view, [mark.target.x, mark.target.y, mark.target.w, mark.target.h]);
+      if (!box) break;
+      const pad = Math.max(6, Math.min(16, Math.min(box.w, box.h) * 0.1));
+      const x = box.x - pad;
+      const y = box.y - pad;
+      const w = box.w + pad * 2;
+      const h = box.h + pad * 2;
+      const p = easeInOutCubic(clamp01(age / mark.dur));
+      const color = COLORS[mark.color];
+      if (mark.style === "highlight") {
+        // A marker pulled across the thing from left to right.
+        ctx.globalAlpha = leaving * 0.34;
+        ctx.fillStyle = color;
+        ctx.beginPath();
+        ctx.roundRect(x, y, w * p, h, 8);
+        ctx.fill();
+        break;
+      }
+      // Round the four sides in one go, ending a little past where it began, as a hand would.
+      const round = (w + h) * 2;
+      const seed = x * 0.011 + y * 0.019;
+      const points: [number, number][] = [];
+      const upTo = round * 1.03 * p;
+      for (let d = 0; d <= upTo; d += 6) {
+        const e = d % round;
+        const wobble = Math.sin(d * 0.045 + seed) * 1.6;
+        if (e < w) points.push([x + e, y + wobble]);
+        else if (e < w + h) points.push([x + w + wobble, y + e - w]);
+        else if (e < w * 2 + h) points.push([x + w - (e - w - h), y + h + wobble]);
+        else points.push([x + wobble, y + h - (e - w * 2 - h)]);
+      }
+      inked(ctx, points, color, 4.5);
+      break;
+    }
+    case "stamp": {
+      const at = anchorOf(view, image, mark.at);
+      if (!at) break;
+      const size = mark.size === "large" ? 120 : mark.size === "small" ? 48 : 78;
+      const pop = 0.5 + 0.5 * easeOutBack(clamp01(age / mark.dur));
+      ctx.globalAlpha = leaving * clamp01(age / 0.12);
+      drawIcon(ctx, mark.icon, at.x, at.y, size * pop, { color: INK, width: size * 0.19 });
+      drawIcon(ctx, mark.icon, at.x, at.y, size * pop, { color: COLORS[mark.color], width: size * 0.1, filled: true });
+      break;
+    }
+    case "travel": {
+      const stops = mark.path.map((spot) => anchorOf(view, image, spot));
+      if (stops.some((stop) => !stop)) break;
+      const points = (stops as Anchor[]).map((stop) => [stop.x, stop.y] as const);
+      const lengths = points.slice(1).map(([x, y], n) => Math.hypot(x - points[n][0], y - points[n][1]));
+      const total = lengths.reduce((sum, length) => sum + length, 0) || 1;
+      if (total < SHORTEST_STROKE) break;
+      /** The point a share `u` of the way along the whole path. */
+      const along = (u: number): [number, number] => {
+        let left = clamp01(u) * total;
+        for (let n = 0; n < lengths.length; n++) {
+          if (left <= lengths[n] || n === lengths.length - 1) {
+            const k = lengths[n] ? Math.min(1, left / lengths[n]) : 0;
+            return [lerp(points[n][0], points[n + 1][0], k), lerp(points[n][1], points[n + 1][1], k)];
+          }
+          left -= lengths[n];
+        }
+        return [points[0][0], points[0][1]];
+      };
+      const run = age / mark.dur;
+      const p = mark.repeat ? run % 1 : easeInOutCubic(clamp01(run));
+      const color = COLORS[mark.color];
+      // The way it has come glows behind it and fades; the dot itself is bright with a soft halo.
+      ctx.lineCap = "round";
+      for (let k = 12; k >= 1; k--) {
+        const from = along(p - (k * 0.3) / 12);
+        const to = along(p - ((k - 1) * 0.3) / 12);
+        ctx.globalAlpha = leaving * (1 - k / 13) * 0.7;
+        ctx.beginPath();
+        ctx.moveTo(from[0], from[1]);
+        ctx.lineTo(to[0], to[1]);
+        ctx.lineWidth = 14 * (1 - k / 14);
+        ctx.strokeStyle = color;
+        ctx.stroke();
+      }
+      const [x, y] = along(p);
+      ctx.globalAlpha = leaving;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 22;
+      ctx.beginPath();
+      ctx.arc(x, y, 13 + Math.sin(age * 7) * 1.5, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = INK;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(x - 4, y - 4, 4, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(255, 255, 255, 0.85)";
+      ctx.fill();
+      break;
+    }
+    case "effect": {
+      const whole = mark.effect === "rain" || mark.effect === "snow";
+      const at = whole ? { x: 0, y: 0 } : mark.at ? anchorOf(view, image, mark.at) : null;
+      if (!at) break;
+      // The effects were made for a smaller picture, so one from a spot is drawn larger here.
+      const scale = whole ? 1 : 3.4;
+      ctx.translate(at.x, at.y);
+      ctx.scale(scale, scale);
+      const config =
+        mark.effect === "rain" ? rainEmitter(VIEW_W, VIEW_H, mark.seed)
+        : mark.effect === "snow" ? snowEmitter(VIEW_W, VIEW_H, mark.seed)
+        : mark.effect === "fire" ? fireEmitter(0, 0, mark.seed)
+        : mark.effect === "smoke" ? smokeEmitter(0, 0, mark.seed)
+        : mark.effect === "sparks" ? sparksEmitter(0, 0, mark.seed)
+        : mark.effect === "dust" ? dustEmitter(0, 0, mark.seed)
+        : mark.effect === "confetti" ? confettiEmitter(0, 0, mark.seed)
+        : energyEmitter(0, 0, mark.seed);
+      emit(ctx, config, age);
+      // A second layer, out of step with the first, so a fire or a plume is thick enough to read as one.
+      if (!whole && mark.effect !== "confetti") emit(ctx, { ...config, seed: mark.seed + 97 }, age + 0.37);
+      break;
+    }
+  }
+  ctx.restore();
+}
+
+/** The pointer: a cursor that glides from spot to spot, and gives a small ripple where it lands. */
+function drawPointer(ctx: CanvasRenderingContext2D, track: PointerTrack, view: View, image: ImageObject | undefined, t: number) {
+  const first = track.keys[0];
+  if (!first || t < first.at || t >= track.until) return;
+  let pos: { x: number; y: number } | null = null;
+  let landed = -1;
+  for (const key of track.keys) {
+    if (key.at > t) break;
+    const to = anchorOf(view, image, key.spot);
+    if (!to) continue;
+    // It comes in from the lower right the first time, and from where it was after that.
+    const from: { x: number; y: number } = pos ?? { x: Math.min(VIEW_W + 60, to.x + 260), y: Math.min(VIEW_H + 60, to.y + 240) };
+    const p = easeInOutCubic(clamp01((t - key.at) / key.dur));
+    pos = { x: lerp(from.x, to.x, p), y: lerp(from.y, to.y, p) };
+    landed = t - key.at - key.dur;
+  }
+  if (!pos) return;
+  ctx.save();
+  ctx.globalAlpha = clamp01((t - first.at) / 0.2) * clamp01((track.until - t) / 0.25);
+  if (landed >= 0 && landed < 0.55) {
+    const p = landed / 0.55;
+    ctx.beginPath();
+    ctx.arc(pos.x, pos.y, 8 + easeOutCubic(p) * 30, 0, Math.PI * 2);
+    ctx.lineWidth = 4 * (1 - p) + 1;
+    ctx.strokeStyle = `rgba(255, 210, 74, ${1 - p})`;
+    ctx.stroke();
+  }
+  ctx.translate(pos.x, pos.y);
+  ctx.scale(2.1, 2.1);
+  ctx.beginPath();
+  for (const [i, [x, y]] of ([[0, 0], [0, 17], [4.4, 13.2], [7.4, 20], [10.2, 18.8], [7.2, 12.2], [12.6, 12.2]] as const).entries()) {
+    if (i) ctx.lineTo(x, y);
+    else ctx.moveTo(x, y);
+  }
+  ctx.closePath();
+  ctx.shadowColor = "rgba(0, 0, 0, 0.45)";
+  ctx.shadowBlur = 6;
+  ctx.shadowOffsetY = 2;
+  ctx.fillStyle = "#ffffff";
+  ctx.fill();
+  ctx.shadowColor = "transparent";
+  ctx.lineJoin = "round";
+  ctx.lineWidth = 1.7;
+  ctx.strokeStyle = INK;
+  ctx.stroke();
   ctx.restore();
 }
 
@@ -474,7 +703,18 @@ function drawSpeech(ctx: CanvasRenderingContext2D, text: string, box: Rect, age:
   ctx.restore();
 }
 
-function drawOverlay(ctx: CanvasRenderingContext2D, object: OverlayObject, entrance: "fade" | "slam" | "word-by-word", t: number, at: number, dur: number, until: number) {
+/** Where words of this size go when they sit beside a thing: above it when there is room, else below, inside the frame. */
+function besideBox(anchor: Anchor, w: number, h: number): Rect {
+  const top = anchor.box ? anchor.box.y : anchor.y;
+  const bottom = anchor.box ? anchor.box.y + anchor.box.h : anchor.y;
+  const floor = VIEW_H - 150 - h;
+  const above = top - h - 14 > 12;
+  const box = { x: Math.min(VIEW_W - 20 - w, Math.max(20, anchor.x - w / 2)), y: Math.min(Math.max(12, floor), Math.max(12, above ? top - h - 14 : bottom + 14)), w, h };
+  zoneTaken.push(box);
+  return box;
+}
+
+function drawOverlay(ctx: CanvasRenderingContext2D, object: OverlayObject, entrance: "fade" | "slam" | "word-by-word", t: number, at: number, dur: number, until: number, anchor: Anchor | null = null) {
   const age = t - at;
   const exit = clamp01((until - t) / 0.3);
   const enter = clamp01(age / Math.min(0.5, dur));
@@ -488,7 +728,7 @@ function drawOverlay(ctx: CanvasRenderingContext2D, object: OverlayObject, entra
       ctx.font = `700 ${size}px ${HAND}`;
       const lines = wrap(ctx, object.text, VIEW_W - 120);
       const widest = Math.max(...lines.map((line) => ctx.measureText(line).width));
-      const box = zoneBox(object.zone, widest, lines.length * size * 1.1);
+      const box = anchor ? besideBox(anchor, widest, lines.length * size * 1.1) : zoneBox(object.zone, widest, lines.length * size * 1.1);
       const cx = box.x + box.w / 2;
       const cy = box.y + box.h / 2;
       ctx.translate(cx, cy);
@@ -526,6 +766,45 @@ function drawOverlay(ctx: CanvasRenderingContext2D, object: OverlayObject, entra
           }
           x += width + space;
         }
+      });
+      if (object.underline) {
+        const p = easeOutCubic(clamp01((age - 0.2) / 0.45));
+        const y = ((lines.length - 1) / 2) * size * 1.1 + size * 0.5;
+        if (p > 0) inked(ctx, handStroke({ x: -widest / 2, y }, { x: widest / 2, y: y - 3 }, 0.015, p), color, Math.max(4, size * 0.06));
+      }
+      break;
+    }
+    case "timeline": {
+      const box = zoneBox(object.zone ?? "bottom", 800, 168);
+      panel(ctx, box.x, box.y, box.w, box.h);
+      const n = object.events.length;
+      const x0 = box.x + 80;
+      const x1 = box.x + box.w - 80;
+      const y = box.y + 72;
+      const step = (x1 - x0) / Math.max(1, n - 1);
+      // The line runs out from the left, and each moment lands on it in turn.
+      const reach = easeOutCubic(clamp01(age / (0.4 + n * 0.35)));
+      inked(ctx, [[x0 - 30, y], [lerp(x0 - 30, x1 + 30, reach), y]], "#ffffff", 3.5);
+      object.events.forEach((event, i) => {
+        const p = clamp01((age - 0.25 - i * 0.4) / 0.3);
+        if (p <= 0) return;
+        const x = x0 + i * step;
+        ctx.save();
+        ctx.globalAlpha *= p;
+        ctx.beginPath();
+        ctx.arc(x, y, 5 + 4 * easeOutBack(p), 0, Math.PI * 2);
+        ctx.fillStyle = COLORS.accent;
+        ctx.fill();
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = INK;
+        ctx.stroke();
+        comicText(ctx, event.when, x, y - 34, 34, COLORS.accent);
+        ctx.font = `700 23px ${HAND}`;
+        ctx.fillStyle = "#ffffff";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        wrap(ctx, event.label, Math.max(110, step - 12)).forEach((line, k) => ctx.fillText(line, x, y + 30 + k * 24));
+        ctx.restore();
       });
       break;
     }
@@ -648,21 +927,57 @@ export function drawScene(ctx: CanvasRenderingContext2D, scene: ResolvedScene, t
     // The shot we are leaving, held where its camera stopped.
     const old = scene.images.get(before.picture);
     const oldRect = coverRect(old?.aspect ?? VIEW_W / VIEW_H);
-    drawBackdrop(ctx, old, viewOf(lensAt(scene, entry.at - 0.001, before.picture, oldRect), oldRect, 0, 0));
-    ctx.save();
-    if (entry.entrance === "iris") {
-      ctx.beginPath();
-      ctx.arc(VIEW_W / 2, VIEW_H / 2, easeInOutCubic(arriving) * Math.hypot(VIEW_W, VIEW_H) * 0.52, 0, Math.PI * 2);
-      ctx.clip();
+    const oldView = viewOf(lensAt(scene, entry.at - 0.001, before.picture, oldRect), oldRect, 0, 0);
+    const p = easeInOutCubic(arriving);
+    /** Draw with the whole frame scaled about its middle. */
+    const scaled = (by: number, draw: () => void) => {
+      ctx.save();
+      ctx.translate(VIEW_W / 2, VIEW_H / 2);
+      ctx.scale(by, by);
+      ctx.translate(-VIEW_W / 2, -VIEW_H / 2);
+      draw();
+      ctx.restore();
+    };
+    if (entry.entrance === "push") {
+      // The old picture slides out to the left as the new one slides in from the right: "and next".
+      drawBackdrop(ctx, old, { ...oldView, dx: -p * VIEW_W });
+      drawBackdrop(ctx, image, { ...view, dx: view.dx + (1 - p) * VIEW_W });
+    } else if (entry.entrance === "zoom") {
+      // The camera dives into the old picture and comes out in the new one: "inside it".
+      scaled(1 + p * 0.9, () => drawBackdrop(ctx, old, oldView));
+      ctx.save();
+      ctx.globalAlpha = clamp01((arriving - 0.25) / 0.6);
+      // The new picture starts a little too close and settles, so it always covers the frame.
+      scaled(1.3 - 0.3 * p, () => drawBackdrop(ctx, image, view));
+      ctx.restore();
     } else {
-      ctx.globalAlpha = easeInOutCubic(arriving);
+      drawBackdrop(ctx, old, oldView);
+      ctx.save();
+      if (entry.entrance === "iris") {
+        ctx.beginPath();
+        ctx.arc(VIEW_W / 2, VIEW_H / 2, p * Math.hypot(VIEW_W, VIEW_H) * 0.52, 0, Math.PI * 2);
+        ctx.clip();
+      } else if (entry.entrance === "wipe") {
+        // The new picture is drawn across from the left, behind a soft bright edge.
+        ctx.beginPath();
+        ctx.rect(0, 0, p * VIEW_W, VIEW_H);
+        ctx.clip();
+      } else {
+        ctx.globalAlpha = p;
+      }
+      drawBackdrop(ctx, image, view);
+      ctx.restore();
+      if (entry.entrance === "wipe") {
+        const edge = ctx.createLinearGradient(p * VIEW_W - 26, 0, p * VIEW_W + 4, 0);
+        edge.addColorStop(0, "rgba(255, 255, 255, 0)");
+        edge.addColorStop(1, `rgba(255, 255, 255, ${0.55 * (1 - arriving)})`);
+        ctx.fillStyle = edge;
+        ctx.fillRect(p * VIEW_W - 26, 0, 30, VIEW_H);
+      }
     }
-    drawBackdrop(ctx, image, view);
-    ctx.restore();
   } else {
     drawBackdrop(ctx, image, view);
   }
-  drawCutouts(ctx, scene, t, picture, view);
 
   const spotOf = (part?: string) => (part ? image?.hotspots?.[part] : undefined);
   for (const mark of scene.attentions) {
@@ -676,6 +991,11 @@ export function drawScene(ctx: CanvasRenderingContext2D, scene: ResolvedScene, t
   vignette.addColorStop(1, "rgba(0, 0, 0, 0.5)");
   ctx.fillStyle = vignette;
   ctx.fillRect(0, 0, VIEW_W, VIEW_H);
+
+  for (const mark of scene.marks) {
+    if (t < mark.at || t >= mark.until || mark.item.picture !== picture) continue;
+    drawMark(ctx, mark.item, view, image, t - mark.at, mark.until - t);
+  }
 
   const placed: Rect[] = [];
   for (const label of scene.labels) {
@@ -694,8 +1014,13 @@ export function drawScene(ctx: CanvasRenderingContext2D, scene: ResolvedScene, t
 
   for (const overlay of scene.overlays) {
     if (t < overlay.at || t >= overlay.until) continue;
-    drawOverlay(ctx, overlay.item.object, overlay.item.entrance, t, overlay.at, overlay.item.dur, overlay.until);
+    const object = overlay.item.object;
+    // Words set beside a thing go there while its picture is on screen; otherwise they go to their zone.
+    const near = object.kind === "text" && object.near !== undefined && (typeof object.near !== "string" || object.near.split(".")[0] === picture) ? anchorOf(view, image, object.near) : null;
+    drawOverlay(ctx, object, overlay.item.entrance, t, overlay.at, overlay.item.dur, overlay.until, near);
   }
+
+  for (const track of scene.pointers) if (track.picture === picture) drawPointer(ctx, track, view, image, t);
 
   for (const at of scene.flashes) {
     const age = t - at;

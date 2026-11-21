@@ -10,6 +10,11 @@ export type Pace = "instant" | "quick" | "normal" | "slow" | "dramatic";
 export type Zone = "top" | "center" | "bottom" | "left" | "right" | "top-left" | "top-right" | "bottom-left" | "bottom-right";
 export type Shot = "overview" | "wide" | "medium" | "close" | "detail";
 export type Movement = "cut" | "move" | "push" | "arc";
+/**
+ * How a picture comes onto the screen: at once, dissolving, opening from the middle, wiped across from the
+ * left, pushing the old one out to the left, or through a zoom into the old one.
+ */
+export type Entrance = "cut" | "fade" | "iris" | "wipe" | "push" | "zoom";
 
 /** A part's box inside its picture, as fractions 0..1: [x, y, w, h]. */
 export type Hotspot = [number, number, number, number];
@@ -23,38 +28,42 @@ export interface ImageObject {
   src?: string;
   aspect?: number;
   hotspots?: Record<string, Hotspot>;
-  /**
-   * True for a cut-out: one thing with a see-through ground, placed over a background and moved. Set by the
-   * server from the plan; a cut-out never fills the frame and is never the picture a scene opens on.
-   */
-  cutout?: boolean;
 }
 
-/** How big a cut-out stands, by name. Kept so that films made before sizes were measured still play. */
-export type CutoutSize = "tiny" | "small" | "medium" | "large" | "huge";
+/** The colours anything written or drawn on the picture can take. */
+export type Ink = "white" | "accent" | "danger" | "good";
+
 /**
- * How big a cut-out stands. Measured against a part of the background on screen: `times` as tall as that part's
- * box in the drawing (1 when left out). Or a number: its height as a share of the frame's height. Or a name.
+ * Somewhere in the background on screen that a drawn mark can start, end or sit: a found part of it, by name
+ * ("<picture>.<part>"), or a point, as shares of the picture's width and height from its top-left corner.
  */
-export type SizeSpec = CutoutSize | number | { of: string; times?: number };
-/** Where a cut-out goes relative to a named part of the background. */
-export type Relation = "at" | "on" | "before" | "left-of" | "right-of";
-/**
- * Somewhere a cut-out can go: a place by name (a part of the background, a zone, or just outside an edge), or a
- * point in the background picture, as shares of its width and height from its top-left corner.
- */
-export type Place = string | { x: number; y: number };
-/** How a cut-out travels to its next place. */
-export type Path = "straight" | "arc" | "hop";
-export type Tilt = "upright" | "left" | "right" | "over";
+export type Spot = string | { x: number; y: number };
+/** A stretch of the background, as shares of the picture: its left, top, width and height. */
+export interface Region {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** Simple signs the film can stamp on the picture. */
+export const STAMP_ICONS = ["check", "cross", "plus", "minus", "star", "heart", "bolt", "drop", "sun", "leaf", "flame", "clock", "warning", "cloud"] as const;
+export type StampIcon = (typeof STAMP_ICONS)[number];
+/** Moving effects the film can run on the picture. Rain and snow fall over the whole frame; the rest come from one spot. */
+export const EFFECT_KINDS = ["fire", "smoke", "sparks", "rain", "snow", "dust", "confetti", "energy"] as const;
+export type EffectKind = (typeof EFFECT_KINDS)[number];
 
 export interface TextObject {
   id: string;
   kind: "text";
   text: string;
   zone?: Zone;
+  /** Beside this spot of the background, in place of a zone: the word sits next to the thing it is about. */
+  near?: Spot;
   size?: "small" | "medium" | "large";
-  color?: "white" | "accent" | "danger" | "good";
+  color?: Ink;
+  /** A line drawn under the words by hand. */
+  underline?: boolean;
 }
 
 export interface EquationObject {
@@ -85,23 +94,33 @@ export interface ChartObject {
   zone?: Zone;
 }
 
-export type OverlayObject = TextObject | EquationObject | CounterObject | ChartObject;
+/** A row of moments in order, each with when it was and what it was. */
+export interface TimelineObject {
+  id: string;
+  kind: "timeline";
+  events: { when: string; label: string }[];
+  zone?: Zone;
+}
+
+export type OverlayObject = TextObject | EquationObject | CounterObject | ChartObject | TimelineObject;
 export type SceneObject = ImageObject | OverlayObject;
 
 export type Action =
   | { do: "camera"; target: string; shot?: Shot; movement?: Movement }
-  | { do: "cut"; to: string; entrance?: "cut" | "iris" | "fade" }
+  | { do: "cut"; to: string; entrance?: Entrance }
+  | { do: "pan"; from: Spot; to: Spot; shot?: Shot; lasts?: "pace" | "until-next" }
   | { do: "speak"; target: string; text: string }
   | { do: "label"; target: string; text: string; id?: string }
   | { do: "attention"; target: string; verb: "dim" | "encircle" | "pulse" }
   | { do: "show"; targets: string[]; entrance?: "fade" | "slam" | "word-by-word" }
   | { do: "hide"; targets: string[] }
-  | { do: "place"; what: string; at: Place; where?: Relation; size?: SizeSpec; mirror?: boolean; entrance?: "appear" | "fade" | "pop" }
-  | { do: "move"; what: string; to: Place; where?: Relation; size?: SizeSpec; path?: Path; lasts?: "pace" | "until-next" }
-  | { do: "swap"; what: string; to: string }
-  | { do: "resize"; what: string; size: SizeSpec }
-  | { do: "turn"; what: string; mirror?: boolean; tilt?: Tilt }
-  | { do: "remove"; what: string; exit?: "cut" | "fade" | "shrink" }
+  | { do: "arrow"; from: Spot; to: Spot; color?: Ink; bend?: "straight" | "left" | "right"; id?: string }
+  | { do: "line"; from: Spot; to: Spot; color?: Ink; dashed?: boolean; id?: string }
+  | { do: "box"; target: string | Region; style?: "outline" | "highlight"; color?: Ink; id?: string }
+  | { do: "point"; at: Spot }
+  | { do: "stamp"; icon: StampIcon; at: Spot; size?: "small" | "medium" | "large"; color?: Ink; id?: string }
+  | { do: "effect"; kind: EffectKind; at?: Spot; id?: string }
+  | { do: "travel"; path: Spot[]; color?: Ink; repeat?: boolean; lasts?: "pace" | "until-next"; id?: string }
   | { do: "shake"; strength?: "subtle" | "normal" | "strong" }
   | { do: "flash" };
 
@@ -137,8 +156,6 @@ export interface FilmHeader {
 export interface PictureRow {
   id: string;
   parts: string[];
-  /** True when the picture is a cut-out and not a background. */
-  cutout?: boolean;
 }
 
 // ── Stream events (mirrors AiRA's omni.film_progress / omni.film_scene) ─────────────────────────────

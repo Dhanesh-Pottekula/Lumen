@@ -50,9 +50,10 @@ These are aims, not a checklist. Use your judgement about how each one applies t
   the sound off still follows it. One picture held while the voice says several things in turn is a slideshow
   with a caption.
 - A picture explains. It shows more than where things are: drawn into it is whatever makes the idea plain to
-  the eye. An arrow for a force or a direction, a thing cut open to show its inside, two things side by side to
-  compare them, a scale or a gauge, the marks of weight, strain or speed. A plain view of a place with a person
-  in it leaves the voice to do all the explaining.
+  the eye: a thing cut open to show its inside, two things side by side to compare them, a scale or a gauge,
+  the marks of weight, strain or speed. A plain view of a place with a person in it leaves the voice to do all
+  the explaining. Arrows, lines and boxes are not drawn into a picture: the film draws those itself, on top,
+  at the moment the voice needs them.
 - What is said is also read. When the voice gives a number, a multiple, an amount or a size, the viewer reads it
   on the screen as it is said, beside the thing it measures: a number that is only heard is gone a moment later.
   The same holds for a name the person is meeting for the first time, a thing, a part or a process: written
@@ -67,72 +68,69 @@ Knowing the medium lets you decide how to show an idea. This is everything the s
 asks for anything else cannot be played, and the scene writer is left to guess at a substitute.
 
 Pictures:
-- There are two kinds. A background is one whole film frame, edge to edge. A cut-out is one thing drawn alone,
-  a person, an object, an arrow, a symbol, which the film lays over a background. Both are drawn by an image
-  model from your brief, and both are still: nothing inside one moves.
-- The background is the picture of what the voice is saying. When the voice says that air splits sunlight into
-  its colours, the background is the white beam meeting the air and fanning out into red, orange, yellow,
-  green, blue and violet. It is never a plain place waiting for something to be put in it: the idea itself is
-  drawn there, with everything that makes it plain to the eye.
-- When the voice moves on to the next thing, the picture does too. Backgrounds are drawn two to a drawing, so
-  they are cheap enough to have one for each thing the film explains: most films need six to ten. A background
-  that is a later moment of the one listed just before it is drawn in the same drawing as that one, so the
-  two match exactly and only the change differs: the beam spread into colours, then the blue filling the sky.
-- Cut-outs, words and numbers are the live layer on top. All of a film's cut-outs, up to twelve, are drawn
-  together in one drawing, so they cost almost nothing. A cut-out comes on at the moment the voice names it
-  and moves as the voice describes: the person walks in, the cup drops, the arrow slides to the thing it
-  points at. It is what makes the film move while the background holds, and a film with no cut-outs has
-  nothing in it that moves. Most films need six to twelve.
-- A cut-out is for a thing that arrives, leaves, moves or changes while the picture stays: a person, an
-  object, a creature, a single bold arrow, a symbol. Another drawing of the same thing in a new pose or state
-  can replace it where it stands, and is drawn to match it.
-- A cut-out has its own fixed shape. It cannot be stretched, bent or made to reach from one place to another,
-  and it cannot be put down exactly enough to touch two things at once. So whatever joins two things, a beam
-  from the sun to the air, a pipe, a road, a path something follows, is drawn into the background.
-- A cut-out is the thing alone. A person sitting up in bed is the person only; the bed, pillow and blanket are
-  in the background. Whatever a cut-out brings with it is pasted over the background's own. And a background
-  is drawn without the things that will be laid over it as cut-outs, with clear room where they will go and
-  the places they go named as parts.
-- A cut-out is laid over pictures of any colour. An arrow or a symbol is drawn in one bright colour with a dark
-  outline, so it shows on a dark wall and on a bright sky alike.
-- A background is framed for what it shows. When a step is about a cup falling off a table, the frame is the
+- A picture is one whole film frame, edge to edge, drawn by an image model from your brief. It is still:
+  nothing inside it moves.
+- A picture is the drawing of one thing the voice says. When the voice says that air splits sunlight into its
+  colours, the picture is the white beam meeting the air and fanning out into red, orange, yellow, green, blue
+  and violet. When it then says the light reaches the eye, that is another picture: the coloured light coming
+  down to a person's eye. It is never a plain place with the subject somewhere in it. The idea itself is drawn
+  there, large, with everything that makes it plain to the eye.
+- When the voice moves on to the next thing, the picture does too. That is what makes this a film and not a
+  slideshow: the viewer is always looking at a drawing of the sentence they are hearing.
+- Pictures are cheap. Nine are drawn together in one drawing and cut apart, so a film has eighteen or
+  twenty-seven of them, two to four for each step. A drawing that holds fewer than nine costs the same as a
+  full one, and one picture over a full drawing costs a whole drawing more, so the count is a full eighteen
+  or a full twenty-seven, each one a picture the film needs. The tenth and the nineteenth picture start a new
+  drawing, so neither is a later moment of the picture before it.
+- A picture can be shown again as often as the film needs, in the same step or a later one, and a picture
+  that already shows what a sentence says is used again and not drawn twice.
+- A picture that is a later moment of the one listed just before it is drawn beside it in the same drawing,
+  so the two match and only the change differs: the cup on the table, then the cup in pieces on the floor.
+  Cutting from one to the other is how a thing is seen to change, arrive or go.
+- A picture is framed for what it shows. When a sentence is about a cup falling off a table, the frame is the
   table top up close with the floor below it, not a whole kitchen with a table somewhere in it.
-- Anything that explains can be drawn, in a background or as a cut-out: arrows, lines, cut-open views, gauges,
-  symbols. Only writing cannot. The image model cannot be trusted with letters or numbers, so no picture has
-  any, and the film writes the words and numbers itself, on top.
-- Backgrounds are drawn as you list them, two at a time, and the cut-outs once the list of pictures is
-  complete. A picture can be shown again as often as the film needs, in the same step or a later one.
+- Anything that explains can be drawn into a picture: a thing cut open, two things side by side, a path, a
+  beam, the marks of weight, strain or speed. Only writing cannot. The image model cannot be trusted with
+  letters or numbers, so no picture has any, and the film writes the words and numbers itself, on top.
+- Each picture ends up small in the drawing, so a brief asks for a few large things, plainly drawn, not a
+  crowded scene full of small ones.
 
 What the film does with them:
-- It cuts between pictures. Within one, the camera moves to any part of it you named, and back out to the whole
-  frame. It has nowhere else to go.
-- It puts these on top, at the moment the voice says them: large bold words; a large number that counts up to
-  its value; a formula; a bar, pie or line chart of a few values; a small name tag attached to a named part; a
-  ring round a named part, or everything but that part darkened; a short line of speech in a bubble beside a
-  named part; a brief shake or a white flash of the whole frame.
-- Writing comes in those two sizes for a reason. A small tag names a thing and stays beside it. Large words or
-  a large number are what the viewer reads first: they are for the figure or the few words a step turns on.
+- It changes from one picture to the next by a dissolve, unless another way says more: at once, when the
+  same shot simply changes; an iris opening from the middle; a wipe across the frame; a push that slides the
+  old picture out as the new one slides in; or a zoom that dives into the old picture and comes out in the
+  new one.
+- Within a picture, the camera moves to any part of it you named and back out to the whole frame, and it can
+  travel slowly across the picture from one thing to another while the voice follows the same way.
+- It draws on top of the picture, by hand, at the moment the voice says a thing: an arrow from one thing to
+  another; a line joining two things; a box round a thing, or a marker's highlight over it; a ring round a
+  thing, or everything but that thing darkened; a pointer, like a teacher's finger, that glides from thing to
+  thing as the voice goes through them; a simple sign stamped on a thing (a tick, a cross, a warning, a plus,
+  a minus, a star, a heart, a bolt, a drop, a sun, a leaf, a flame, a clock, a cloud).
+- It sends a glowing dot along a path through the picture, once or round and round: light on its way to the
+  eye, blood through a vessel, a signal down a wire, anything that travels.
+- It runs moving effects on the picture: fire, smoke, sparks, drifting dust, a burst of confetti or a glow of
+  energy at a spot, and rain or snow over the whole frame.
+- It writes on top: large bold words; a large number that counts up to its value; a formula; a bar, pie or
+  line chart of a few values; a timeline of a few moments in order; a small name tag attached to a thing; a
+  short line of speech in a bubble beside a figure.
+- It can shake the whole frame briefly, or flash it white.
+- All of that is aimed at a named part of the picture on screen, or at a spot in it the scene writer can see.
+  Things you will want pointed at, joined, boxed or named are worth naming as parts.
+- These are what make a still picture move, and each one is used because the sentence calls for it: the dot
+  because the voice says a thing travels, the arrow because one thing pushes another, the line because two
+  things are compared, the box because a thing is singled out, the fire because the thing burns. Most
+  sentences call for one of them. A film that only puts a ring round things has used one of them, and a step
+  with a mark on every word is as hard to follow as one with none.
+- Writing comes in two sizes for a reason. A small tag names a thing and stays beside it. Large words or a
+  large number are what the viewer reads first: they are for the figure or the few words a step turns on.
 - What is written is a keyword, not a sentence: the figure with its unit, or the one to three words the
-  voice is leaning on, landing on screen on the very word that says it. The subtitles already carry the
-  sentences; the keywords are what the viewer keeps.
-- A name tag, a ring, a speech bubble and the camera are aimed at a named part of a background, never at a
-  cut-out. What is written about a cut-out is large words or a large number, put in the region of the frame
-  beside it.
-- It can put no line, arrow or shape of its own on top. An arrow or a symbol the film needs is a cut-out.
+  voice is leaning on, landing on screen on the very word that says it, beside the thing it is about. The
+  subtitles already carry the sentences; the keywords are what the viewer keeps.
+- Nothing drawn in a picture can be moved, and no drawing can be laid over another. A thing is seen to move by
+  the dot that travels its path, by an arrow along the way it goes, or by cutting to a picture of where it has
+  got to.
 - Subtitles of the narration run along the bottom of the frame.
-
-What a cut-out can do:
-- The film lays it over the background on screen at the moment the voice names it. It can simply appear and
-  stay. It can be replaced by another drawing of the same thing. It can be carried from place to place, brought
-  in from outside the frame or taken out, made larger or smaller, turned round or over. Several can be on screen
-  at once. When the voice describes a thing moving, it moves on those words; otherwise it arrives where it belongs.
-- It moves as one piece: it slides, rises, falls and turns, but its limbs do not move. It belongs to the
-  background it was laid over, and leaves when that background does.
-- It is put somewhere by name: at a named part of the background, standing on it, in front of it or beside it;
-  in a region of the frame; or just outside an edge.
-- Its size is given against a named part beside it, as so many times that part's height. The film measures the
-  part in the finished drawing, so the two come out in proportion. With nothing to measure against, as in open
-  sky, its size is a share of the frame's height.
 
 ## Your skills
 
@@ -142,12 +140,12 @@ you, in general terms, how that kind of film is told. Let it shape the whole fil
 
 ## What you write
 
-Reply with one JSON object and nothing else, with its keys in exactly this order. The order matters: drawing
-begins on each picture the moment its entry is complete, while you are still writing the steps.
+Reply with one JSON object and nothing else, with its keys in exactly this order. The order matters: the
+pictures are sent to be drawn, nine at a time, as soon as they are listed, while you are still writing the steps.
 
 {"title": "...",
  "character": "...",
- "pictures": [{"id": "...", "kind": "background", "brief": "...", "parts": [{"id": "...", "where": "..."}], "of": "..."}],
+ "pictures": [{"id": "...", "brief": "...", "parts": [{"id": "...", "where": "..."}], "of": "..."}],
  "steps": [{"id": "s1", "narration": "...", "screen": ["..."], "show": "..."}]}
 
 title: the person's question, at most 60 characters.
@@ -159,30 +157,23 @@ exactly those words in the brief of every picture they are in, and in no other.
 
 pictures: every picture the film shows, listed in the order the steps first need them.
 - id: lowercase letters, digits and hyphens, starting with a letter.
-- kind: "background" for a whole frame, "cutout" for one thing drawn alone. The first background sets the
-  drawing style for everything after it, so list a background before any cut-out. List at most twelve
-  cut-outs.
 - brief: what is seen, in enough detail that an illustrator who knows nothing else draws the right picture. The
-  illustrator draws every thing a brief mentions, including a thing it says to leave out or to leave room for.
-  So a brief mentions only what is in the picture, and never a thing that will be laid over it as a cut-out. A
-  cut-out's brief is the one thing alone: what it is, its pose, and which way it faces.
-- parts: the things in a background that the film may point at, move the camera to, attach a name or a line of
-  speech to, put a cut-out at, or measure a cut-out against. Each has an id and "where", a few words telling an
+  illustrator draws every thing a brief mentions, including a thing it says to leave out. So a brief mentions
+  only what is in the picture. The first picture sets the drawing style for all the others.
+- parts: the things in the picture that the film may point at, move the camera to, join with an arrow or a
+  line, box, or attach a name or a line of speech to. Each has an id and "where", a few words telling an
   inspector which thing it is. The inspector boxes each part in the finished drawing, so a part is a drawn thing
   with its own edges, plainly visible and big enough to pick out. A position, a direction, a boundary nobody
-  drew or a stretch of empty space cannot be found, and is lost. A picture keeps at most four parts. A cut-out
-  has none.
-- of: for a later moment of an earlier background, or another pose of an earlier cut-out: that picture's id.
-  List a later moment directly after the background it is a moment of.
+  drew or a stretch of empty space cannot be found, and is lost. A picture keeps at most four parts.
+- of: for a later moment of an earlier picture: that picture's id. List a later moment directly after the
+  picture it is a moment of.
 
 How many pictures to make comes from the narration, not from the number of steps. Each time the voice says that
 something is there, that something happens, or that something has changed, the viewer needs to see exactly that:
-a background that shows it, and on it the cut-outs and keywords that arrive as it is said. A step usually needs
-one or two backgrounds and several things on top, and a film many more pictures than it has steps. Never draw
-two pictures that show the same thing: show the first one again. Before you go on from a step, read it back
-against its pictures. For every sentence, ask what the viewer is looking at while it is said, and whether that
-shows what the sentence says. If it shows something else, or a general view with the thing somewhere in it, a
-picture is missing.
+a picture that shows it, and on it the marks and keywords that arrive as it is said. Before you go on from a
+step, read it back against its pictures. For every sentence, ask what the viewer is looking at while it is said,
+and whether that shows what the sentence says. If it shows something else, or a general view with the thing
+somewhere in it, a picture is missing.
 
 steps: the film in order. Aim for six to eight steps and 400 to 600 spoken words in all.
 - id: "s1", "s2", and so on.
@@ -193,9 +184,12 @@ steps: the film in order. Aim for six to eight steps and 400 to 600 spoken words
   to do for the viewer, and what the screen shows as the narration goes. Tie each thing to the narration words it
   belongs with by quoting those words exactly: that is how it is timed. Name pictures and parts by id, a part as
   picture.part. The scene writer has only the pictures in this step's "screen", so a direction that names any
-  other picture, or a thing no picture shows, is lost. Put in quotes whatever is to be written on the screen, and say whether it is a small tag on a
-  thing or large words. It says what the voice says at that moment and nothing the voice does not, though a
-  number may be written in figures and with its unit or sign.
+  other picture, or a thing no picture shows, is lost. Put in quotes whatever is to be written on the screen,
+  and say whether it is a small tag on a thing or large words. It says what the voice says at that moment and
+  nothing the voice does not, though a number may be written in figures and with its unit or sign. Say which
+  of the things above you want with which words: the dot travelling from one part to another, the arrow, the
+  pointer going through a list, the camera travelling across, how the next picture arrives. A direction that
+  only says "show" or "point out" gets a ring.
   Ask only for what the screen section above describes.
 
 ## Voice marks
@@ -223,7 +217,7 @@ export function starsCharacter(brief: string, character: string): boolean {
 
 /** The look every background is drawn in: a frame from a 2D animated film, with its whole setting. */
 export const BACKGROUND_LOOK =
-  "One frame from a 2D animated explainer film, composed like a wide film shot. Flat cartoon drawing with clean bold dark outlines, simple shapes and flat cel shading with one or two shadow tones. The whole frame is drawn edge to edge, with its full setting: walls, floor, sky, furniture, street, whatever the place has. Never an empty, white or plain background. Whatever the brief asks for to explain the idea is drawn in as part of the picture, in the same style: arrows, lines, a thing cut open, two things side by side. Cinematic, moody lighting from one clear light source, deep soft shadows, a strong atmospheric colour grade and a slight dark vignette.";
+  "One frame from a 2D animated explainer film, composed like a wide film shot. Flat cartoon drawing with clean bold dark outlines, simple shapes and flat cel shading with one or two shadow tones. The whole frame is drawn edge to edge, with its full setting: walls, floor, sky, furniture, street, whatever the place has. Never an empty, white or plain background. The subject of the brief is drawn large, filling the frame, and whatever the brief asks for to explain the idea is drawn in as part of the picture, in the same style: a thing cut open, two things side by side, a beam, a path. No arrows, pointers, boxes or callout marks are drawn: the film adds those itself. Cinematic, moody lighting from one clear light source, deep soft shadows, a strong atmospheric colour grade and a slight dark vignette.";
 
 /** `look` is the opening paragraph: how the film's pictures are drawn. The rest is what the pipeline needs of every frame. */
 export function drawingPrompt(brief: string, character: string, mode: "lead" | "styled" | "state", look: string = BACKGROUND_LOOK): string {
@@ -250,139 +244,142 @@ Keep the things the brief names large and clearly separate from each other. The 
 Write no text anywhere in the picture: no letters, numbers, captions, labels, signs with writing, logos, watermarks or speech bubbles.`;
 }
 
-/** One of the two backgrounds drawn together: its brief, and whether it is a later moment of the one above it. */
-export interface PairItem {
+/** One picture on a sheet: its brief, and the place (from 1) of the picture it is a later moment of, when that is on the sheet. */
+export interface SheetItem {
   brief: string;
-  laterOfFirst?: boolean;
+  laterOf?: number;
 }
 
 /**
- * Two backgrounds in one drawing, one above the other with a white band between, cut apart by code. A drawing
- * costs the same whatever is in it, so two backgrounds cost what one did. `given` says what the reference
- * image is: nothing, a frame of the same film to match in style, or an earlier moment of the top picture.
+ * Several of a film's pictures in one drawing, as a grid of wide frames with white between them, cut apart by
+ * code. A drawing costs the same whatever is in it, so eight pictures cost what one did. `styled` says a frame
+ * of the same film is given, to match in style.
  */
-export function pairPrompt(items: [PairItem, PairItem], character: string, given: "none" | "style" | "earlier", look: string = BACKGROUND_LOOK): string {
+export function sheetPrompt(items: SheetItem[], character: string, cols: number, rows: number, styled: boolean, look: string = BACKGROUND_LOOK): string {
   const starring = items.some((item) => starsCharacter(item.brief, character));
   const cast = starring
     ? `A brief that says "the main character" puts the film's main character in that picture, the same every time: ${character} People are simple cartoon stick figures: a plain round white head with two dot eyes and a small mouth, thin black limbs, simple flat clothes, the whole body acting out what the brief says. A picture whose brief names no person has no person in it.`
     : "Draw only what each brief describes. If it describes no person, there is no person anywhere in that picture. Any person it does describe is a simple cartoon stick figure: a plain round white head with two dot eyes and a small mouth, thin black limbs, simple flat clothes.";
-  const reference =
-    given === "earlier"
-      ? "\nThe image given is an earlier moment of the TOP picture's shot. Draw the top picture as that same shot a moment later, keeping the same place, framing, camera angle and drawing style, and changing only what its brief says."
-      : given === "style"
-        ? "\nThe image given is another frame of the same film. Match its drawing style, line weight and colour grade exactly in both pictures, but draw these new scenes, not that one, and take no person or thing from it."
-        : "";
-  const second = items[1].laterOfFirst
-    ? `BOTTOM picture: the very same shot as the top picture a moment later: the same place, framing, camera angle and everything in it, changed only like this: ${items[1].brief}`
-    : `BOTTOM picture: ${items[1].brief}`;
-  return `Two separate frames from one 2D animated explainer film, drawn in one image so that a program can cut them apart. The image is split into a top half and a bottom half by a plain pure-white horizontal band across its full width, about a twentieth of the image's height. The top picture fills everything above the band and the bottom picture fills everything below it, each one a complete wide 16:9 frame drawn right up to the image's edges and to the band. They are two different pictures: nothing in one continues into the other, and the band is empty white with no line, shadow or border.
+  const list = items
+    .map(({ brief, laterOf }, i) =>
+      laterOf
+        ? `Picture ${i + 1}: the very same shot as picture ${laterOf} a moment later: the same place, framing, camera angle and everything in it, changed only like this: ${brief}`
+        : `Picture ${i + 1}: ${brief}`,
+    )
+    .join("\n");
+  const places = cols * rows;
+  const order = cols === 1 ? "from the top down" : "in reading order: left to right along the top row, then the next row down";
+  const empty = places - items.length;
+  const spare = empty > 0 ? ` Only the first ${items.length} places hold a picture. The last ${empty === 1 ? "place" : `${empty} places`} of the grid ${empty === 1 ? "has" : "have"} no picture: leave ${empty === 1 ? "it" : "them"} plain white.` : "";
+  return `${items.length} separate frames from one 2D animated explainer film, drawn in one image so that a program can cut them apart. The image is a grid of ${cols} ${cols === 1 ? "column" : "columns"} and ${rows} rows, with one frame in each place, ${order}.${spare} Each frame is a complete picture of its own, a wide frame three units across to two down, the same size as all the others, and it fills its place in the grid right to its own straight edges. Between the frames, and round the outside of the image, is a plain pure-white (#FFFFFF) gutter, about a fortieth of the image's width, running straight and unbroken from one side of the image to the other. They are different pictures: nothing in one continues into another, and the gutters are empty white with no line, shadow, border or number.
 
 How each picture is drawn: ${look.trim()}
 
 ${cast}
+${styled ? "\nThe image given is another frame of the same film. Match its drawing style, line weight and colour grade exactly in every picture, but draw these new pictures, not that one, and take no person or thing from it.\n" : ""}
+${list}
 
-TOP picture: ${items[0].brief}
-${second}${reference}
-
-In each picture keep the things its brief names large and clearly separate from each other, and keep the lowest fifth of that picture free of anything important, because subtitles sit there.
+Each picture is small, so draw the few things its brief names large, bold and clearly separate from each other. The film shows each picture on a wider screen, so a strip along its top and along its bottom, each about a tenth of its height, is cut off: keep everything that matters clear of both, and keep the lowest fifth free of anything important, because subtitles sit there. No picture has a white or empty background of its own: each is drawn edge to edge in full colour, so the white gutters are the only white bands in the image.
 Write no text anywhere: no letters, numbers, captions, labels, signs with writing, logos, watermarks or speech bubbles.`;
 }
 
-/**
- * The look of a cut-out: one thing drawn alone on plain white, so code can remove the white and the film can
- * place and move the thing over a background. Same drawing style as the frames, but lit evenly and with nothing
- * round it, because whatever is round it would be cut away or, worse, kept.
- */
-export const CUTOUT_LOOK =
-  "One thing from a 2D animated explainer film, drawn alone so that it can be lifted out and placed into the film's scenes. Flat cartoon drawing with clean bold dark outlines, simple shapes and flat cel shading with one or two shadow tones.";
+export const PARTS_SYSTEM = `You are given several pictures from one explainer film. Before each picture is a note
+with its id, its size in pixels, what it was drawn to show, and the parts to find in it. The film points at parts
+of its pictures: it moves the camera to one, draws an arrow or a line between two, puts a box round one, or names
+one. It can only do that for a thing whose place in the drawing is known, and you are the one who says where each
+thing is.
 
-export function cutoutPrompt(brief: string, character: string, mode: "lead" | "styled" | "state", look: string = CUTOUT_LOOK): string {
-  const cast = starsCharacter(brief, character)
-    ? `The thing to draw is the film's main character, the same in every picture: ${character} A person is a simple cartoon stick figure: a plain round white head with two dot eyes and a small mouth, thin black limbs, simple flat clothes, the whole body acting out what the brief says.`
-    : "Draw only the one thing the brief describes, and no person unless that is what it describes. A person is a simple cartoon stick figure: a plain round white head with two dot eyes and a small mouth, thin black limbs, simple flat clothes.";
-  const ask =
-    mode === "state"
-      ? `The image given is this same thing in another pose. Draw the same thing again, with the same design, colours, proportions and size in the picture, on the same plain white, changed only as the brief says: ${brief}`
-      : mode === "styled"
-        ? `The image given is a frame of the same film. Match its drawing style, line weight and character design exactly, but do not draw that scene. Draw only this one thing: ${brief}`
-        : `Draw only this one thing: ${brief}`;
-  return `${look.trim()}
+Answer for every picture, each one by itself, under its own id. A picture's parts are looked for in that picture
+only, and nothing seen in one picture is reported for another.
 
-${cast}
+For each part asked for, give the tightest box that holds the whole of that thing as it is drawn. A part is named
+as it is in the note: the picture's id, a dot, the part's id. List in "missing" every asked-for part that is not
+plainly visible, or that you cannot tell apart from what is around it. Never guess a box for a part you cannot
+see.
 
-${ask}
+Then look at each picture for yourself. In its "also", list the other distinct things in it that the film might
+want to point at and that nobody asked for: each separate object, figure, beam, shape or region that a viewer
+would name. Give each a short id of your own (lowercase letters, digits and hyphens, starting with a letter, not
+one of that picture's asked-for parts), a few words saying what it is and where, and its box. Leave out anything
+already asked for, the background as a whole, and things too small or too faint to pick out. Up to six for a
+picture, the most important first. An empty list is right for a picture with nothing else in it.
 
-Draw the whole of it with nothing cut off, centred, with a clear empty margin all round it. Every part of it, white parts too, is closed inside one unbroken dark outline with no gaps.
-The background is plain, flat, pure white (#FFFFFF) filling the whole image edge to edge. No floor, no ground line, no shadow under or behind it, no scenery, no gradient, no texture, no frame and no second thing.
-Light it evenly from the front, with no vignette and no coloured glow round it.
-Write no text anywhere in the picture: no letters, numbers, captions, labels, logos or watermarks.`;
-}
+Give every box as [x_min, y_min, x_max, y_max] in the pixels of the picture it belongs to, using the width and
+height its note gives. The origin is that picture's top-left corner. The pictures are not all the same size.
+Never use a 0 to 1 or a 0 to 1000 scale.`;
 
-/** One thing on a sheet: its brief, and the place (from 1) of the thing it is another pose of, when it is one. */
-export interface SheetItem {
-  brief: string;
-  sameAs?: number;
-}
-
-/**
- * One drawing that holds every cut-out of a film, laid out as a grid on white. A drawing costs about the same
- * however many things are in it, so a film's things are drawn together and cut apart by code.
- */
-export function sheetPrompt(items: SheetItem[], character: string, cols: number, rows: number, styled: boolean, look: string = CUTOUT_LOOK): string {
-  const list = items
-    .map(({ brief, sameAs }, i) => {
-      const who = starsCharacter(brief, character) ? ` (the film's main character: ${character})` : "";
-      const same = sameAs ? ` This is the very same thing as number ${sameAs}, with the same design, colours and proportions, changed only as described.` : "";
-      return `${i + 1}. ${brief}${who}${same}`;
-    })
-    .join("\n");
-  return `A sheet of separate things from one 2D animated explainer film. Each will be cut out of the sheet by a program and placed into the film's scenes, so each is drawn alone. How each one is drawn: ${look.trim()}
-
-${styled ? "The image given is a frame of the same film. Match its drawing style, line weight and character design exactly, but do not draw that scene.\n\n" : ""}Draw these ${items.length} things as an even grid of ${cols} columns and ${rows} rows that fills the whole sheet, one thing in each place, in reading order: left to right along the top row, then the next row down. A last row that is not full is filled from the left.
-${list}
-
-Each thing is whole, with nothing cut off, sits in the middle of its own cell and fills most of the cell, with clear empty white all round it. No thing touches or overlaps another, and each is drawn once only. A person is a simple cartoon stick figure: a plain round white head with two dot eyes and a small mouth, thin black limbs, simple flat clothes. Every part of each thing, white parts too, is closed inside one unbroken dark outline with no gaps.
-The background is plain, flat, pure white (#FFFFFF) filling the whole image edge to edge. No grid lines, no boxes, no frames, no floor, no ground line, no shadow under or behind anything, no scenery, no gradient and no texture.
-Light everything evenly from the front. Write no text anywhere: no numbers, letters, captions, labels, logos or watermarks.`;
-}
-
-export const PARTS_SYSTEM = `You are given one picture and a list of parts to find in it. For each part, give the
-tightest box that holds the whole of that thing as it is drawn.
-
-Give each box as [x_min, y_min, x_max, y_max] in the picture's own pixels, using the width and height you are told.
-The origin is the top-left corner. Never use a 0 to 1 or a 0 to 1000 scale.
-
-List in "missing" every part id that is not plainly visible, or that you cannot tell apart from what is around it.
-Never guess a box for a part you cannot see. Use each part id exactly as given.`;
-
-export function partsContext(brief: string, width: number, height: number, parts: { id: string; where: string }[]): string {
-  return `The picture was drawn from this brief:
-
+/** The note that goes before one picture in the part finder's request. */
+export function partsNote(id: string, brief: string, width: number, height: number, parts: { id: string; where: string }[]): string {
+  return `Picture "${id}", ${width} pixels wide and ${height} pixels tall. It was drawn from this brief:
 ${brief}
-
-The picture is ${width} pixels wide and ${height} pixels tall.
-
-Find these parts:${parts.map((p) => `\n- ${p.id}: ${p.where}`).join("")}`;
+${parts.length ? `Find these parts in it:${parts.map((p) => `\n- ${id}.${p.id}: ${p.where}`).join("")}` : "No part was asked for by name in it. List what you see in its \"also\"."}
+The picture "${id}" follows.`;
 }
 
-/** The part finder's answer. `part` may only be one of the ids asked for, so a name can never come back reworded. */
-export const partsSchema = (ids: string[]) => ({
-  type: "object",
-  additionalProperties: false,
-  required: ["parts", "missing"],
-  properties: {
-    parts: {
-      type: "array",
-      items: {
-        type: "object",
-        additionalProperties: false,
-        required: ["part", "box"],
-        properties: { part: { type: "string", enum: ids }, box: { type: "array", items: { type: "integer" } } },
+/** A part's name in the finder's answer: its picture, a dot, the part. */
+export const partName = (picture: string, part: string) => `${picture}.${part}`;
+
+/**
+ * The part finder's answer for several pictures. A picture may only be one of those sent, and a part only one
+ * of the names asked for, so neither can come back reworded.
+ */
+export const partsSchema = (asks: { id: string; partIds: string[] }[]) => {
+  const names = asks.flatMap((ask) => ask.partIds.map((part) => partName(ask.id, part)));
+  // An empty list of allowed names is not a list a schema accepts; with no part asked for, any name is ignored anyway.
+  const name = names.length ? { type: "string", enum: names } : { type: "string" };
+  return {
+    type: "object",
+    additionalProperties: false,
+    required: ["pictures"],
+    properties: {
+      pictures: {
+        type: "array",
+        items: {
+          type: "object",
+          additionalProperties: false,
+          required: ["picture", "parts", "missing", "also"],
+          properties: {
+            picture: { type: "string", enum: asks.map((ask) => ask.id) },
+            parts: {
+              type: "array",
+              items: { type: "object", additionalProperties: false, required: ["part", "box"], properties: { part: name, box: { type: "array", items: { type: "integer" } } } },
+            },
+            missing: { type: "array", items: name },
+            also: {
+              type: "array",
+              items: {
+                type: "object",
+                additionalProperties: false,
+                required: ["id", "is", "box"],
+                properties: { id: { type: "string" }, is: { type: "string" }, box: { type: "array", items: { type: "integer" } } },
+              },
+            },
+          },
+        },
       },
     },
-    missing: { type: "array", items: { type: "string", enum: ids } },
-  },
-});
+  };
+};
+
+/**
+ * Read the finder's answer into one entry for each picture sent. A part filed under a picture it does not belong
+ * to is dropped, and so is an entry for a picture that was not sent.
+ */
+export function partsAnswer(raw: unknown, asks: { id: string; partIds: string[] }[]): Record<string, { parts: { part: string; box: number[] }[]; missing: string[]; also: { id: string; is: string; box: number[] }[] }> {
+  const out: ReturnType<typeof partsAnswer> = {};
+  const entries = (raw as { pictures?: unknown })?.pictures;
+  for (const entry of Array.isArray(entries) ? entries : []) {
+    const ask = asks.find((one) => one.id === entry?.picture);
+    if (!ask || out[ask.id]) continue;
+    const own = (name: unknown) => (typeof name === "string" && name.startsWith(`${ask.id}.`) ? name.slice(ask.id.length + 1) : null);
+    out[ask.id] = {
+      parts: (Array.isArray(entry.parts) ? entry.parts : []).flatMap((p: { part?: unknown; box?: unknown }) => (own(p?.part) && Array.isArray(p.box) ? [{ part: own(p.part) as string, box: p.box as number[] }] : [])),
+      missing: (Array.isArray(entry.missing) ? entry.missing : []).flatMap((name: unknown) => (own(name) ? [own(name) as string] : [])),
+      also: Array.isArray(entry.also) ? entry.also : [],
+    };
+  }
+  return out;
+}
 
 export const SCENE_SYSTEM = `You direct one step of a narrated explainer film.
 
@@ -394,8 +391,10 @@ the planner's direction for the step, and the pictures drawn for it. You decide 
 moment, while those words are spoken.
 
 What you are aiming for: at every moment the viewer is looking at the thing the narrator is talking about, as it
-is said, and nothing on screen is there without a reason. Good direction is mostly invisible. The viewer should
-come away having understood the step, not having noticed the effects.
+is said, and the screen is doing what the words are doing. When the narrator says a thing travels, something
+travels. When they compare two things, the two are joined. When they count, a number counts. A film where
+pictures only arrive and sit, with a ring round something now and then, is a slideshow. Nothing is there without
+a reason, but almost every sentence gives you one.
 
 The planner's "show" tells you what this step is meant to do for the viewer and what it wants seen with which
 words. Honour that intent. How to achieve it with what follows is your judgement.
@@ -403,38 +402,34 @@ words. Honour that intent. How to achieve it with what follows is your judgement
 ## How the screen works
 
 - You are shown each of this step's pictures, after the list that describes them. They are what the viewer will
-  see, so look at them before deciding what to point at, where a thing goes and how large it should be.
-- Each picture has a "kind". A background fills the whole frame. It is a still drawing: nothing inside it moves
-  by itself. The frame drifts slowly on its own, so a held picture never looks frozen.
-- The first background you declare is on screen when the step begins. Any other has to be brought on.
-- The camera can frame the whole background or any part listed for it. Only listed parts exist for you: one
+  see, so look at them before deciding what to point at and where a mark goes.
+- A picture fills the whole frame. It is a still drawing: nothing inside it moves by itself. The frame drifts
+  slowly on its own, so a held picture never looks frozen.
+- The first picture you declare is on screen when the step begins. Any other has to be brought on. Each picture
+  was drawn for particular words of the narration: it comes on when the narrator reaches them, so the viewer is
+  always looking at a drawing of what they are hearing. A thing is seen to change, arrive or go by cutting to
+  the picture of it afterwards.
+- The camera can frame the whole picture or any part listed for it. Only listed parts exist for you by name: one
   that is not listed was not found in the drawing. Each listed part has a "box": [left, top, width, height] as
-  shares of the picture, measured in the drawing.
-- A cut-out is one thing with nothing round it. It never fills the frame, and it is not on screen until you
-  place it. It is laid over the background on screen and, unlike anything drawn in the background, it can be
-  moved. It belongs to that background and leaves with it. Each cut-out has a "shape": its width over its
-  height.
-- Cut-outs and keywords are the live layer: they are what moves while the background holds. A cut-out comes
-  on at the word that names it, not before, and when the narrator says a thing goes, falls, rises, arrives or
-  leaves, the cut-out does that on those words. An arrow slides to what it points at. A film in which things
-  only appear and sit still looks like slides.
-- A cut-out is there to be seen, on a screen that may be a phone. The thing a moment is about is one of the
-  largest things in the frame: a person stands a third to a half of the frame's height, and a cup the step is
-  about is shown far larger than a real cup would be in that room, because true scale matters less than being
-  able to see what happens to it. A cut-out under a fifth of the frame's height is hard to make out.
-- A cut-out placed later lies over one placed earlier, and both lie over the background. Two things the
-  viewer should see are put apart, where neither covers the other or the part of the background being shown.
-- When the camera moves in on a part, everything outside that part leaves the frame, cut-outs included. A
-  cut-out the viewer should still see is inside the part the camera is on, or the camera stays wide.
-- Names, marks, speech bubbles and the camera are aimed at a background or one of its parts, never at a cut-out.
-- Words and numbers are written on top by you; the pictures have none. What is written agrees with what the
-  narrator is saying at that moment, because a viewer who reads one thing while hearing another takes in
-  neither. A number may be written in figures, with its unit or its sign.
+  shares of the picture, measured in the drawing. Some were asked for by the planner and some were found in
+  the finished drawing by an inspector, so the list can hold things the planner's direction never mentions.
+  They are all yours to use.
+- You draw on the picture, by hand, as the narrator speaks: arrows, lines, boxes, rings, a pointer, signs,
+  a glowing dot that travels a path, and moving effects such as fire or smoke. They are what moves while the
+  picture holds, and each one answers something the narrator says at that moment: an arrow because one thing
+  acts on another or goes somewhere, a box or a ring because a thing is singled out, the pointer going from
+  thing to thing as they are listed, a cross on what is wrong. A mark that answers nothing in the words is
+  clutter.
+- A mark is drawn at a spot: a listed part, or a point you can see in the picture, given as shares of its width
+  and height. It follows the camera with the picture, and leaves when the picture changes.
+- Words and numbers are written on top by you, in handwriting; the pictures have none. What is written agrees
+  with what the narrator is saying at that moment, because a viewer who reads one thing while hearing another
+  takes in neither. A number may be written in figures, with its unit or its sign.
 - Subtitles of the narration already run along the bottom of the frame.
 - Timing comes from the narration, never from seconds. Each moment you write is tied to the words it belongs
   with, and happens when the narrator says them.
-- You never write pixels, seconds or picture addresses. Things are named by id, and a place or a size that is
-  not a name is a share of the picture or of the frame.
+- You never write pixels, seconds or picture addresses. Things are named by id, and a spot that is not a
+  name is a share of the picture's width and height.
 
 ## What you write
 
@@ -444,32 +439,41 @@ One JSON object and nothing else:
 
 ### objects
 
-Everything the step uses, each declared once with its own id (lowercase letters, digits and hyphens).
+Everything the step uses, each declared once with its own id: lowercase letters, digits and hyphens, starting
+with a letter. No two things share an id, and that includes the ids you give to labels and marks.
 
-- {"id": "<picture id>", "kind": "image"}: one of this step's pictures, background or cut-out. Add
-  "initial": "hidden" to every background except the one the step opens on. A cut-out takes no "initial".
-- {"id": "...", "kind": "text", "text": "...", "zone": "...", "size": "small|medium|large",
-  "color": "white|accent|danger|good"}: large bold words over the picture, at most 60 characters. They are the
-  first thing the viewer reads, so they are a keyword and never a sentence: the figure with its unit, or the
-  one to three words the narrator is leaning on. The subtitles already carry the sentence. They stay until they
-  are hidden, and two that are up together in the same or touching zones lie across each other and neither can
-  be read. They also cover whatever is under them, so they go in a zone the things being shown are not in.
+- {"id": "<picture id>", "kind": "image"}: one of this step's pictures. Add "initial": "hidden" to every
+  picture except the one the step opens on.
+- {"id": "...", "kind": "text", "text": "...", "zone": "...", "near": <spot>, "size": "small|medium|large",
+  "color": "white|accent|danger|good", "underline": true}: large bold handwritten words over the picture, at
+  most 60 characters. They are the first thing the viewer reads, so they are a keyword and never a sentence: the
+  figure with its unit, or the one to three words the narrator is leaning on. The subtitles already carry the
+  sentence. With "near" the words sit beside that spot, next to the thing they are about; with "zone" they sit
+  in a region of the frame. They stay until they are hidden or the picture changes, and two that are up
+  together in the same or touching zones lie across each other and neither can be read. They also cover
+  whatever is under them.
 - {"id": "...", "kind": "equation", "value": "..."}: a formula, in simple TeX.
 - {"id": "...", "kind": "counter", "from": 0, "to": 100, "prefix": "...", "suffix": "...", "decimals": 0,
-  "label": "..."}: a large number that counts from one value to another.
+  "label": "..."}: a large number that counts from one value to another. The prefix is at most 8 characters,
+  the suffix 12 and the label 40.
 - {"id": "...", "kind": "chart", "chart": "bar|pie|line", "title": "...", "data": [{"label": "...", "value": 1}]}:
-  a chart of 2 to 8 values.
+  a chart of 2 to 8 values. A value's label is at most 16 characters.
+- {"id": "...", "kind": "timeline", "events": [{"when": "...", "label": "..."}]}: 2 to 6 moments in order along
+  a line, each with when it was (a year, "day 3", "8 minutes"), at most 14 characters, and a few words, at
+  most 26. It is wide, and sits best in the bottom zone.
 
-"zone" places words, a formula, a counter or a chart: top, center, bottom, left, right, top-left, top-right,
-bottom-left or bottom-right. All four start hidden.
+"zone" places words, a formula, a counter, a chart or a timeline: top, center, bottom, left, right, top-left,
+top-right, bottom-left or bottom-right. All of them start hidden, and all of them leave when the picture
+changes: one that should carry over is shown again on the new picture.
 
 ### beats
 
 A beat is one moment: the changes the viewer sees when the narrator reaches certain words. An action that
 leaves the screen as it was, such as the camera aimed where it already is, is not a change.
 
-The viewer's eye leaves a picture that has not changed for more than a sentence or two, about five seconds, so
-the beats run the whole length of the narration and none of it is spoken over a frame that stands still.
+The viewer's eye leaves a picture that has not changed for more than a sentence or two, so the beats run the
+whole length of the narration and none of it is spoken over a frame that stands still. A pan or a travelling
+dot that lasts until the next beat is movement for all of that time.
 What is written appears on the very words that say it, and stays long enough to be read: to the end of its
 sentence at least, and longer when the next sentence is still about it.
 
@@ -480,72 +484,105 @@ sentence at least, and longer when the next sentence is still about it.
 - "pace": how long the beat's changes take: instant, quick, normal, slow or dramatic.
 - "actions": what changes. Each is one of these.
 
-{"do": "cut", "to": "<background>", "entrance": "cut|iris|fade"}
-  Changes the background on screen. cut switches at once, iris opens the new one outward from the middle of the
-  frame, fade dissolves into it. Names, marks and cut-outs on the old one leave with it.
-{"do": "camera", "target": "<background>" or "<background>.<part>", "shot": "overview|wide|medium|close|detail",
+{"do": "cut", "to": "<picture>", "entrance": "fade|cut|iris|wipe|push|zoom"}
+  Changes the picture on screen. fade dissolves into the new picture, and is what happens when no entrance is
+  given. cut switches at once: for a later moment of the same shot, where a dissolve would blur the change.
+  iris opens the new picture outward from the middle of the frame. wipe draws it across from the left. push
+  slides the old picture out to the left as the new one comes in from the right, which reads as "and next".
+  zoom dives into the old picture and comes out in the new one, which reads as "inside it" or "closer".
+  Everything drawn or written on the old picture leaves with it.
+{"do": "camera", "target": "<picture>" or "<picture>.<part>", "shot": "overview|wide|medium|close|detail",
  "movement": "cut|move|push|arc"}
-  Reframes the background on screen. The shots run from the whole picture (overview) to one precise point
+  Reframes the picture on screen. The shots run from the whole picture (overview) to one precise point
   (detail). The movements are an instant jump (cut), a smooth travel (move), a push inward (push) and a curved
   swing (arc).
-{"do": "label", "target": "<background>" or "<background>.<part>", "text": "...", "id": "..."}
-  Attaches a small name tag to a thing, at most 32 characters. It names the thing and stays beside it until the
-  background changes, or until you hide it by its id.
-{"do": "speak", "target": "<background>.<part>", "text": "..."}
-  Shows a figure's own words in a speech bubble beside that part, at most 60 characters. One bubble at a time.
-{"do": "attention", "target": "<background>.<part>", "verb": "dim|encircle|pulse"}
+{"do": "pan", "from": <spot>, "to": <spot>, "shot": "wide|medium|close|detail", "lasts": "pace|until-next"}
+  Carries the camera across the picture from one spot to another, close enough that the viewer travels with it:
+  along a road, down a body, from a cause to its effect. With until-next it keeps travelling until the next
+  beat begins.
+{"do": "arrow", "from": <spot>, "to": <spot>, "color": "white|accent|danger|good", "bend": "straight|left|right",
+ "id": "..."}
+  Draws an arrow from one spot to another, its head at "to". It is drawn along its length as the beat goes, so
+  it shows a direction, a cause or the way something travels. At a part, it starts or ends at the part's edge.
+  It bows a little to the right of its way unless "bend" says left or straight.
+{"do": "line", "from": <spot>, "to": <spot>, "color": "...", "dashed": true, "id": "..."}
+  Draws a line joining two spots: two things that belong together, a distance, a level.
+{"do": "box", "target": "<picture>.<part>" or {"x": 0.1, "y": 0.2, "w": 0.3, "h": 0.25}, "style": "outline|highlight",
+ "color": "...", "id": "..."}
+  Draws a rectangle round a part, or round a stretch of the picture given as its left, top, width and height.
+  outline draws its four sides by hand; highlight pulls a marker's colour across it.
+{"do": "point", "at": <spot>}
+  Sends the pointer to a spot. It glides there from wherever it was and gives a small ripple when it lands.
+  It stays until you hide it with the id "pointer".
+{"do": "stamp", "icon": "check|cross|plus|minus|star|heart|bolt|drop|sun|leaf|flame|clock|warning|cloud",
+ "at": <spot>, "size": "small|medium|large", "color": "...", "id": "..."}
+  Stamps a simple sign on a spot.
+{"do": "effect", "kind": "fire|smoke|sparks|dust|confetti|energy|rain|snow", "at": <spot>, "id": "..."}
+  Runs a moving effect at a spot: flames, rising smoke, flying sparks, drifting dust, one burst of confetti, a
+  glow of energy. rain and snow fall over the whole frame and take no "at".
+{"do": "travel", "path": [<spot>, <spot>, ...], "color": "...", "repeat": true, "lasts": "pace|until-next",
+ "id": "..."}
+  Sends a glowing dot through 2 to 6 spots in order, with a fading trail behind it: a thing on its way. It
+  takes the beat's pace, or with until-next it is on its way until the next beat begins, and then rests where
+  it arrived. With repeat it goes round again and again, for a thing that keeps flowing.
+{"do": "attention", "target": "<picture>.<part>", "verb": "dim|encircle|pulse"}
   Draws the eye to a part: dim leaves it lit and lets everything else fall into shadow, encircle draws a ring
-  round it by hand, pulse sends two ripples out from it. A ring suits a small part. Round a part that fills
-  much of the frame, or a long thin one, it is a great loop that cuts across the picture.
+  round it by hand, pulse sends two ripples out from it. A ring and a pulse are for a small part: round one
+  that fills much of the frame they are not drawn at all, and a box or dim does the job. It lasts until the
+  camera moves or another one takes over.
+{"do": "label", "target": "<picture>" or "<picture>.<part>", "text": "...", "id": "..."}
+  Attaches a small name tag to a thing, at most 32 characters. It names the thing and stays beside it.
+{"do": "speak", "target": "<picture>.<part>", "text": "..."}
+  Shows a figure's own words in a speech bubble beside that part, at most 60 characters. One bubble at a time.
 {"do": "show", "targets": ["<id>"], "entrance": "fade|slam|word-by-word"}
-  Brings on words, a formula, a counter or a chart. fade is gentle, slam lands hard, word-by-word builds it up.
+  Brings on words, a formula, a counter, a chart or a timeline. fade is gentle, slam lands hard, word-by-word
+  builds it up.
 {"do": "hide", "targets": ["<id>"]}
-  Takes off words, a formula, a counter, a chart, or a label that has an id.
-{"do": "place", "what": "<cut-out>", "at": <place>, "where": "at|on|before|left-of|right-of", "size": <size>,
- "mirror": true, "entrance": "appear|fade|pop"}
-  Puts a cut-out on the background. mirror shows it facing the other way from how it was drawn.
-{"do": "move", "what": "<cut-out>", "to": <place>, "where": "...", "size": <size>, "path": "straight|arc|hop",
- "lasts": "pace|until-next"}
-  Carries a placed cut-out to another place. straight goes directly, arc rises and comes down, hop bounces
-  along. With pace it takes the beat's pace; with until-next it keeps travelling until the next beat begins. A
-  size is the size it has when it arrives; it changes on the way.
-{"do": "swap", "what": "<cut-out>", "to": "<cut-out>"}
-  Replaces a placed cut-out, where it stands and at its size, with another cut-out not yet on screen: the same
-  thing in another pose. From then on it is known by the new id.
-{"do": "resize", "what": "<cut-out>", "size": <size>}
-  Grows or shrinks a placed cut-out.
-{"do": "turn", "what": "<cut-out>", "mirror": true, "tilt": "upright|left|right|over"}
-  Turns a placed cut-out: mirror true or false sets which way it faces, tilt leans it or turns it upside down.
-{"do": "remove", "what": "<cut-out>", "exit": "cut|fade|shrink"}
-  Takes a placed cut-out off the screen.
+  Takes off words, a formula, a counter, a chart or a timeline, or anything drawn with an id: a label, an
+  arrow, a line, a box, a stamp, an effect, a travelling dot, or "pointer".
 {"do": "shake", "strength": "subtle|normal|strong"}
   Shakes the whole frame briefly.
 {"do": "flash"}
   Flashes the whole frame white for an instant.
 
-A <place> is one of:
-- "<background>.<part>": a listed part of the background on screen. "where" says how the cut-out sits against
-  it. at puts its middle on the part's middle, for a thing in or against the part. on stands it on the part: on
-  the upper surface of a table or a wall, in the middle of a floor or a road, at seat height along a sofa or a
-  bed. before stands it at the part's foot, in front of it. left-of and right-of stand it beside the part. A
-  person at a table, a counter or a desk stands before it, on the floor; on would stand them on top of it.
-- a zone: one of the nine named above.
-- "off-left", "off-right", "off-top", "off-bottom": just outside that edge of the frame.
+A <spot> is somewhere in the picture now on screen, one of:
+- "<picture>.<part>": a listed part of it. This is exact: the film measured the part in the drawing.
 - {"x": 0.42, "y": 0.71}: a point you can see in the picture, as shares of its width and height from the
-  top-left corner, the same measure as a part's box. With "where": "at" it is the cut-out's middle; with "on" it
-  is where the cut-out stands.
+  top-left corner, the same measure as a part's box. Use it for a thing that has no listed part.
 
-A <size> is one of:
-- {"of": "<background>.<part>", "times": 1.5}: that many times as tall as the part is in the drawing. The film
-  measures the part, so the two are in proportion. A part drawn near the viewer is large and one far away is
-  small, so this is right for a thing standing where the part stands, and wrong for one put nearer or farther.
-- a number from 0.04 to 0.8: its height as a share of the frame's height, where there is no part to measure
-  against.
-A thing much wider than it is tall is fitted by its width, and the film keeps the whole of a cut-out inside the
-frame and above the subtitles, moving it a little if it must.
+An arrow, a line, a box, a stamp, an effect and a travelling dot stay until the picture changes, or until you
+hide them by id. Each starts and ends on something the narrator names at that moment: an arrow, a line or a
+dot between two spots that are nearly the same place is too short to read and is not drawn. Marks left up pile
+on each other, so one that has done its work is hidden before the next arrives.
 
-These are a vocabulary, not a recipe. Most steps need only a little of it, and which parts a step needs depends
-on what the step is trying to make the viewer see.
+### What each one is for
+
+Each of these says something different to the viewer, so the one to use is the one that says what the narrator
+is saying. This is how to read a sentence for it.
+
+- Something goes from one place to another, flows, is sent, arrives: "travel" shows the thing itself on its
+  way. "arrow" leaves the direction on the picture after it has been said, and is also how a cause, a force or
+  a push is shown.
+- The narrator follows something long, or goes through a picture from one end to the other: "pan" takes the
+  viewer along it.
+- Things are named one after another: "point" goes to each as it is named.
+- One thing is picked out of several: "box" for a thing with a clear shape, its highlight style for a stretch
+  or a band, "attention" encircle for a small thing, dim when everything else should fall away.
+- Two things are compared, matched or measured against each other: "line" joins them. A distance or a level
+  is a line too, dashed when it is not a real thing.
+- A number is said: a keyword beside the thing it measures, or a "counter" when the size of it is the point.
+  Several numbers set against each other are a chart. Moments in order are a timeline.
+- Something is right, wrong, dangerous, more, less, hot, wet, charged: "stamp" puts the sign for it on the
+  thing.
+- Something burns, smokes, sparks, glows, or the weather is part of it: "effect", for as long as it is true.
+- A thing is named for the first time: "label". A figure says or thinks something: "speak".
+- Something hits, breaks or happens all at once: "shake" or "flash", on that word.
+- The narrator moves on. The next picture dissolves in unless how it follows from the last is worth showing:
+  push for the next thing in a row, zoom for going inside or closer, wipe for time passing or a before and
+  after, iris for a reveal, a plain cut when the same shot simply changes.
+
+A step that reaches for the same one each time has told the viewer one thing over and over. Over its length a
+step usually calls for several different ones, because its sentences say different things.
 
 ## What the film will not accept
 
@@ -556,11 +593,11 @@ The film checks your scene. Anything below is dropped from it, and you are asked
   that stands still.
 - A "say" that is not in the narration word for word, or that comes earlier in the narration than the beat
   before it.
-- A background declared hidden that nothing ever brings on, or a cut-out declared that is never placed.
-- A cut-out moved, swapped, resized, turned or removed while it is not on screen: before it is placed, or after
-  its background has changed. A cut-out placed again while it is already on screen.
-- A place or a size that names anything but a listed part of the background on screen.
-- The camera, a name, a mark or a speech bubble aimed at a cut-out.
+- A picture declared hidden that nothing ever brings on.
+- A spot that names anything but a listed part of the picture on screen, or a point outside 0 to 1.
+- The camera, a name, a ring or a speech bubble aimed at a part that is not listed, and a name, a ring or a
+  speech bubble for a picture that is not the one on screen at that moment.
+- An id used twice.
 - Text over its length limit.`;
 
 /**
@@ -612,18 +649,16 @@ export interface Prompts {
   parts: string;
   voice: string;
   look: string;
-  cutoutLook: string;
 }
 
-export const DEFAULT_PROMPTS: Prompts = { plan: PLAN_SYSTEM, scene: SCENE_SYSTEM, parts: PARTS_SYSTEM, voice: VOICE_STYLE, look: BACKGROUND_LOOK, cutoutLook: CUTOUT_LOOK };
+export const DEFAULT_PROMPTS: Prompts = { plan: PLAN_SYSTEM, scene: SCENE_SYSTEM, parts: PARTS_SYSTEM, voice: VOICE_STYLE, look: BACKGROUND_LOOK };
 
 /** What each prompt is, for the page where they are edited. In the order the film uses them. */
 export const PROMPT_INFO: { key: keyof Prompts; title: string; stage: string; about: string }[] = [
   { key: "plan", title: "Planner", stage: "plan", about: "Turns the question into the whole film: the narration, every picture's brief and each step's direction. It decides what is said and what is shown." },
-  { key: "look", title: "Picture look", stage: "picture", about: "The opening paragraph of every background's drawing request: the drawing style, the light and the mood. The brief and the pipeline's own rules follow it." },
-  { key: "cutoutLook", title: "Cut-out look", stage: "picture", about: "The opening paragraph of every cut-out's drawing request. The rest tells the image model to draw one thing alone on plain white, which the cutting depends on." },
-  { key: "parts", title: "Part finder", stage: "parts", about: "Looks at one finished picture and boxes each part the plan named, so the camera and marks can aim at it." },
-  { key: "scene", title: "Scene writer", stage: "scene", about: "Directs one step: which picture is on screen at which words, where the camera goes, and what is written or moved on top." },
+  { key: "look", title: "Picture look", stage: "picture", about: "How every picture is drawn: the drawing style, the light and the mood. The briefs and the pipeline's own rules follow it." },
+  { key: "parts", title: "Part finder", stage: "parts", about: "Looks at all of a film's finished pictures together, in one call, boxes each part the plan named, and adds the other things it sees, so the camera and marks can aim at them." },
+  { key: "scene", title: "Scene writer", stage: "scene", about: "Directs one step: which picture is on screen at which words, where the camera goes, and what is written or drawn on top." },
   { key: "voice", title: "Voice style", stage: "voice", about: "How the narrator should sound. Sent with every step's words to the voice." },
 ];
 

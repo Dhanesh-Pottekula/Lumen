@@ -220,3 +220,21 @@ describe("the film pipeline", () => {
     expect(events.at(-1)).toMatchObject({ type: "film_done", status: "failed", scenes: 0, error: "no plan" });
   });
 });
+
+describe("parts the finder adds for itself", () => {
+  it("keeps things it saw that the plan did not name, and leaves out ones that cannot be used", async () => {
+    const { seenParts } = await import("./film");
+    const found = {
+      parts: [],
+      missing: [],
+      also: [
+        { id: "Red Beam", is: "the red beam at the right", box: [100, 50, 300, 90] },
+        { id: "sun", is: "already asked for", box: [0, 0, 50, 50] },
+        { id: "sky", is: "the whole picture", box: [0, 0, 400, 200] },
+        { id: "speck", is: "too small", box: [10, 10, 12, 12] },
+        { id: "bad", is: "no box", box: [1, 2] },
+      ],
+    };
+    expect(seenParts(found, ["sun"], 400, 200)).toEqual([{ id: "red-beam", is: "the red beam at the right", box: [0.25, 0.25, 0.5, 0.2] }]);
+  });
+});

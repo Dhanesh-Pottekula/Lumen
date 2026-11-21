@@ -17,11 +17,11 @@ import path from "node:path";
 import type { FilmEvent, FilmFile, FilmHeader, FilmScene, Hotspot, ImageObject, PictureRow, ProgressStage, ProgressStatus, SceneAudio } from "../src/film/types";
 import { alignWords } from "../src/film/words";
 import { validateScene, withPictures } from "../src/film/validate";
-import { PAIR_SIZE, SHEET_MOST, cutPair, cutSheet, sheetLayout, shrinkPng } from "./cutout";
-import { DEFAULT_PROMPTS, PROMPT_INFO, type Prompts, SCENE_REPAIR, cutoutPrompt, drawingPrompt, pairPrompt, partsContext, promptsWith, sceneContext, sceneRetry, sceneStable, sheetPrompt } from "./prompts";
+import { SHEET_MOST, cutSheet, sheetLayout, shrinkPng } from "./sheet";
+import { DEFAULT_PROMPTS, PROMPT_INFO, type Prompts, SCENE_REPAIR, drawingPrompt, partsNote, promptsWith, sceneContext, sceneRetry, sceneStable, sheetPrompt } from "./prompts";
 import { createTracer } from "./trace";
 import { createMeter } from "./usage";
-import type { ImageBytes, Message, Provider } from "./providers/types";
+import type { ImageBytes, Message, PartsAsk, PartsFound, Provider } from "./providers/types";
 import { loadSkills, skillTool } from "./skills";
 import { knownMarksOnly, plainOf } from "./voice";
 import { PICTURES_KEY, STEPS_KEY, entriesClosed, imageSize, jsonObject, lanes, planHeader, slug, writingLanes } from "./text";
@@ -36,8 +36,6 @@ interface PicturePlan {
   brief: string;
   parts: { id: string; where: string }[];
   of: string | null;
-  /** True for one thing drawn alone on white, to be cut out and laid over a background. */
-  cutout: boolean;
 }
 
 interface Step {
@@ -55,7 +53,13 @@ interface Drawn extends ImageBytes {
   height: number;
 }
 
-type Picture = Required<Pick<ImageObject, "src" | "aspect" | "hotspots">> & { cutout?: boolean };
+type Picture = Required<Pick<ImageObject, "src" | "aspect" | "hotspots">> & {
+  /** Parts the finder added itself, with its own words for what each is. They are in `hotspots` too. */
+  seen: Record<string, string>;
+};
+
+/** The most parts the finder may add to one picture beyond the ones the plan named. */
+export const SEEN_MOST = 6;
 
 export interface FilmJob {
   provider: Provider;
@@ -80,19 +84,16 @@ function picturePlanOf(entry: unknown, known: Map<string, PicturePlan>): Picture
   const raw = entry as Record<string, unknown>;
   const id = slug(raw.id ?? "");
   if (!id || known.has(id) || typeof raw.brief !== "string" || !raw.brief.trim()) return null;
-  const cutout = raw.kind === "cutout";
   const parts: PicturePlan["parts"] = [];
-  // A cut-out is moved as one piece and nothing is aimed at it, so it has no parts to find.
-  for (const part of !cutout && Array.isArray(raw.parts) ? raw.parts : []) {
+  for (const part of Array.isArray(raw.parts) ? raw.parts : []) {
     const record = typeof part === "string" ? { id: part, where: part } : (part as Record<string, unknown> | null);
     const partId = slug(record?.id ?? "");
     if (!partId || parts.some((p) => p.id === partId) || parts.length >= 4) continue;
     parts.push({ id: partId, where: typeof record?.where === "string" && record.where.trim() ? record.where.trim() : partId });
   }
-  // "of" joins two pictures of one kind: a later moment of a background, or another pose of a cut-out.
+  // "of" joins a picture to the earlier one it is a later moment of.
   const earlier = typeof raw.of === "string" ? known.get(slug(raw.of)) : undefined;
-  const of = earlier && earlier.cutout === cutout ? earlier.id : null;
-  return { id, brief: raw.brief.trim(), parts, of, cutout };
+  return { id, brief: raw.brief.trim(), parts, of: earlier ? earlier.id : null };
 }
 
 function stepOf(entry: unknown): Step | null {
@@ -132,6 +133,29 @@ export function hotspotsOf(found: { parts: { part: string; box: number[] }[]; mi
 }
 
 /**
+ * The parts the finder added itself: things it saw in the picture that the plan did not name. Each gets an id
+ * that is free, and a box as fractions of the picture. One with no usable box, one that covers nearly the whole
+ * picture, and one past the limit are left out.
+ */
+export function seenParts(found: PartsFound, taken: string[], width: number, height: number): { id: string; is: string; box: Hotspot }[] {
+  const out: { id: string; is: string; box: Hotspot }[] = [];
+  const clamp = (v: number) => Math.min(1, Math.max(0, v));
+  for (const entry of found.also ?? []) {
+    const id = slug(entry?.id ?? "");
+    const box = entry?.box;
+    if (!id || taken.includes(id) || out.some((one) => one.id === id) || out.length >= SEEN_MOST) continue;
+    if (!Array.isArray(box) || box.length !== 4 || !box.every((n) => typeof n === "number" && Number.isFinite(n))) continue;
+    const x0 = clamp(Math.min(box[0], box[2]) / width);
+    const y0 = clamp(Math.min(box[1], box[3]) / height);
+    const x1 = clamp(Math.max(box[0], box[2]) / width);
+    const y1 = clamp(Math.max(box[1], box[3]) / height);
+    if (x1 - x0 < 0.02 || y1 - y0 < 0.02 || (x1 - x0 > 0.92 && y1 - y0 > 0.92)) continue;
+    out.push({ id, is: typeof entry.is === "string" && entry.is.trim() ? entry.is.trim().slice(0, 80) : id, box: [x0, y0, x1 - x0, y1 - y0].map((n) => Math.round(n * 10000) / 10000) as Hotspot });
+  }
+  return out;
+}
+
+/**
  * A short fingerprint of the prompts a film was made with. Two films with the same value were written by the
  * same planner, scene writer, part finder and look, so their numbers can be compared.
  */
@@ -144,11 +168,8 @@ export function promptVersion(prompts: Prompts = DEFAULT_PROMPTS): string {
     drawingPrompt("", "none", "lead", prompts.look),
     drawingPrompt("the main character", "x", "state", prompts.look),
     drawingPrompt("", "x", "styled", prompts.look),
-    cutoutPrompt("the main character", "x", "styled", prompts.cutoutLook),
-    cutoutPrompt("", "x", "state", prompts.cutoutLook),
-    sheetPrompt([{ brief: "the main character" }, { brief: "", sameAs: 1 }], "x", 4, 3, true, prompts.cutoutLook),
-    pairPrompt([{ brief: "the main character" }, { brief: "", laterOfFirst: true }], "x", "earlier", prompts.look),
-    pairPrompt([{ brief: "" }, { brief: "" }], "x", "style", prompts.look),
+    sheetPrompt([{ brief: "the main character" }, { brief: "", laterOf: 1 }], "x", 2, 4, true, prompts.look),
+    sheetPrompt([{ brief: "" }, { brief: "" }, { brief: "" }], "x", 1, 3, false, prompts.look),
   ].join("\u0000");
   return createHash("sha256").update(text).digest("hex").slice(0, 12);
 }
@@ -169,8 +190,7 @@ export async function makeFilm(job: FilmJob): Promise<FilmFile> {
     file: path.join(dir, "calls.jsonl"),
     started,
     describe: (stage) => source.stages?.[stage] ?? { model: source.name },
-    // A cut-out's call gets back the drawing on white; that is the file kept as <id>.drawn.png.
-    outputSrc: (stage, id, type) => (stage === "picture" ? `${base}/pictures/${id}${plans.get(id)?.cutout ? ".drawn" : ""}.${EXTENSIONS[type] ?? "png"}` : stage === "voice" ? `${base}/voice/${id}.${EXTENSIONS[type] ?? "mp3"}` : undefined),
+    outputSrc: (stage, id, type) => (stage === "picture" ? `${base}/pictures/${id}.${EXTENSIONS[type] ?? "png"}` : stage === "voice" ? `${base}/voice/${id}.${EXTENSIONS[type] ?? "mp3"}` : undefined),
   });
   const provider = tracer.wrap(source);
   const log = (entry: Record<string, unknown>) =>
@@ -231,89 +251,101 @@ export async function makeFilm(job: FilmJob): Promise<FilmFile> {
     }
   })();
 
-  // ── Cut-outs: drawn together ────────────────────────────────────────────────────────────────────────
-  // A drawing costs about the same however many things are in it, so a film's cut-outs wait until the plan has
-  // listed every picture and are then drawn on one sheet of twelve places (a second sheet past twelve) and cut apart by code.
-  const sheetPlans: PicturePlan[] = [];
-  /** Why a drawing, or a thing on a sheet, could not be used. Any entry here fails the run: nothing is drawn again. */
+  // ── Pictures: eight to a drawing ────────────────────────────────────────────────────────────────────
+  // A drawing costs the same whatever is in it, so pictures wait until eight are listed and are drawn together
+  // as a grid of frames, which is then cut apart. They are grouped in the order the plan lists them; the last
+  // group holds however many are left. Nothing is drawn a second time: a drawing that fails, or a frame that
+  // is missing from one, is recorded and the run is marked failed.
+  /** Why a drawing, or a frame of one, could not be used. Any entry here fails the run. */
   const drawFailures: string[] = [];
-  let openSheets!: () => void;
-  const picturesListed = new Promise<void>((resolve) => (openSheets = resolve));
-  let sheets: Promise<Map<string, Drawn>> | null = null;
-  const sheetDrawings = () => (sheets ??= picturesListed.then(drawSheets));
+  type Waiting = { plan: PicturePlan; settle: (drawn: Drawn | null) => void };
+  const sheetWaiting: Waiting[] = [];
+  let sheets = 0;
+  let picturesClosed = false;
+  /** The film's first drawing. Later ones wait for it, to be drawn in the style of its first frame. */
+  let firstSheet: Promise<void> | null = null;
+  const queuePicture = (plan: PicturePlan) =>
+    new Promise<Drawn | null>((settle) => {
+      sheetWaiting.push({ plan, settle });
+      flushSheets();
+    });
 
-  async function drawSheets(): Promise<Map<string, Drawn>> {
-    const made = new Map<string, Drawn>();
-    if (!sheetPlans.length) return made;
-    const groups: PicturePlan[][] = [];
-    for (let at = 0; at < sheetPlans.length; at += SHEET_MOST) groups.push(sheetPlans.slice(at, at + SHEET_MOST));
-    // The lead picture sets the film's drawing style, so the sheet is drawn from it.
-    const lead = leadId ? ((await drawings.get(leadId)) ?? null) : null;
-    await Promise.all(
-      groups.map((group, g) =>
-        drawing(async () => {
-          const sheetId = `sheet-${g + 1}`;
-          const { cols, rows, size } = sheetLayout(group.length);
-          const items = group.map((plan) => {
-            const same = plan.of ? group.findIndex((other) => other.id === plan.of) + 1 : 0;
-            return { brief: plan.brief, ...(same ? { sameAs: same } : {}) };
-          });
-          progress("picture", "drawing", `Drawing ${group.length} cut-outs on one sheet: ${group.map((plan) => plan.id).join(", ")}`, { id: sheetId });
-          try {
-            const image = await provider.draw(sheetPrompt(items, character, cols, rows, Boolean(lead), P.cutoutLook), lead, sheetId, size);
-            fs.writeFileSync(path.join(dir, `pictures/${sheetId}.png`), image.bytes);
-            tracer.name(image.bytes, `${base}/pictures/${sheetId}.png`);
-            cutSheet(image.bytes, cols, rows, group.length).forEach((thing, n) => {
-              const plan = group[n];
-              log({ stage: "picture", id: plan.id, sheet: sheetId, place: n + 1, cut: thing ? { width: thing.cut.width, height: thing.cut.height, coverage: Math.round(thing.cut.coverage * 1000) / 1000, problem: thing.cut.problem } : "nothing was drawn in its place" });
-              if (!thing || thing.cut.problem) {
-                const why = thing?.cut.problem ?? "nothing was found in its place on the sheet";
-                drawFailures.push(`${plan.id}: ${why}`);
-                progress("picture", "failed", `The cut-out ${plan.id} could not be used: ${why}`, { id: plan.id });
-                return;
-              }
-              fs.writeFileSync(path.join(dir, `pictures/${plan.id}.drawn.png`), thing.drawn);
-              tracer.name(thing.drawn, `${base}/pictures/${plan.id}.drawn.png`);
-              const file = `pictures/${plan.id}.png`;
-              fs.writeFileSync(path.join(dir, file), thing.cut.png);
-              made.set(plan.id, { bytes: thing.drawn, type: "image/png", file, width: thing.cut.width, height: thing.cut.height });
-            });
-            progress("picture", "drawing", `${group.filter((plan) => made.has(plan.id)).length} of ${group.length} cut-outs came off the sheet`, { id: sheetId });
-          } catch (error) {
-            // No second drawing and no drawing them one by one: the run is marked failed, with the reason.
-            const why = String((error as Error).message ?? error);
-            drawFailures.push(`${sheetId}: ${why}`);
-            log({ stage: "picture", id: sheetId, error: why });
-            progress("picture", "failed", `The sheet of cut-outs could not be made: ${why}`, { id: sheetId });
+  /**
+   * Send off every full group that is ready. A full group goes once a ninth picture is listed, so that a later
+   * moment is never cut off from the picture it is a moment of: the two go in one drawing, where they can match.
+   */
+  function flushSheets() {
+    while (sheetWaiting.length > SHEET_MOST || (picturesClosed && sheetWaiting.length)) {
+      let size = Math.min(SHEET_MOST, sheetWaiting.length);
+      if (sheetWaiting.length > size) {
+        const inGroup = (id: string | null, upTo: number) => (id ? sheetWaiting.slice(0, upTo).findIndex((one) => one.plan.id === id) : -1);
+        for (let earlier = inGroup(sheetWaiting[size].plan.of, size); earlier > 0; earlier = inGroup(sheetWaiting[size].plan.of, size)) size = earlier;
+      }
+      const group = sheetWaiting.splice(0, size);
+      const drawn = drawSheet(group, firstSheet);
+      firstSheet ??= drawn;
+    }
+  }
+  /** The list of pictures is complete (or the plan has ended): whatever is still waiting is drawn now. */
+  let listed!: () => void;
+  /** Settles once the plan has named every picture it is going to. */
+  const picturesListed = new Promise<void>((resolve) => (listed = resolve));
+  const closePictures = () => {
+    picturesClosed = true;
+    flushSheets();
+    listed();
+  };
+
+  async function drawSheet(group: Waiting[], after: Promise<void> | null) {
+    // One picture left over is an ordinary drawing of its own.
+    if (group.length === 1) {
+      await after;
+      group[0].settle(await drawAlone(group[0].plan));
+      return;
+    }
+    const sheetId = `sheet-${++sheets}`;
+    const ids = group.map((one) => one.plan.id);
+    await after;
+    const lead = leadId && !ids.includes(leadId) ? ((await drawings.get(leadId)) ?? null) : null;
+    await drawing(async () => {
+      const { cols, rows, size } = sheetLayout(group.length);
+      const items = group.map(({ plan }) => {
+        const earlier = plan.of ? ids.indexOf(plan.of) + 1 : 0;
+        return { brief: plan.brief, ...(earlier ? { laterOf: earlier } : {}) };
+      });
+      progress("picture", "drawing", `Drawing ${group.length} pictures in one drawing: ${ids.join(", ")}`, { id: sheetId });
+      try {
+        const image = await provider.draw(sheetPrompt(items, character, cols, rows, Boolean(lead), P.look), lead, sheetId, size);
+        fs.writeFileSync(path.join(dir, `pictures/${sheetId}.png`), image.bytes);
+        tracer.name(image.bytes, `${base}/pictures/${sheetId}.png`);
+        const frames = cutSheet(image.bytes, cols, rows, group.length);
+        group.forEach((one, n) => {
+          const frame = frames[n];
+          const drawn = frame ? keep(one.plan.id, frame) : null;
+          log({ stage: "picture", id: one.plan.id, sheet: sheetId, place: n + 1, size: drawn ? [drawn.width, drawn.height] : null });
+          if (!drawn) {
+            drawFailures.push(`${one.plan.id}: no frame was found in place ${n + 1} of ${sheetId}`);
+            progress("picture", "failed", `${one.plan.id} is missing from the drawing`, { id: one.plan.id });
           }
-        }),
-      ),
-    );
-    return made;
+          one.settle(drawn);
+        });
+      } catch (error) {
+        const why = String((error as Error).message ?? error);
+        drawFailures.push(`${sheetId} (${ids.join(", ")}): ${why}`);
+        log({ stage: "picture", id: sheetId, error: why });
+        progress("picture", "failed", `Could not draw ${ids.join(", ")}: ${why}`, { id: sheetId });
+        for (const one of group) one.settle(null);
+      }
+    });
   }
 
-  // ── Backgrounds: two to a drawing ───────────────────────────────────────────────────────────────────
-  // A drawing costs the same whatever is in it, so backgrounds are drawn two at a time, one above the other,
-  // and cut apart. They are paired in the order the plan lists them; an odd last one is drawn by itself.
-  // Nothing is drawn a second time: a drawing that fails is recorded and the run is marked failed.
-  const pairWaiting: { plan: PicturePlan; settle: (drawn: Drawn | null) => void }[] = [];
-  let pairs = 0;
-  const queueBackground = (plan: PicturePlan) =>
-    new Promise<Drawn | null>((settle) => {
-      pairWaiting.push({ plan, settle });
-      if (pairWaiting.length === 2) void drawPair(pairWaiting.splice(0, 2));
-    });
-  void picturesListed.then(() => {
-    for (const { plan, settle } of pairWaiting.splice(0)) void drawAlone(plan).then(settle);
-  });
-
-  /** The picture a drawing is made from, and what it is to that drawing. Awaited outside the drawing lanes. */
-  async function referenceFor(plan: PicturePlan, others: string[]): Promise<{ reference: Drawn | null; given: "none" | "style" | "earlier" }> {
-    if (plan.of && !others.includes(plan.of)) {
+  /** The picture a drawing of one picture is made from, and what it is to that drawing. Awaited outside the drawing lanes. */
+  async function referenceFor(plan: PicturePlan): Promise<{ reference: Drawn | null; given: "none" | "style" | "earlier" }> {
+    if (plan.of) {
       const earlier = (await drawings.get(plan.of)) ?? null;
       if (earlier) return { reference: earlier, given: "earlier" };
     }
-    if (leadId && leadId !== plan.id && !others.includes(leadId)) {
+    if (leadId && leadId !== plan.id) {
       const lead = (await drawings.get(leadId)) ?? null;
       if (lead) return { reference: lead, given: "style" };
     }
@@ -329,40 +361,9 @@ export async function makeFilm(job: FilmJob): Promise<FilmFile> {
     return { bytes, type: "image/png", file, width: size[0], height: size[1] };
   };
 
-  async function drawPair(two: { plan: PicturePlan; settle: (drawn: Drawn | null) => void }[]) {
-    let [top, bottom] = two;
-    // A later moment of a picture drawn earlier goes on top, where the drawing given can be its earlier moment.
-    if (bottom.plan.of && bottom.plan.of !== top.plan.id && !top.plan.of) [top, bottom] = [bottom, top];
-    const pairId = `pair-${++pairs}`;
-    const ids = [top.plan.id, bottom.plan.id];
-    const { reference, given } = await referenceFor(top.plan, ids);
-    await drawing(async () => {
-      progress("picture", "drawing", `Drawing ${ids.join(" and ")} in one drawing`, { id: pairId });
-      try {
-        const items: [{ brief: string }, { brief: string; laterOfFirst?: boolean }] = [{ brief: top.plan.brief }, { brief: bottom.plan.brief, ...(bottom.plan.of === top.plan.id ? { laterOfFirst: true } : {}) }];
-        const image = await provider.draw(pairPrompt(items, character, given, P.look), reference, pairId, PAIR_SIZE);
-        fs.writeFileSync(path.join(dir, `pictures/${pairId}.png`), image.bytes);
-        tracer.name(image.bytes, `${base}/pictures/${pairId}.png`);
-        const frames = cutPair(image.bytes);
-        [top, bottom].forEach((one, n) => {
-          const drawn = keep(one.plan.id, frames[n]);
-          log({ stage: "picture", id: one.plan.id, pair: pairId, place: n ? "bottom" : "top", size: drawn ? [drawn.width, drawn.height] : null });
-          one.settle(drawn);
-        });
-      } catch (error) {
-        const why = String((error as Error).message ?? error);
-        drawFailures.push(`${pairId} (${ids.join(", ")}): ${why}`);
-        log({ stage: "picture", id: pairId, error: why });
-        progress("picture", "failed", `Could not draw ${ids.join(" and ")}: ${why}`, { id: pairId });
-        top.settle(null);
-        bottom.settle(null);
-      }
-    });
-  }
-
-  /** One background in a drawing of its own: the odd one out, or every one when the provider's cannot be cut. */
+  /** One picture in a drawing of its own: the one left over, or every one when the provider's drawings cannot be cut. */
   async function drawAlone(plan: PicturePlan): Promise<Drawn | null> {
-    const { reference, given } = await referenceFor(plan, []);
+    const { reference, given } = await referenceFor(plan);
     const mode = given === "earlier" ? "state" : given === "style" ? "styled" : "lead";
     return drawing(async () => {
       progress("picture", "drawing", `Drawing ${plan.id}`, { id: plan.id });
@@ -384,18 +385,55 @@ export async function makeFilm(job: FilmJob): Promise<FilmFile> {
     });
   }
 
+  // ── Parts: one call for all of a film's pictures ────────────────────────────────────────────────────
+  /** The most pictures one call looks at. A film has eighteen or twenty-seven, so it is one call; more are split. */
+  const PARTS_MOST = 30;
+  let filmParts: Promise<Record<string, PartsFound>> | null = null;
+  /**
+   * The finder's answer for every picture of the film, by picture id. It waits until the plan has named every
+   * picture and each one is drawn, then looks at all of them together. No picture's parts are known before that.
+   */
+  const partsOfFilm = () =>
+    (filmParts ??= picturesListed.then(async () => {
+      const ready: { plan: PicturePlan; image: Drawn }[] = [];
+      for (const plan of plans.values()) {
+        const image = await drawings.get(plan.id);
+        if (image) ready.push({ plan, image });
+      }
+      const answers: Record<string, PartsFound> = {};
+      for (let at = 0; at < ready.length; at += PARTS_MOST) Object.assign(answers, await findPartsIn(ready.slice(at, at + PARTS_MOST), ready.length > PARTS_MOST ? `pictures-${at / PARTS_MOST + 1}` : "all-pictures"));
+      return answers;
+    }));
+
+  /**
+   * Look at several finished pictures in one call and say where each one's parts are. The call is made once:
+   * if it fails, those pictures go on with no parts, and the camera and marks can only aim by eye.
+   */
+  function findPartsIn(group: { plan: PicturePlan; image: Drawn }[], name?: string): Promise<Record<string, PartsFound>> {
+    if (!group.length) return Promise.resolve({});
+    const batchId = name ?? group[0].plan.id;
+    return measuring(async () => {
+      const ids = group.map((one) => one.plan.id);
+      progress("picture", "measuring", group.length === 1 ? `Looking at ${ids[0]}` : `Looking at ${group.length} pictures together: ${ids.join(", ")}`, { id: batchId });
+      const asks: PartsAsk[] = group.map(({ plan, image }) => ({ id: plan.id, note: partsNote(plan.id, plan.brief, image.width, image.height, plan.parts), image, partIds: plan.parts.map((p) => p.id) }));
+      try {
+        const found = await provider.findParts(P.parts, asks, batchId);
+        log({ stage: "picture", id: batchId, pictures: ids, found });
+        return found;
+      } catch (error) {
+        log({ stage: "picture", id: batchId, pictures: ids, error: String((error as Error).message ?? error) });
+        progress("picture", "measuring", `The parts of ${ids.join(", ")} could not be found`, { id: batchId });
+        return {};
+      }
+    });
+  }
+
   // ── Pictures ────────────────────────────────────────────────────────────────────────────────────────
   function startPicture(plan: PicturePlan) {
-    // The lead sets the film's drawing style, so it is a whole frame, never a cut-out.
-    if (!leadId && !plan.of && !plan.cutout) leadId = plan.id;
+    // The first picture sets the film's drawing style.
+    if (!leadId && !plan.of) leadId = plan.id;
     progress("picture", "planned", plan.brief, { id: plan.id });
-    if (plan.cutout) sheetPlans.push(plan);
-
-    const drawn = (async (): Promise<Drawn | null> => {
-      // A cut-out comes off the sheet or not at all: nothing is drawn a second time.
-      if (plan.cutout) return (await sheetDrawings()).get(plan.id) ?? null;
-      return source.pairs === false ? drawAlone(plan) : queueBackground(plan);
-    })();
+    const drawn = source.sheets === false ? drawAlone(plan) : queuePicture(plan);
     drawings.set(plan.id, drawn);
 
     pictures.set(
@@ -403,26 +441,21 @@ export async function makeFilm(job: FilmJob): Promise<FilmFile> {
       drawn.then(async (image): Promise<Picture | null> => {
         if (!image) return null;
         const src = `${base}/${image.file}`;
-        let hotspots: Record<string, Hotspot> = {};
-        if (plan.parts.length) {
-          hotspots = await measuring(async () => {
-            progress("picture", "measuring", `Finding ${plan.parts.map((p) => p.id).join(", ")} in ${plan.id}`, { id: plan.id });
-            for (let attempt = 1; attempt <= 2; attempt++) {
-              try {
-                const ids = plan.parts.map((p) => p.id);
-                const found = await provider.findParts(P.parts, partsContext(plan.brief, image.width, image.height, plan.parts), image, plan.id, ids);
-                log({ stage: "picture", id: plan.id, attempt, found });
-                return hotspotsOf(found, ids, image.width, image.height);
-              } catch (error) {
-                log({ stage: "picture", id: plan.id, attempt, error: String((error as Error).message ?? error) });
-              }
-            }
-            return {};
-          });
+        // Every picture is looked at, whether or not the plan named a part in it: the finder also lists the
+        // other things it sees, so the scene writer has more to aim at than the planner thought of. All of a
+        // film's pictures are looked at together, in one call, once the last of them is drawn.
+        const answers = await partsOfFilm();
+        const found = answers[plan.id] ?? { parts: [], missing: [] };
+        const ids = plan.parts.map((p) => p.id);
+        const hotspots = hotspotsOf(found, ids, image.width, image.height);
+        const seen: Record<string, string> = {};
+        for (const extra of seenParts(found, ids, image.width, image.height)) {
+          hotspots[extra.id] = extra.box;
+          seen[extra.id] = extra.is;
         }
-        const found = Object.keys(hotspots);
-        progress("picture", "ready", found.length ? `${plan.id} is ready: ${found.join(", ")}` : plan.cutout ? `${plan.id} is cut out and ready` : `${plan.id} is ready`, { id: plan.id, src });
-        return { src, aspect: Math.round((image.width / image.height) * 1000) / 1000, hotspots, ...(plan.cutout ? { cutout: true } : {}) };
+        const named = Object.keys(hotspots);
+        progress("picture", "ready", named.length ? `${plan.id} is ready: ${named.join(", ")}` : `${plan.id} is ready`, { id: plan.id, src });
+        return { src, aspect: Math.round((image.width / image.height) * 1000) / 1000, hotspots, seen };
       }),
     );
   }
@@ -433,7 +466,10 @@ export async function makeFilm(job: FilmJob): Promise<FilmFile> {
     // A direction that names a picture means it to be on screen, even when the planner left it out of the
     // step's list. Without this the picture is drawn, paid for and never shown.
     for (const id of plans.keys()) {
-      if (!step.screen.includes(id) && new RegExp(`(^|[^a-z0-9-])${id}([^a-z0-9-]|$)`).test(step.show)) step.screen.push(id);
+      // An id such as "sun" is also an ordinary word, so a plain id only counts when it is written as an id:
+      // with a hyphen or a digit in it, or followed by one of its parts ("sun.core").
+      const named = /[-0-9]/.test(id) ? new RegExp(`(^|[^a-z0-9-])${id}([^a-z0-9-]|$)`) : new RegExp(`(^|[^a-z0-9-])${id}\\.[a-z]`);
+      if (!step.screen.includes(id) && named.test(step.show)) step.screen.push(id);
     }
     steps.push(step);
     progress("step", "planned", `Planned step ${place + 1}: ${step.narration}`, { id: step.id, index: place });
@@ -477,47 +513,46 @@ export async function makeFilm(job: FilmJob): Promise<FilmFile> {
       const picture = await pictures.get(id);
       if (picture) drawnHere.set(id, picture);
     }
-    // If every background of this step failed, stay on the nearest earlier one that was drawn. Cut-outs alone
-    // cannot make a scene: they need a background to stand on.
-    const grounded = () => [...drawnHere.values()].some((picture) => !picture.cutout);
-    for (let back = place - 1; !grounded() && back >= 0; back--) {
+    // If every picture of this step failed, stay on the nearest earlier one that was drawn.
+    for (let back = place - 1; !drawnHere.size && back >= 0; back--) {
       for (const id of steps[back].screen) {
         const picture = await pictures.get(id);
-        if (picture && !picture.cutout) {
+        if (picture) {
           drawnHere.set(id, picture);
           break;
         }
       }
     }
-    if (!grounded()) {
+    if (!drawnHere.size) {
       writing.withdraw(place);
       progress("scene", "dropped", `Step ${place + 1} has no picture and is left out`, { id: step.id, index: place });
       return null;
     }
 
-    const rows: PictureRow[] = [...drawnHere].map(([id, picture]) => ({ id, parts: Object.keys(picture.hotspots), ...(picture.cutout ? { cutout: true } : {}) }));
+    const rows: PictureRow[] = [...drawnHere].map(([id, picture]) => ({ id, parts: Object.keys(picture.hotspots) }));
     const table = [...drawnHere].map(([id, picture]) => {
       const planned = plans.get(id)?.parts ?? [];
       const missing = planned.filter((p) => !(p.id in picture.hotspots)).map((p) => p.id);
       return {
         id,
-        kind: picture.cutout ? "cutout" : "background",
         shows: plans.get(id)?.brief,
         // Each found part with its box in the drawing, [left, top, width, height] as shares of the picture.
-        parts: planned.filter((p) => p.id in picture.hotspots).map((p) => ({ id: `${id}.${p.id}`, is: p.where, box: picture.hotspots[p.id].map((n) => Math.round(n * 100) / 100) })),
-        // A cut-out's own shape, width over height, now that it is cropped to the thing.
-        ...(picture.cutout ? { shape: Math.round(picture.aspect * 100) / 100 } : {}),
+        parts: [
+          ...planned.filter((p) => p.id in picture.hotspots).map((p) => ({ id: `${id}.${p.id}`, is: p.where, box: picture.hotspots[p.id].map((n) => Math.round(n * 100) / 100) })),
+          // What the finder saw for itself, in its own words.
+          ...Object.entries(picture.seen).map(([part, is]) => ({ id: `${id}.${part}`, is, box: picture.hotspots[part].map((n) => Math.round(n * 100) / 100) })),
+        ],
         ...(missing.length ? { not_found: missing } : {}),
       };
     });
 
     // The scene writer is shown the pictures themselves, small: where things are and how big they came out is
-    // easier to see than to read. A cut-out is shown as it was drawn, on white.
+    // easier to see than to read.
     const shown: NonNullable<Message["images"]> = [];
-    for (const [id, picture] of drawnHere) {
+    for (const id of drawnHere.keys()) {
       const drawn = await drawings.get(id);
       if (!drawn || drawn.type !== "image/png") continue;
-      shown.push({ label: `The picture "${id}", ${picture.cutout ? "a cut-out, shown here on white before the white is removed" : "a background"}:`, image: shownAs(drawn, `${base}/pictures/${id}${picture.cutout ? ".drawn" : ""}.png`) });
+      shown.push({ label: `The picture "${id}":`, image: shownAs(drawn, `${base}/pictures/${id}.png`) });
     }
 
     function shownAs(drawn: Drawn, src: string): ImageBytes {
@@ -546,7 +581,7 @@ export async function makeFilm(job: FilmJob): Promise<FilmFile> {
         let checked = validateScene(raw, rows, step.id, step.narration);
         if (checked.problems.length) {
           log({ stage: "scene", id: step.id, problems: checked.problems });
-          const ids = rows.map((row) => row.cutout ? `- cut-out ${row.id}: placed and moved, never aimed at` : `- background ${row.id}: ${row.parts.length ? `its parts are ${row.parts.map((p) => `${row.id}.${p}`).join(", ")}` : "no part can be named, only the whole picture"}`).join("\n");
+          const ids = rows.map((row) => `- picture ${row.id}: ${row.parts.length ? `its parts are ${row.parts.map((p) => `${row.id}.${p}`).join(", ")}` : "no part can be named, only the whole picture"}`).join("\n");
           const reply = await provider.write(P.scene, [...messages, { role: "user", content: sceneRetry(checked.problems, ids) }], step.id);
           const fixed = jsonObject(reply);
           const again = fixed ? validateScene(fixed, rows, step.id, step.narration) : null;
@@ -566,7 +601,7 @@ export async function makeFilm(job: FilmJob): Promise<FilmFile> {
       progress("scene", "dropped", `Scene ${place + 1} could not be written and is left out`, { id: step.id, index: place });
       return null;
     }
-    const scene = withPictures(verdict.scene, Object.fromEntries(drawnHere));
+    const scene = withPictures(verdict.scene, Object.fromEntries([...drawnHere].map(([id, { src, aspect, hotspots }]) => [id, { src, aspect, hotspots }])));
     const audio = await voices.get(step.id);
     if (audio) scene.audio = audio;
     progress("scene", "ready", `Scene ${place + 1} is ready`, { id: step.id, index: place });
@@ -601,7 +636,7 @@ export async function makeFilm(job: FilmJob): Promise<FilmFile> {
         plans.set(plan.id, plan);
         startPicture(plan);
       }
-      if (picturesDone) openSheets();
+      if (picturesDone) closePictures();
     }
     // Steps are read only once every picture is known, so a step can never name a picture not yet planned.
     if (picturesDone) {
@@ -630,8 +665,8 @@ export async function makeFilm(job: FilmJob): Promise<FilmFile> {
     fs.writeFileSync(path.join(dir, "plan.json"), buffer);
     progress("plan", "failed", `The plan stopped early: ${failure}`);
   }
-  // A plan that ended without closing its list of pictures still gets the cut-outs it named.
-  openSheets();
+  // A plan that ended without closing its list of pictures still gets the pictures it named.
+  closePictures();
 
   enqueue(null);
   await released;

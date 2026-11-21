@@ -169,7 +169,10 @@ describe("the record of a film's making", () => {
     const { calls } = await made();
     const parts = calls.find((c) => c.stage === "parts")!;
     const picture = parts.input.find((part) => part.kind === "image")!;
-    expect(picture.src).toBe(`/film-runs/t/pictures/${parts.id}.svg`);
+    // One call looks at all of the film's pictures, and each is shown by the file the run saved it as.
+    expect(parts.id).toBe("all-pictures");
+    expect(picture.src).toMatch(/^\/film-runs\/t\/pictures\/[a-z-]+\.svg$/);
+    expect(parts.input.filter((part) => part.kind === "image").length).toBeGreaterThan(1);
   });
 
   it("gives a list without the texts, and the same numbers", async () => {
