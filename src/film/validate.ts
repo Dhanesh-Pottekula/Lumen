@@ -167,6 +167,7 @@ export function validateScene(raw: unknown, pictures: PictureRow[], id: string, 
   let spoken = 0;
   /** The word each kept beat happens on, to find stretches of narration with nothing happening on screen. */
   const changesAt: number[] = [0];
+  let cameraOn = "";
   const beatIds = new Set<string>();
 
   for (const [i, entry] of (Array.isArray(raw.beats) ? raw.beats : []).entries()) {
@@ -206,7 +207,17 @@ export function validateScene(raw: unknown, pictures: PictureRow[], id: string, 
       continue;
     }
     scene.beats.push(beat);
-    if (pendingAt >= 0) changesAt.push(pendingAt);
+    // A beat changes the screen when it does anything but aim the camera where it already is.
+    let seen = false;
+    for (const action of beat.actions) {
+      if (action.do !== "camera") seen = true;
+      else {
+        const aim = `${action.target}/${action.shot ?? ""}`;
+        if (aim !== cameraOn) seen = true;
+        cameraOn = aim;
+      }
+    }
+    if (pendingAt >= 0 && seen) changesAt.push(pendingAt);
   }
 
   // A stretch of narration with no beat in it is spoken over a frame that stands still. About 22 words is

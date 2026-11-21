@@ -582,3 +582,66 @@ export function cutSheet(bytes: Uint8Array, cols: number, rows: number, count: n
     return lift(box, (i) => pieces[label[i]].size >= speck && here.includes(root(label[i])));
   });
 }
+
+// ── Two backgrounds in one drawing ──────────────────────────────────────────────────────────────────
+/** The size of a drawing that holds two 16:9 backgrounds, one above the other, each about 1024 by 550 px. */
+export const PAIR_SIZE = "1024x1152";
+
+/**
+ * Cut a drawing of two frames, one above the other with a white band between, into the two frames, top first.
+ * The band is found as the run of all-white rows nearest the middle; with no such run the drawing is cut at
+ * its middle row. White left along a frame's outer edges is trimmed off.
+ */
+export function cutPair(bytes: Uint8Array): [Uint8Array, Uint8Array] {
+  const source = decodePng(bytes);
+  const { width, height, data } = source;
+  const white = (x: number, y: number) => {
+    const o = (y * width + x) * 4;
+    return data[o] >= 238 && data[o + 1] >= 238 && data[o + 2] >= 238;
+  };
+  const rowWhite = (y: number) => {
+    let n = 0;
+    for (let x = 0; x < width; x++) if (white(x, y)) n++;
+    return n >= width * 0.97;
+  };
+  const colWhite = (x: number, top: number, bottom: number) => {
+    let n = 0;
+    for (let y = top; y <= bottom; y++) if (white(x, y)) n++;
+    return n >= (bottom - top + 1) * 0.97;
+  };
+
+  // The band: the longest run of white rows in the middle third of the drawing.
+  let bandTop = height >> 1;
+  let bandBottom = (height >> 1) - 1;
+  let best = 0;
+  for (let y = Math.floor(height * 0.33); y < height * 0.67; ) {
+    if (!rowWhite(y)) {
+      y++;
+      continue;
+    }
+    let end = y;
+    while (end + 1 < height * 0.67 && rowWhite(end + 1)) end++;
+    if (end - y + 1 > best) {
+      best = end - y + 1;
+      bandTop = y;
+      bandBottom = end;
+    }
+    y = end + 1;
+  }
+
+  const frame = (top: number, bottom: number): Uint8Array => {
+    while (top < bottom && rowWhite(top)) top++;
+    while (bottom > top && rowWhite(bottom)) bottom--;
+    let left = 0;
+    let right = width - 1;
+    while (left < right && colWhite(left, top, bottom)) left++;
+    while (right > left && colWhite(right, top, bottom)) right--;
+    // A pixel in from each side, so the soft edge where a frame meets the white is left behind.
+    top = Math.min(bottom, top + 1);
+    bottom = Math.max(top, bottom - 1);
+    const out: Pixels = { width: right - left + 1, height: bottom - top + 1, data: new Uint8Array((right - left + 1) * (bottom - top + 1) * 4) };
+    for (let y = top; y <= bottom; y++) out.data.set(data.subarray((y * width + left) * 4, (y * width + right + 1) * 4), (y - top) * out.width * 4);
+    return encodePng(out);
+  };
+  return [frame(0, bandTop - 1), frame(bandBottom + 1, height - 1)];
+}

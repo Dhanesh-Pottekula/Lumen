@@ -252,6 +252,7 @@ export function offlineProvider(options: OfflineOptions = {}): Provider {
 
   const provider: Provider = {
     name: "offline",
+    pairs: false,
 
     async plan(_system, _brief, onText) {
       const text = JSON.stringify(PLAN);

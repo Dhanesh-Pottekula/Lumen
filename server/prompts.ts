@@ -67,42 +67,41 @@ Knowing the medium lets you decide how to show an idea. This is everything the s
 asks for anything else cannot be played, and the scene writer is left to guess at a substitute.
 
 Pictures:
-- There are two kinds. A background is one whole film frame: a place, edge to edge, with what belongs to it. A
-  cut-out is one thing drawn alone, a person, an object, an arrow, a symbol, which the film lays over a
-  background. Both are drawn by an image model from your brief, and both are still: nothing inside one moves.
-- They cost very differently, and that shapes the film. Every background is a drawing of its own. All of a
-  film's cut-outs, up to twelve, are drawn together in a single drawing and cut apart. So one more background
-  costs as much as every cut-out in the film put together, and a cut-out is close to free.
-- So a film is a few backgrounds, the places it happens in, each one stayed on for a good while, and many
-  cut-outs that come and go on them as the voice speaks. A kitchen is drawn once. The person, the same person
-  bent to the floor, the scale, the apple and the arrow showing the pull are cut-outs laid into it one after
-  another. Most films need four to six backgrounds and eight to twelve cut-outs.
-- A change is shown by putting another drawing of the same thing where the first one was: the person standing is
-  replaced by the same person bent double, the full glass by the empty one. Everything round it stays as it was,
-  so the change is what the viewer sees. A cut-out that is another pose or state of an earlier one is drawn to
-  match it.
-- A background can also be redrawn as a later moment of itself, when the place itself has changed: the light,
-  the weather, the damage done. It costs a whole drawing, so it is for a change no cut-out can show.
+- There are two kinds. A background is one whole film frame, edge to edge. A cut-out is one thing drawn alone,
+  a person, an object, an arrow, a symbol, which the film lays over a background. Both are drawn by an image
+  model from your brief, and both are still: nothing inside one moves.
+- The background is the picture of what the voice is saying. When the voice says that air splits sunlight into
+  its colours, the background is the white beam meeting the air and fanning out into red, orange, yellow,
+  green, blue and violet. It is never a plain place waiting for something to be put in it: the idea itself is
+  drawn there, with everything that makes it plain to the eye.
+- When the voice moves on to the next thing, the picture does too. Backgrounds are drawn two to a drawing, so
+  they are cheap enough to have one for each thing the film explains: most films need six to ten. A background
+  that is a later moment of the one listed just before it is drawn in the same drawing as that one, so the
+  two match exactly and only the change differs: the beam spread into colours, then the blue filling the sky.
+- Cut-outs, words and numbers are the live layer on top. All of a film's cut-outs, up to twelve, are drawn
+  together in one drawing, so they cost almost nothing. A cut-out comes on at the moment the voice names it
+  and moves as the voice describes: the person walks in, the cup drops, the arrow slides to the thing it
+  points at. It is what makes the film move while the background holds, and a film with no cut-outs has
+  nothing in it that moves. Most films need six to twelve.
+- A cut-out is for a thing that arrives, leaves, moves or changes while the picture stays: a person, an
+  object, a creature, a single bold arrow, a symbol. Another drawing of the same thing in a new pose or state
+  can replace it where it stands, and is drawn to match it.
 - A cut-out has its own fixed shape. It cannot be stretched, bent or made to reach from one place to another,
-  and it cannot be put down exactly enough to touch two things at once. So whatever joins two things in a
-  place, a beam from the sun to the air, a pipe, a road, a path something follows, is drawn into the
-  background. A cut-out is a thing that stands by itself: a person, an object, a creature, a single arrow.
+  and it cannot be put down exactly enough to touch two things at once. So whatever joins two things, a beam
+  from the sun to the air, a pipe, a road, a path something follows, is drawn into the background.
 - A cut-out is the thing alone. A person sitting up in bed is the person only; the bed, pillow and blanket are
-  in the background. Whatever a cut-out brings with it is pasted over the background's own.
+  in the background. Whatever a cut-out brings with it is pasted over the background's own. And a background
+  is drawn without the things that will be laid over it as cut-outs, with clear room where they will go and
+  the places they go named as parts.
 - A cut-out is laid over pictures of any colour. An arrow or a symbol is drawn in one bright colour with a dark
   outline, so it shows on a dark wall and on a bright sky alike.
-- A background is the stage, not the story. It is drawn without the people and things that will be laid over it,
-  with clear room where they will go, and with the places they go named as parts.
-- A background is framed for what happens on it. When a step is about a cup falling off a table, the frame is
-  the table top up close with the floor below it, not a whole kitchen with a table somewhere in it. The cut-outs
-  laid on it then stand large in the frame, and what happens to them can be seen.
-- Because a cut-out costs nothing more, every step has its own. A step that shows four cut-outs costs the same
-  as one that shows none, and the one that shows none is a still picture with a voice over it.
+- A background is framed for what it shows. When a step is about a cup falling off a table, the frame is the
+  table top up close with the floor below it, not a whole kitchen with a table somewhere in it.
 - Anything that explains can be drawn, in a background or as a cut-out: arrows, lines, cut-open views, gauges,
   symbols. Only writing cannot. The image model cannot be trusted with letters or numbers, so no picture has
   any, and the film writes the words and numbers itself, on top.
-- The first background is drawn as soon as you list it, and the cut-outs once the list of pictures is complete.
-  A picture can be shown again as often as the film needs, in the same step or a later one.
+- Backgrounds are drawn as you list them, two at a time, and the cut-outs once the list of pictures is
+  complete. A picture can be shown again as often as the film needs, in the same step or a later one.
 
 What the film does with them:
 - It cuts between pictures. Within one, the camera moves to any part of it you named, and back out to the whole
@@ -113,6 +112,9 @@ What the film does with them:
   named part; a brief shake or a white flash of the whole frame.
 - Writing comes in those two sizes for a reason. A small tag names a thing and stays beside it. Large words or
   a large number are what the viewer reads first: they are for the figure or the few words a step turns on.
+- What is written is a keyword, not a sentence: the figure with its unit, or the one to three words the
+  voice is leaning on, landing on screen on the very word that says it. The subtitles already carry the
+  sentences; the keywords are what the viewer keeps.
 - A name tag, a ring, a speech bubble and the camera are aimed at a named part of a background, never at a
   cut-out. What is written about a cut-out is large words or a large number, put in the region of the frame
   beside it.
@@ -123,7 +125,7 @@ What a cut-out can do:
 - The film lays it over the background on screen at the moment the voice names it. It can simply appear and
   stay. It can be replaced by another drawing of the same thing. It can be carried from place to place, brought
   in from outside the frame or taken out, made larger or smaller, turned round or over. Several can be on screen
-  at once. Movement is for when the voice describes movement; most cut-outs just appear where they belong.
+  at once. When the voice describes a thing moving, it moves on those words; otherwise it arrives where it belongs.
 - It moves as one piece: it slides, rises, falls and turns, but its limbs do not move. It belongs to the
   background it was laid over, and leaves when that background does.
 - It is put somewhere by name: at a named part of the background, standing on it, in front of it or beside it;
@@ -171,14 +173,16 @@ pictures: every picture the film shows, listed in the order the steps first need
   drew or a stretch of empty space cannot be found, and is lost. A picture keeps at most four parts. A cut-out
   has none.
 - of: for a later moment of an earlier background, or another pose of an earlier cut-out: that picture's id.
+  List a later moment directly after the background it is a moment of.
 
 How many pictures to make comes from the narration, not from the number of steps. Each time the voice says that
 something is there, that something happens, or that something has changed, the viewer needs to see exactly that:
-most often a cut-out laid into the background already on screen, sometimes a new background. A step usually
-shows several things, and a film many more than it has steps. Never draw two pictures that show the same thing:
-show the first one again. Before you go on from a step, read it back against its pictures. For every sentence,
-ask what the viewer is looking at while it is said, and whether that shows what the sentence says. If it shows
-something else, or a general view with the thing somewhere in it, a picture is missing.
+a background that shows it, and on it the cut-outs and keywords that arrive as it is said. A step usually needs
+one or two backgrounds and several things on top, and a film many more pictures than it has steps. Never draw
+two pictures that show the same thing: show the first one again. Before you go on from a step, read it back
+against its pictures. For every sentence, ask what the viewer is looking at while it is said, and whether that
+shows what the sentence says. If it shows something else, or a general view with the thing somewhere in it, a
+picture is missing.
 
 steps: the film in order. Aim for six to eight steps and 400 to 600 spoken words in all.
 - id: "s1", "s2", and so on.
@@ -244,6 +248,44 @@ ${ask}${match}
 
 Keep the things the brief names large and clearly separate from each other. The film shows this frame on a wider 16:9 screen, so a thin strip along the top and along the bottom, each about a twelfth of the height, is cut off: keep everything that matters clear of both. Subtitles then sit along the bottom of what is left, so keep the lowest fifth of the frame free of anything important.
 Write no text anywhere in the picture: no letters, numbers, captions, labels, signs with writing, logos, watermarks or speech bubbles.`;
+}
+
+/** One of the two backgrounds drawn together: its brief, and whether it is a later moment of the one above it. */
+export interface PairItem {
+  brief: string;
+  laterOfFirst?: boolean;
+}
+
+/**
+ * Two backgrounds in one drawing, one above the other with a white band between, cut apart by code. A drawing
+ * costs the same whatever is in it, so two backgrounds cost what one did. `given` says what the reference
+ * image is: nothing, a frame of the same film to match in style, or an earlier moment of the top picture.
+ */
+export function pairPrompt(items: [PairItem, PairItem], character: string, given: "none" | "style" | "earlier", look: string = BACKGROUND_LOOK): string {
+  const starring = items.some((item) => starsCharacter(item.brief, character));
+  const cast = starring
+    ? `A brief that says "the main character" puts the film's main character in that picture, the same every time: ${character} People are simple cartoon stick figures: a plain round white head with two dot eyes and a small mouth, thin black limbs, simple flat clothes, the whole body acting out what the brief says. A picture whose brief names no person has no person in it.`
+    : "Draw only what each brief describes. If it describes no person, there is no person anywhere in that picture. Any person it does describe is a simple cartoon stick figure: a plain round white head with two dot eyes and a small mouth, thin black limbs, simple flat clothes.";
+  const reference =
+    given === "earlier"
+      ? "\nThe image given is an earlier moment of the TOP picture's shot. Draw the top picture as that same shot a moment later, keeping the same place, framing, camera angle and drawing style, and changing only what its brief says."
+      : given === "style"
+        ? "\nThe image given is another frame of the same film. Match its drawing style, line weight and colour grade exactly in both pictures, but draw these new scenes, not that one, and take no person or thing from it."
+        : "";
+  const second = items[1].laterOfFirst
+    ? `BOTTOM picture: the very same shot as the top picture a moment later: the same place, framing, camera angle and everything in it, changed only like this: ${items[1].brief}`
+    : `BOTTOM picture: ${items[1].brief}`;
+  return `Two separate frames from one 2D animated explainer film, drawn in one image so that a program can cut them apart. The image is split into a top half and a bottom half by a plain pure-white horizontal band across its full width, about a twentieth of the image's height. The top picture fills everything above the band and the bottom picture fills everything below it, each one a complete wide 16:9 frame drawn right up to the image's edges and to the band. They are two different pictures: nothing in one continues into the other, and the band is empty white with no line, shadow or border.
+
+How each picture is drawn: ${look.trim()}
+
+${cast}
+
+TOP picture: ${items[0].brief}
+${second}${reference}
+
+In each picture keep the things its brief names large and clearly separate from each other, and keep the lowest fifth of that picture free of anything important, because subtitles sit there.
+Write no text anywhere: no letters, numbers, captions, labels, signs with writing, logos, watermarks or speech bubbles.`;
 }
 
 /**
@@ -372,6 +414,10 @@ words. Honour that intent. How to achieve it with what follows is your judgement
   place it. It is laid over the background on screen and, unlike anything drawn in the background, it can be
   moved. It belongs to that background and leaves with it. Each cut-out has a "shape": its width over its
   height.
+- Cut-outs and keywords are the live layer: they are what moves while the background holds. A cut-out comes
+  on at the word that names it, not before, and when the narrator says a thing goes, falls, rises, arrives or
+  leaves, the cut-out does that on those words. An arrow slides to what it points at. A film in which things
+  only appear and sit still looks like slides.
 - A cut-out is there to be seen, on a screen that may be a phone. The thing a moment is about is one of the
   largest things in the frame: a person stands a third to a half of the frame's height, and a cup the step is
   about is shown far larger than a real cup would be in that room, because true scale matters less than being
@@ -404,7 +450,8 @@ Everything the step uses, each declared once with its own id (lowercase letters,
   "initial": "hidden" to every background except the one the step opens on. A cut-out takes no "initial".
 - {"id": "...", "kind": "text", "text": "...", "zone": "...", "size": "small|medium|large",
   "color": "white|accent|danger|good"}: large bold words over the picture, at most 60 characters. They are the
-  first thing the viewer reads, so they suit the figure or the few words a step turns on. They stay until they
+  first thing the viewer reads, so they are a keyword and never a sentence: the figure with its unit, or the
+  one to three words the narrator is leaning on. The subtitles already carry the sentence. They stay until they
   are hidden, and two that are up together in the same or touching zones lie across each other and neither can
   be read. They also cover whatever is under them, so they go in a zone the things being shown are not in.
 - {"id": "...", "kind": "equation", "value": "..."}: a formula, in simple TeX.

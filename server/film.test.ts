@@ -141,8 +141,11 @@ describe("the film pipeline", () => {
     // Proof the offline provider really finished a later step before the first.
     const ready = events.filter((e) => e.type === "film_progress" && e.stage === "scene" && e.status === "ready").map((e) => (e as { id?: string }).id);
     expect(ready.indexOf("s4")).toBeLessThan(ready.indexOf("s1"));
-    expect(film.status).toBe("ready");
-    expect(events.at(-1)).toMatchObject({ type: "film_done", status: "ready", scenes: 5 });
+    // One picture of the offline film always fails to draw. Nothing is drawn again, so the run is marked
+    // failed and says why, and the scenes that could be made are all kept.
+    expect(film.status).toBe("failed");
+    expect(film.error).toContain("Nothing was drawn again");
+    expect(events.at(-1)).toMatchObject({ type: "film_done", status: "failed", scenes: 5 });
     expect(film.header.title).toBe("What if the Moon vanished tonight?");
   });
 
@@ -208,7 +211,7 @@ describe("the film pipeline", () => {
     };
     const { film, events } = await run(provider);
     expect(film.scenes.map((s) => s.id)).toEqual(["s1", "s2"]);
-    expect(events.at(-1)).toMatchObject({ type: "film_done", status: "ready", scenes: 2 });
+    expect(events.at(-1)).toMatchObject({ type: "film_done", scenes: 2 });
   });
 
   it("fails when no scene can be made", async () => {

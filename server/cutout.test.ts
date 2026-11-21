@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import type { FilmEvent, ImageObject } from "../src/film/types";
-import { type Pixels, cutOut, cutOutPng, SHEET_MOST, cutSheet, decodePng, encodePng, sheetLayout, shrinkPng } from "./cutout";
+import { type Pixels, cutOut, cutOutPng, SHEET_MOST, cutPair, cutSheet, decodePng, encodePng, sheetLayout, shrinkPng } from "./cutout";
 import { makeFilm } from "./film";
 import { offlineProvider } from "./providers/offline";
 import type { ImageBytes, Message, Provider } from "./providers/types";
@@ -371,5 +371,75 @@ describe("a sheet of things", () => {
     expect(things.map((t) => t?.cut.problem ?? null)).toEqual([null, null, null]);
     expect(things[0]!.cut.width).toBeLessThan(130);
     expect(things[2]!.cut.height).toBeGreaterThan(120);
+  });
+});
+
+describe("two backgrounds in one drawing", () => {
+  /** A red frame over a blue one, with a white band between and a little white round the outside. */
+  const pair = (band: boolean) => {
+    const p = canvas(200, 230);
+    const fill = (top: number, bottom: number, colour: [number, number, number]) => {
+      for (let y = top; y <= bottom; y++) for (let x = 3; x < 197; x++) p.data.set([...colour, 255], (y * 200 + x) * 4);
+    };
+    fill(2, band ? 108 : 114, [200, 40, 40]);
+    fill(band ? 121 : 115, 227, [40, 60, 200]);
+    return encodePng(p);
+  };
+
+  it("cuts at the white band and trims the white round each frame", () => {
+    const [top, bottom] = cutPair(pair(true)).map((bytes) => decodePng(bytes));
+    expect([top.data[0], top.data[2]]).toEqual([200, 40]);
+    expect([bottom.data[0], bottom.data[2]]).toEqual([40, 200]);
+    expect(top.width).toBe(194);
+    expect(top.height).toBeGreaterThan(100);
+    expect(top.height).toBeLessThan(108);
+    // No white is left along any edge of either frame.
+    for (const frame of [top, bottom]) expect(frame.data[(frame.height - 1) * frame.width * 4 + 1]).toBeLessThan(100);
+  });
+
+  it("cuts at the middle when there is no band", () => {
+    const [top, bottom] = cutPair(pair(false)).map((bytes) => decodePng(bytes));
+    expect(Math.abs(top.height - bottom.height)).toBeLessThan(6);
+  });
+
+  it("draws a film's backgrounds two to a drawing, and the odd one by itself", async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "lumen-pair-"));
+    const drawn: { id: string; prompt: string; size?: string; reference: ImageBytes | null }[] = [];
+    const plan = {
+      title: "Three places",
+      character: "none",
+      pictures: [
+        { id: "field", kind: "background", brief: "A field." },
+        { id: "field-night", kind: "background", of: "field", brief: "The same field at night." },
+        { id: "sea", kind: "background", brief: "The sea." },
+      ],
+      steps: [{ id: "s1", narration: "A field by day, then by night, then the sea.", screen: ["field", "field-night", "sea"], show: "" }],
+    };
+    const provider: Provider = {
+      ...offlineProvider({}),
+      pairs: true,
+      async plan(_s, _b, onText) {
+        onText(JSON.stringify(plan));
+      },
+      async draw(prompt, reference, id, size) {
+        drawn.push({ id, prompt, size, reference });
+        return { bytes: id.startsWith("pair") ? pair(true) : encodePng(canvas(120, 80, [10, 120, 160])), type: "image/png" };
+      },
+      async write() {
+        return JSON.stringify({ objects: [{ id: "field", kind: "image" }], beats: [{ id: "a", actions: [{ do: "camera", target: "field", shot: "wide" }] }] });
+      },
+      async speak() {
+        return null;
+      },
+    };
+    const film = await makeFilm({ provider, brief: "Three places", run: "t", dir, base: "/film-runs/t", emit: () => {} });
+    expect(film.status).toBe("ready");
+    expect(drawn.map((d) => [d.id, d.size])).toEqual([["pair-1", "1024x1152"], ["sea", undefined]]);
+    expect(drawn[0].prompt).toContain("TOP picture: A field.");
+    expect(drawn[0].prompt).toContain("BOTTOM picture: the very same shot as the top picture a moment later");
+    // The first pair has nothing to match; the odd one is drawn in the style of the film's first background.
+    expect(drawn[0].reference).toBeNull();
+    expect(decodePng(drawn[1].reference!.bytes).data[0]).toBe(200);
+    expect(decodePng(new Uint8Array(fs.readFileSync(path.join(dir, "pictures/field-night.png")))).data[2]).toBe(200);
   });
 });

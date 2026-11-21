@@ -17,8 +17,8 @@ import path from "node:path";
 import type { FilmEvent, FilmFile, FilmHeader, FilmScene, Hotspot, ImageObject, PictureRow, ProgressStage, ProgressStatus, SceneAudio } from "../src/film/types";
 import { alignWords } from "../src/film/words";
 import { validateScene, withPictures } from "../src/film/validate";
-import { SHEET_MOST, cutSheet, sheetLayout, shrinkPng } from "./cutout";
-import { DEFAULT_PROMPTS, PROMPT_INFO, type Prompts, SCENE_REPAIR, cutoutPrompt, drawingPrompt, partsContext, promptsWith, sceneContext, sceneRetry, sceneStable, sheetPrompt } from "./prompts";
+import { PAIR_SIZE, SHEET_MOST, cutPair, cutSheet, sheetLayout, shrinkPng } from "./cutout";
+import { DEFAULT_PROMPTS, PROMPT_INFO, type Prompts, SCENE_REPAIR, cutoutPrompt, drawingPrompt, pairPrompt, partsContext, promptsWith, sceneContext, sceneRetry, sceneStable, sheetPrompt } from "./prompts";
 import { createTracer } from "./trace";
 import { createMeter } from "./usage";
 import type { ImageBytes, Message, Provider } from "./providers/types";
@@ -147,6 +147,8 @@ export function promptVersion(prompts: Prompts = DEFAULT_PROMPTS): string {
     cutoutPrompt("the main character", "x", "styled", prompts.cutoutLook),
     cutoutPrompt("", "x", "state", prompts.cutoutLook),
     sheetPrompt([{ brief: "the main character" }, { brief: "", sameAs: 1 }], "x", 4, 3, true, prompts.cutoutLook),
+    pairPrompt([{ brief: "the main character" }, { brief: "", laterOfFirst: true }], "x", "earlier", prompts.look),
+    pairPrompt([{ brief: "" }, { brief: "" }], "x", "style", prompts.look),
   ].join("\u0000");
   return createHash("sha256").update(text).digest("hex").slice(0, 12);
 }
@@ -233,8 +235,8 @@ export async function makeFilm(job: FilmJob): Promise<FilmFile> {
   // A drawing costs about the same however many things are in it, so a film's cut-outs wait until the plan has
   // listed every picture and are then drawn on one sheet of twelve places (a second sheet past twelve) and cut apart by code.
   const sheetPlans: PicturePlan[] = [];
-  /** Why a sheet, or a thing on it, could not be used. Any entry here fails the run: nothing is drawn again. */
-  const sheetFailures: string[] = [];
+  /** Why a drawing, or a thing on a sheet, could not be used. Any entry here fails the run: nothing is drawn again. */
+  const drawFailures: string[] = [];
   let openSheets!: () => void;
   const picturesListed = new Promise<void>((resolve) => (openSheets = resolve));
   let sheets: Promise<Map<string, Drawn>> | null = null;
@@ -266,7 +268,7 @@ export async function makeFilm(job: FilmJob): Promise<FilmFile> {
               log({ stage: "picture", id: plan.id, sheet: sheetId, place: n + 1, cut: thing ? { width: thing.cut.width, height: thing.cut.height, coverage: Math.round(thing.cut.coverage * 1000) / 1000, problem: thing.cut.problem } : "nothing was drawn in its place" });
               if (!thing || thing.cut.problem) {
                 const why = thing?.cut.problem ?? "nothing was found in its place on the sheet";
-                sheetFailures.push(`${plan.id}: ${why}`);
+                drawFailures.push(`${plan.id}: ${why}`);
                 progress("picture", "failed", `The cut-out ${plan.id} could not be used: ${why}`, { id: plan.id });
                 return;
               }
@@ -280,7 +282,7 @@ export async function makeFilm(job: FilmJob): Promise<FilmFile> {
           } catch (error) {
             // No second drawing and no drawing them one by one: the run is marked failed, with the reason.
             const why = String((error as Error).message ?? error);
-            sheetFailures.push(`${sheetId}: ${why}`);
+            drawFailures.push(`${sheetId}: ${why}`);
             log({ stage: "picture", id: sheetId, error: why });
             progress("picture", "failed", `The sheet of cut-outs could not be made: ${why}`, { id: sheetId });
           }
@@ -290,50 +292,109 @@ export async function makeFilm(job: FilmJob): Promise<FilmFile> {
     return made;
   }
 
+  // ── Backgrounds: two to a drawing ───────────────────────────────────────────────────────────────────
+  // A drawing costs the same whatever is in it, so backgrounds are drawn two at a time, one above the other,
+  // and cut apart. They are paired in the order the plan lists them; an odd last one is drawn by itself.
+  // Nothing is drawn a second time: a drawing that fails is recorded and the run is marked failed.
+  const pairWaiting: { plan: PicturePlan; settle: (drawn: Drawn | null) => void }[] = [];
+  let pairs = 0;
+  const queueBackground = (plan: PicturePlan) =>
+    new Promise<Drawn | null>((settle) => {
+      pairWaiting.push({ plan, settle });
+      if (pairWaiting.length === 2) void drawPair(pairWaiting.splice(0, 2));
+    });
+  void picturesListed.then(() => {
+    for (const { plan, settle } of pairWaiting.splice(0)) void drawAlone(plan).then(settle);
+  });
+
+  /** The picture a drawing is made from, and what it is to that drawing. Awaited outside the drawing lanes. */
+  async function referenceFor(plan: PicturePlan, others: string[]): Promise<{ reference: Drawn | null; given: "none" | "style" | "earlier" }> {
+    if (plan.of && !others.includes(plan.of)) {
+      const earlier = (await drawings.get(plan.of)) ?? null;
+      if (earlier) return { reference: earlier, given: "earlier" };
+    }
+    if (leadId && leadId !== plan.id && !others.includes(leadId)) {
+      const lead = (await drawings.get(leadId)) ?? null;
+      if (lead) return { reference: lead, given: "style" };
+    }
+    return { reference: null, given: "none" };
+  }
+
+  const keep = (id: string, bytes: Uint8Array): Drawn | null => {
+    const size = imageSize(bytes);
+    if (!size) return null;
+    const file = `pictures/${id}.png`;
+    fs.writeFileSync(path.join(dir, file), bytes);
+    tracer.name(bytes, `${base}/${file}`);
+    return { bytes, type: "image/png", file, width: size[0], height: size[1] };
+  };
+
+  async function drawPair(two: { plan: PicturePlan; settle: (drawn: Drawn | null) => void }[]) {
+    let [top, bottom] = two;
+    // A later moment of a picture drawn earlier goes on top, where the drawing given can be its earlier moment.
+    if (bottom.plan.of && bottom.plan.of !== top.plan.id && !top.plan.of) [top, bottom] = [bottom, top];
+    const pairId = `pair-${++pairs}`;
+    const ids = [top.plan.id, bottom.plan.id];
+    const { reference, given } = await referenceFor(top.plan, ids);
+    await drawing(async () => {
+      progress("picture", "drawing", `Drawing ${ids.join(" and ")} in one drawing`, { id: pairId });
+      try {
+        const items: [{ brief: string }, { brief: string; laterOfFirst?: boolean }] = [{ brief: top.plan.brief }, { brief: bottom.plan.brief, ...(bottom.plan.of === top.plan.id ? { laterOfFirst: true } : {}) }];
+        const image = await provider.draw(pairPrompt(items, character, given, P.look), reference, pairId, PAIR_SIZE);
+        fs.writeFileSync(path.join(dir, `pictures/${pairId}.png`), image.bytes);
+        tracer.name(image.bytes, `${base}/pictures/${pairId}.png`);
+        const frames = cutPair(image.bytes);
+        [top, bottom].forEach((one, n) => {
+          const drawn = keep(one.plan.id, frames[n]);
+          log({ stage: "picture", id: one.plan.id, pair: pairId, place: n ? "bottom" : "top", size: drawn ? [drawn.width, drawn.height] : null });
+          one.settle(drawn);
+        });
+      } catch (error) {
+        const why = String((error as Error).message ?? error);
+        drawFailures.push(`${pairId} (${ids.join(", ")}): ${why}`);
+        log({ stage: "picture", id: pairId, error: why });
+        progress("picture", "failed", `Could not draw ${ids.join(" and ")}: ${why}`, { id: pairId });
+        top.settle(null);
+        bottom.settle(null);
+      }
+    });
+  }
+
+  /** One background in a drawing of its own: the odd one out, or every one when the provider's cannot be cut. */
+  async function drawAlone(plan: PicturePlan): Promise<Drawn | null> {
+    const { reference, given } = await referenceFor(plan, []);
+    const mode = given === "earlier" ? "state" : given === "style" ? "styled" : "lead";
+    return drawing(async () => {
+      progress("picture", "drawing", `Drawing ${plan.id}`, { id: plan.id });
+      try {
+        const image = await provider.draw(drawingPrompt(plan.brief, character, mode, P.look), reference, plan.id);
+        const size = imageSize(image.bytes);
+        if (!size) throw new Error("the drawing came back in a format that cannot be measured");
+        const file = `pictures/${plan.id}.${EXTENSIONS[image.type] ?? "png"}`;
+        fs.writeFileSync(path.join(dir, file), image.bytes);
+        tracer.name(image.bytes, `${base}/${file}`);
+        return { ...image, file, width: size[0], height: size[1] };
+      } catch (error) {
+        const why = String((error as Error).message ?? error);
+        drawFailures.push(`${plan.id}: ${why}`);
+        log({ stage: "picture", id: plan.id, error: why });
+        progress("picture", "failed", `Could not draw ${plan.id}: ${why}`, { id: plan.id });
+        return null;
+      }
+    });
+  }
+
   // ── Pictures ────────────────────────────────────────────────────────────────────────────────────────
   function startPicture(plan: PicturePlan) {
     // The lead sets the film's drawing style, so it is a whole frame, never a cut-out.
     if (!leadId && !plan.of && !plan.cutout) leadId = plan.id;
-    const lead = leadId;
     progress("picture", "planned", plan.brief, { id: plan.id });
     if (plan.cutout) sheetPlans.push(plan);
 
     const drawn = (async (): Promise<Drawn | null> => {
       // A cut-out comes off the sheet or not at all: nothing is drawn a second time.
       if (plan.cutout) return (await sheetDrawings()).get(plan.id) ?? null;
-      // The reference is awaited outside the drawing lane, so a waiting picture never holds a lane idle.
-      let reference: Drawn | null = null;
-      let mode: "lead" | "styled" | "state" = "lead";
-      if (plan.of) {
-        reference = (await drawings.get(plan.of)) ?? null;
-        if (reference) mode = "state";
-      }
-      if (!reference && lead && lead !== plan.id) {
-        reference = (await drawings.get(lead)) ?? null;
-        if (reference) mode = "styled";
-      }
-      return drawing(async () => {
-        progress("picture", "drawing", `Drawing ${plan.id}`, { id: plan.id });
-        // A drawing can be refused or fail for no reason that holds a second time, and a step without its picture
-        // shows the wrong thing under the right words. So a background, like a cut-out, gets a second try.
-        let why = "";
-        for (let attempt = 1; attempt <= 2; attempt++) {
-          try {
-            const image = await provider.draw(drawingPrompt(plan.brief, character, mode, P.look), reference, plan.id);
-            const size = imageSize(image.bytes);
-            if (!size) throw new Error("the drawing came back in a format that cannot be measured");
-            const file = `pictures/${plan.id}.${EXTENSIONS[image.type] ?? "png"}`;
-            fs.writeFileSync(path.join(dir, file), image.bytes);
-            tracer.name(image.bytes, `${base}/${file}`);
-            return { ...image, file, width: size[0], height: size[1] };
-          } catch (error) {
-            why = String((error as Error).message ?? error);
-            log({ stage: "picture", id: plan.id, attempt, error: why });
-          }
-        }
-        progress("picture", "failed", `Could not draw ${plan.id}: ${why}`, { id: plan.id });
-        return null;
-      });
+      return source.pairs === false ? drawAlone(plan) : queueBackground(plan);
     })();
     drawings.set(plan.id, drawn);
 
@@ -369,6 +430,11 @@ export async function makeFilm(job: FilmJob): Promise<FilmFile> {
   // ── Scenes ──────────────────────────────────────────────────────────────────────────────────────────
   function startStep(step: Step) {
     const place = steps.length;
+    // A direction that names a picture means it to be on screen, even when the planner left it out of the
+    // step's list. Without this the picture is drawn, paid for and never shown.
+    for (const id of plans.keys()) {
+      if (!step.screen.includes(id) && new RegExp(`(^|[^a-z0-9-])${id}([^a-z0-9-]|$)`).test(step.show)) step.screen.push(id);
+    }
     steps.push(step);
     progress("step", "planned", `Planned step ${place + 1}: ${step.narration}`, { id: step.id, index: place });
     writing.enlist(place);
@@ -571,8 +637,8 @@ export async function makeFilm(job: FilmJob): Promise<FilmFile> {
   await released;
   await Promise.allSettled([...pictures.values(), ...voices.values()]);
 
-  film.status = film.scenes.length && !sheetFailures.length ? "ready" : "failed";
-  if (sheetFailures.length) film.error = `The cut-outs could not be made (${sheetFailures.join("; ")}). Nothing was drawn again.`;
+  film.status = film.scenes.length && !drawFailures.length ? "ready" : "failed";
+  if (drawFailures.length) film.error = `Some pictures could not be made (${drawFailures.join("; ")}). Nothing was drawn again.`;
   film.usage = meter.summary();
   // Only the folder's last two names are kept: enough to tell Lumen's own skills from another set, without a home path.
   const skillsAt = path.resolve(job.skillsDir ?? "");

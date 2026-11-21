@@ -50,6 +50,11 @@ export interface Provider {
    */
   plan(system: string, brief: string, onText: (delta: string) => void, skills?: SkillTool | null): Promise<void>;
   /** Draw one picture. `reference` is the film's lead picture, or the earlier moment this one redraws. */
+  /**
+   * False when this provider's drawings cannot be cut apart (the offline one gives SVG): backgrounds are then
+   * drawn one to a drawing. Left out, backgrounds are drawn two to a drawing.
+   */
+  pairs?: boolean;
   draw(prompt: string, reference: ImageBytes | null, pictureId: string, size?: string): Promise<ImageBytes>;
   /** Find parts in a finished picture. Boxes are in the picture's own pixels. */
   findParts(system: string, context: string, image: ImageBytes, pictureId: string, partIds: string[]): Promise<PartsFound>;

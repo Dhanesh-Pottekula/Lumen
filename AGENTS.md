@@ -382,3 +382,25 @@ by a separate reviewer. Films cost $0.41 to $0.54 each.
   that is only its end state (a jump that never lands, a fall that is one swap), cut-outs clipped at the
   frame edge after a camera move. These are placement by eye on a small model. A name tag or an arrow cannot
   yet be attached to a cut-out, which would remove most of them.
+
+## Backgrounds that show what is said, two to a drawing (2026-11-21)
+
+Dhanesh, after the three reviewed rounds: the background must be the picture of what the voice is saying ("if
+you say air splits the sunrays then show the multi colors"); arrows, words and numbers act as keywords; objects
+appear when they are named, "in real-time", and move; and backgrounds follow the grid system too, two in one
+picture.
+- **Backgrounds are drawn two to a drawing** (`pairPrompt`, `cutPair`, `PAIR_SIZE` 1024x1152): one above the
+  other with a white band between, each cut out at about 1024 by 550, already 16:9. Measured: 1,641 output
+  tokens a pair against 1,372 for one normal picture, so two backgrounds cost about 1.2 times what one did.
+  They pair in plan order; a later moment listed straight after its original is drawn in the same drawing, so
+  the two match. An odd last one is drawn by itself. A provider whose drawings cannot be cut sets
+  `pairs: false` (the offline one).
+- **No drawing is made twice.** The background's second try is gone too. Any failed drawing marks the run
+  failed with the reason, and the scenes that could be made are kept.
+- The planner is told the background is the idea itself, not an empty stage, and that cut-outs, words and
+  numbers are the live layer on top. Six to ten backgrounds, six to twelve cut-outs.
+- A direction that names a picture puts it on that step's screen even when the planner left it out of the
+  list (Luna did, and two arrows were drawn and never shown).
+- The still-frame check counts a beat only when it changes what is seen: aiming the camera where it already
+  is does not count.
+- Sky film with all of this: 9 backgrounds and 5 cut-outs in 6 drawings, 13 places and 17 moves, $0.49.
