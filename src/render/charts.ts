@@ -126,25 +126,6 @@ export function axes(ctx: CanvasRenderingContext2D, plot: Plot, o: AxesOptions =
   ctx.restore();
 }
 
-// ── Function plotting ──────────────────────────────────────────────────────────────────────────────
-
-/** Draw y = fn(x) across the x-domain, revealing the first `p` fraction (draw-on). */
-export function plotFunction(
-  ctx: CanvasRenderingContext2D,
-  plot: Plot,
-  fn: (x: number) => number,
-  p: number,
-  opts: { color?: string; width?: number; samples?: number } = {},
-) {
-  const samples = opts.samples ?? 120;
-  const pts: Pt[] = [];
-  for (let i = 0; i <= samples; i++) {
-    const x = lerp(plot.xDomain[0], plot.xDomain[1], i / samples);
-    pts.push([plot.sx(x), plot.sy(fn(x))]);
-  }
-  strokeOn(ctx, pts, p, { color: opts.color ?? "#5cc8ae", width: opts.width ?? 2.5 });
-}
-
 // ── Bar chart ────────────────────────────────────────────────────────────────────────────────────
 
 export interface Datum {

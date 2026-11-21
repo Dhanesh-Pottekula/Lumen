@@ -128,39 +128,6 @@ export function shakeOffset(t: number, at: number, mag: number, opts: { dur?: nu
 /** Quick 0→1→0 flash within `dur` of `at`. */
 export const flashAlpha = (t: number, at: number, dur = 0.25): number => Math.max(0, 1 - Math.abs(t - at) / dur);
 
-// draw wrappers -------------------------------------------------------------------------------------
-
-/** Run `draw` with a punch scale about (cx,cy) at `at`. */
-export function withPunch(ctx: CanvasRenderingContext2D, cx: number, cy: number, t: number, at: number, draw: (c: CanvasRenderingContext2D) => void, opts: { amp?: number; width?: number } = {}) {
-  const s = punchScale(t, at, opts.amp ?? 0.2, opts.width ?? 0.4);
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.scale(s, s);
-  ctx.translate(-cx, -cy);
-  draw(ctx);
-  ctx.restore();
-}
-
-/** Run `draw` shaken around `at`. */
-export function withShake(ctx: CanvasRenderingContext2D, t: number, at: number, draw: (c: CanvasRenderingContext2D) => void, opts: { mag?: number; dur?: number; freq?: number } = {}) {
-  const [dx, dy] = shakeOffset(t, at, opts.mag ?? 6, opts);
-  ctx.save();
-  ctx.translate(dx, dy);
-  draw(ctx);
-  ctx.restore();
-}
-
-/** A full-view color flash at `at` (draw on the fx layer). */
-export function flashOverlay(ctx: CanvasRenderingContext2D, t: number, at: number, w: number, h: number, opts: { color?: string; dur?: number } = {}) {
-  const a = flashAlpha(t, at, opts.dur ?? 0.25);
-  if (a <= 0) return;
-  ctx.save();
-  ctx.globalAlpha *= a;
-  ctx.fillStyle = opts.color ?? "rgba(255,255,255,0.6)";
-  ctx.fillRect(0, 0, w, h);
-  ctx.restore();
-}
-
 // ── Orchestration ─────────────────────────────────────────────────────────────────────────────────
 
 export interface Beat {

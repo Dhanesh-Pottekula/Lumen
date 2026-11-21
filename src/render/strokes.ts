@@ -96,9 +96,6 @@ export function windowPolyline(points: Pt[], start: number, end: number): Pt[] {
   return out;
 }
 
-/** First `p` (0..1) of a polyline by arc length — draw-on convenience. `= windowPolyline(pts, 0, p)`. */
-export const partialPolyline = (points: Pt[], p: number): Pt[] => windowPolyline(points, 0, p);
-
 // ── Curve interpolation: point-list → smooth dense polyline ───────────────────────────────────────
 
 export type CurveKind =
