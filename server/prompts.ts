@@ -71,12 +71,12 @@ Pictures:
   cut-out is one thing drawn alone, a person, an object, an arrow, a symbol, which the film lays over a
   background. Both are drawn by an image model from your brief, and both are still: nothing inside one moves.
 - They cost very differently, and that shapes the film. Every background is a drawing of its own. All of a
-  film's cut-outs, up to eighteen, are drawn together in a single drawing and cut apart. So one more background
+  film's cut-outs, up to twelve, are drawn together in a single drawing and cut apart. So one more background
   costs as much as every cut-out in the film put together, and a cut-out is close to free.
 - So a film is a few backgrounds, the places it happens in, each one stayed on for a good while, and many
   cut-outs that come and go on them as the voice speaks. A kitchen is drawn once. The person, the same person
   bent to the floor, the scale, the apple and the arrow showing the pull are cut-outs laid into it one after
-  another. Most films need four to six backgrounds and ten to eighteen cut-outs.
+  another. Most films need four to six backgrounds and eight to twelve cut-outs.
 - A change is shown by putting another drawing of the same thing where the first one was: the person standing is
   replaced by the same person bent double, the full glass by the empty one. Everything round it stays as it was,
   so the change is what the viewer sees. A cut-out that is another pose or state of an earlier one is drawn to
@@ -150,7 +150,7 @@ exactly those words in the brief of every picture they are in, and in no other.
 pictures: every picture the film shows, listed in the order the steps first need them.
 - id: lowercase letters, digits and hyphens, starting with a letter.
 - kind: "background" for a whole frame, "cutout" for one thing drawn alone. The first background sets the
-  drawing style for everything after it, so list a background before any cut-out. List at most eighteen
+  drawing style for everything after it, so list a background before any cut-out. List at most twelve
   cut-outs.
 - brief: what is seen, in enough detail that an illustrator who knows nothing else draws the right picture. The
   illustrator draws every thing a brief mentions, including a thing it says to leave out or to leave room for.
@@ -285,9 +285,9 @@ export function sheetPrompt(items: SheetItem[], character: string, cols: number,
       return `${i + 1}. ${brief}${who}${same}`;
     })
     .join("\n");
-  return `A sheet of ${items.length} separate things from one 2D animated explainer film. Each will be cut out of the sheet by a program and placed into the film's scenes, so each is drawn alone. How each one is drawn: ${look.trim()}
+  return `A sheet of separate things from one 2D animated explainer film. Each will be cut out of the sheet by a program and placed into the film's scenes, so each is drawn alone. How each one is drawn: ${look.trim()}
 
-${styled ? "The image given is a frame of the same film. Match its drawing style, line weight and character design exactly, but do not draw that scene.\n\n" : ""}Draw these ${items.length} things as an even grid of ${cols} columns and ${rows} rows, in reading order: left to right along the top row, then the next row down. A last row that is not full is filled from the left.
+${styled ? "The image given is a frame of the same film. Match its drawing style, line weight and character design exactly, but do not draw that scene.\n\n" : ""}Draw these ${items.length} things as an even grid of ${cols} columns and ${rows} rows that fills the whole sheet, one thing in each place, in reading order: left to right along the top row, then the next row down. A last row that is not full is filled from the left.
 ${list}
 
 Each thing is whole, with nothing cut off, sits in the middle of its own cell and fills most of the cell, with clear empty white all round it. No thing touches or overlaps another, and each is drawn once only. A person is a simple cartoon stick figure: a plain round white head with two dot eyes and a small mouth, thin black limbs, simple flat clothes. Every part of each thing, white parts too, is closed inside one unbroken dark outline with no gaps.

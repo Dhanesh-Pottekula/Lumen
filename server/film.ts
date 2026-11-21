@@ -146,7 +146,7 @@ export function promptVersion(prompts: Prompts = DEFAULT_PROMPTS): string {
     drawingPrompt("", "x", "styled", prompts.look),
     cutoutPrompt("the main character", "x", "styled", prompts.cutoutLook),
     cutoutPrompt("", "x", "state", prompts.cutoutLook),
-    sheetPrompt([{ brief: "the main character" }, { brief: "", sameAs: 1 }], "x", 2, 1, true, prompts.cutoutLook),
+    sheetPrompt([{ brief: "the main character" }, { brief: "", sameAs: 1 }], "x", 4, 3, true, prompts.cutoutLook),
   ].join("\u0000");
   return createHash("sha256").update(text).digest("hex").slice(0, 12);
 }
@@ -231,7 +231,7 @@ export async function makeFilm(job: FilmJob): Promise<FilmFile> {
 
   // ── Cut-outs: drawn together ────────────────────────────────────────────────────────────────────────
   // A drawing costs about the same however many things are in it, so a film's cut-outs wait until the plan has
-  // listed every picture and are then drawn on one sheet (two, past eighteen) and cut apart by code.
+  // listed every picture and are then drawn on one sheet of twelve places (a second sheet past twelve) and cut apart by code.
   const sheetPlans: PicturePlan[] = [];
   /** Why a sheet, or a thing on it, could not be used. Any entry here fails the run: nothing is drawn again. */
   const sheetFailures: string[] = [];

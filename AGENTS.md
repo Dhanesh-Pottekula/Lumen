@@ -333,11 +333,19 @@ runs/                      generated films (git-ignored): film.json, plan.json, 
 
 Dhanesh's decisions, in his words where it matters:
 - **Pictures were most of a film's cost** (17 backgrounds, about $0.94 of $1.27). So a film is now a few
-  backgrounds and many cut-outs, and every cut-out of a film is drawn in **one drawing** (`sheet-1`, up to 18
+  backgrounds and many cut-outs, and every cut-out of a film is drawn in **one drawing** (`sheet-1`, up to 12
   things, a second sheet past that) and cut apart by `cutSheet` in `server/cutout.ts`.
 - Measured: a 3072x2048 sheet costs 3,184 output tokens (about $0.11) against 1,372 (about $0.056) for a
   1536x1024 picture. So a larger drawing is not free, but 18 things on it cost a ninth of 18 drawn alone.
   Sheets of up to 6 things are 1536x1024, more are 3072x2048 (`sheetLayout`), about 512 px a thing either way.
+- **The grid fits the number of things** (1, 2, 4, 6, 8, 9, 12 places), at most twelve a sheet (Dhanesh's
+  limit). A grid fixed at twelve with places left empty was tried at his suggestion and does not work: asked
+  for 5 things on a 4x3 grid, the image model drew all five in one row across the top and left two thirds of
+  the sheet empty (`lumen-fixed-grid-test.png` in the projects folder). The image model does not keep to
+  places it cannot see, so the grid is only ever a full one.
+- The splitter joins pieces only to bring the number of pieces down to the number of things asked for,
+  nearest first. It no longer joins things just for being close: on that test sheet the arrow, dog and bench
+  stood close and had been taken for one thing.
 - **"There should not be any fallback."** A sheet that cannot be drawn or cut, or that leaves a thing out, is
   not drawn again and its things are not drawn one by one. The run is marked failed with the reason
   (`film.error`); scenes that could be made are kept. Do not add a retry here.

@@ -373,16 +373,21 @@ export function cutOutPng(bytes: Uint8Array): CutOut {
 }
 
 // ── A sheet of things ───────────────────────────────────────────────────────────────────────────────
-/** How a number of things is laid out on one sheet, and the size of drawing that leaves each about 512 px. */
+/**
+ * How a number of things is laid out on one sheet: the grid fits the number, so the sheet is full and each
+ * thing is drawn as large as it can be. A fixed grid of twelve with places left empty was tried (2026-11-21):
+ * the image model ignored the empty places and drew five things in one row across the top, small and close
+ * together. Up to six things fit a 1536x1024 drawing; more need 3072x2048, which costs about twice as much
+ * (3,184 output tokens against 1,372, measured).
+ */
 export function sheetLayout(count: number): { cols: number; rows: number; size: string } {
-  const cols = count <= 1 ? 1 : count <= 2 ? 2 : count <= 6 ? 3 : count <= 8 ? 4 : count <= 12 ? 4 : count <= 15 ? 5 : 6;
+  const cols = count <= 1 ? 1 : count <= 4 ? 2 : count <= 6 ? 3 : count <= 8 ? 4 : count === 9 ? 3 : 4;
   const rows = Math.max(1, Math.ceil(count / cols));
-  // A drawing four times the area costs about 2.3 times as much (measured: 3,184 output tokens against 1,372).
-  return { cols, rows, size: cols <= 3 && rows <= 2 ? "1536x1024" : "3072x2048" };
+  return { cols, rows, size: count <= 6 ? "1536x1024" : "3072x2048" };
 }
 
-/** The most things one sheet holds. */
-export const SHEET_MOST = 18;
+/** The most things one sheet holds. A film with more gets a second sheet. */
+export const SHEET_MOST = 12;
 
 export interface SheetThing {
   /** The thing alone on white, as it was drawn: what a model is shown, and what another pose is redrawn from. */
@@ -393,8 +398,7 @@ export interface SheetThing {
 /**
  * Split one drawing of many things, laid out on plain white, into its things, in reading order.
  *
- * The things are found by what is drawn, not by where the grid's lines would be: pieces of drawing that lie
- * close together are one thing (the shards of a broken cup, a sun and its rays), and the things are then read
+ * The things are found by what is drawn, not by where the grid's lines would be: loose pieces of one thing are joined, nearest first, until the number of things is the number asked for (the shards of a broken cup, a sun and its rays), and the things are then read
  * row by row, left to right. So a last row that the image model spread out or centred still comes out in
  * order. When fewer things are found than were asked for, there is no telling which is missing, and each is
  * taken from its grid cell instead: an empty cell gives null, and the caller draws that thing on its own.
@@ -501,21 +505,9 @@ export function cutSheet(bytes: Uint8Array, cols: number, rows: number, count: n
   };
   const things = () => real.filter((id) => root(id) === id);
 
-  // Pieces a small step apart are one thing. Things on a sheet stand several times further apart than this.
-  const near = width * 0.025;
-  for (let changed = true; changed; ) {
-    changed = false;
-    const now = things();
-    for (let a = 0; a < now.length; a++) {
-      for (let b = a + 1; b < now.length; b++) {
-        if (root(now[a]) !== root(now[b]) && apart(pieces[root(now[a])], pieces[root(now[b])]) <= near) {
-          join(now[a], now[b]);
-          changed = true;
-        }
-      }
-    }
-  }
-  // Still too many: the two nearest are one thing drawn loosely. Join until the number is the one asked for.
+  // More pieces than things: a thing was drawn in loose pieces (the shards of a cup, a sun and its rays). The
+  // two nearest pieces are joined until the number is the one asked for. Nothing is joined just for being
+  // close, because whole things are sometimes drawn close together.
   for (let now = things(); now.length > count; now = things()) {
     let best: [number, number] = [now[0], now[1]];
     let least = Infinity;

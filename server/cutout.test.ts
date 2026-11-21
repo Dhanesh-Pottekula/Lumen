@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import type { FilmEvent, ImageObject } from "../src/film/types";
-import { type Pixels, cutOut, cutOutPng, cutSheet, decodePng, encodePng, sheetLayout, shrinkPng } from "./cutout";
+import { type Pixels, cutOut, cutOutPng, SHEET_MOST, cutSheet, decodePng, encodePng, sheetLayout, shrinkPng } from "./cutout";
 import { makeFilm } from "./film";
 import { offlineProvider } from "./providers/offline";
 import type { ImageBytes, Message, Provider } from "./providers/types";
@@ -350,10 +350,26 @@ describe("a sheet of things", () => {
     expect(decodePng(things[0]!.drawn).data[3]).toBe(255);
   });
 
-  it("asks for a larger drawing once there are more than six things", () => {
+  it("fits the grid to the number of things, up to twelve", () => {
+    expect(sheetLayout(1)).toEqual({ cols: 1, rows: 1, size: "1536x1024" });
     expect(sheetLayout(2)).toEqual({ cols: 2, rows: 1, size: "1536x1024" });
+    expect(sheetLayout(4)).toEqual({ cols: 2, rows: 2, size: "1536x1024" });
     expect(sheetLayout(6)).toEqual({ cols: 3, rows: 2, size: "1536x1024" });
+    expect(sheetLayout(9)).toEqual({ cols: 3, rows: 3, size: "3072x2048" });
     expect(sheetLayout(12)).toEqual({ cols: 4, rows: 3, size: "3072x2048" });
-    expect(sheetLayout(18)).toEqual({ cols: 6, rows: 3, size: "3072x2048" });
+    expect(SHEET_MOST).toBe(12);
+  });
+
+  it("keeps things drawn close together apart, and joins the loose pieces of one thing", () => {
+    const p = canvas(600, 200);
+    // Two whole things nearly touching, then one thing in two pieces.
+    ring(p, 100, 100, 60);
+    ring(p, 250, 100, 60);
+    ring(p, 450, 80, 40);
+    ring(p, 450, 143, 15);
+    const things = cutSheet(encodePng(p), 3, 1, 3);
+    expect(things.map((t) => t?.cut.problem ?? null)).toEqual([null, null, null]);
+    expect(things[0]!.cut.width).toBeLessThan(130);
+    expect(things[2]!.cut.height).toBeGreaterThan(120);
   });
 });
