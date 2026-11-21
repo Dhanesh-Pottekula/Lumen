@@ -355,8 +355,8 @@ describe("a sheet of things", () => {
     expect(sheetLayout(2)).toEqual({ cols: 2, rows: 1, size: "1536x1024" });
     expect(sheetLayout(4)).toEqual({ cols: 2, rows: 2, size: "1536x1024" });
     expect(sheetLayout(6)).toEqual({ cols: 3, rows: 2, size: "1536x1024" });
-    expect(sheetLayout(9)).toEqual({ cols: 3, rows: 3, size: "3072x2048" });
-    expect(sheetLayout(12)).toEqual({ cols: 4, rows: 3, size: "3072x2048" });
+    expect(sheetLayout(9)).toEqual({ cols: 3, rows: 3, size: "1536x1024" });
+    expect(sheetLayout(12)).toEqual({ cols: 4, rows: 3, size: "1536x1024" });
     expect(SHEET_MOST).toBe(12);
   });
 

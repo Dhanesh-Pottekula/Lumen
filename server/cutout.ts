@@ -377,13 +377,14 @@ export function cutOutPng(bytes: Uint8Array): CutOut {
  * How a number of things is laid out on one sheet: the grid fits the number, so the sheet is full and each
  * thing is drawn as large as it can be. A fixed grid of twelve with places left empty was tried (2026-11-21):
  * the image model ignored the empty places and drew five things in one row across the top, small and close
- * together. Up to six things fit a 1536x1024 drawing; more need 3072x2048, which costs about twice as much
- * (3,184 output tokens against 1,372, measured).
+ * together. Every sheet is one normal 1536x1024 drawing, so it costs what one picture costs (Dhanesh's
+ * decision, 2026-11-21). A 3072x2048 sheet was sharper but cost over twice as much (3,184 output tokens
+ * against 1,372, measured). With twelve things each is about 380 px across, so one shown large looks soft.
  */
 export function sheetLayout(count: number): { cols: number; rows: number; size: string } {
   const cols = count <= 1 ? 1 : count <= 4 ? 2 : count <= 6 ? 3 : count <= 8 ? 4 : count === 9 ? 3 : 4;
   const rows = Math.max(1, Math.ceil(count / cols));
-  return { cols, rows, size: count <= 6 ? "1536x1024" : "3072x2048" };
+  return { cols, rows, size: "1536x1024" };
 }
 
 /** The most things one sheet holds. A film with more gets a second sheet. */

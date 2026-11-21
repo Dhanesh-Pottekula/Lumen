@@ -337,7 +337,8 @@ Dhanesh's decisions, in his words where it matters:
   things, a second sheet past that) and cut apart by `cutSheet` in `server/cutout.ts`.
 - Measured: a 3072x2048 sheet costs 3,184 output tokens (about $0.11) against 1,372 (about $0.056) for a
   1536x1024 picture. So a larger drawing is not free, but 18 things on it cost a ninth of 18 drawn alone.
-  Sheets of up to 6 things are 1536x1024, more are 3072x2048 (`sheetLayout`), about 512 px a thing either way.
+  Every sheet is now one normal 1536x1024 drawing, whatever is on it, up to 12 things (Dhanesh, 2026-11-21:
+  "make it one normal picture and that should support 12 images"). At 12 each thing is about 380 px across.
 - **The grid fits the number of things** (1, 2, 4, 6, 8, 9, 12 places), at most twelve a sheet (Dhanesh's
   limit). A grid fixed at twelve with places left empty was tried at his suggestion and does not work: asked
   for 5 things on a 4x3 grid, the image model drew all five in one row across the top and left two thirds of
