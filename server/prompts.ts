@@ -83,6 +83,14 @@ Pictures:
   match it.
 - A background can also be redrawn as a later moment of itself, when the place itself has changed: the light,
   the weather, the damage done. It costs a whole drawing, so it is for a change no cut-out can show.
+- A cut-out has its own fixed shape. It cannot be stretched, bent or made to reach from one place to another,
+  and it cannot be put down exactly enough to touch two things at once. So whatever joins two things in a
+  place, a beam from the sun to the air, a pipe, a road, a path something follows, is drawn into the
+  background. A cut-out is a thing that stands by itself: a person, an object, a creature, a single arrow.
+- A cut-out is the thing alone. A person sitting up in bed is the person only; the bed, pillow and blanket are
+  in the background. Whatever a cut-out brings with it is pasted over the background's own.
+- A cut-out is laid over pictures of any colour. An arrow or a symbol is drawn in one bright colour with a dark
+  outline, so it shows on a dark wall and on a bright sky alike.
 - A background is the stage, not the story. It is drawn without the people and things that will be laid over it,
   with clear room where they will go, and with the places they go named as parts.
 - A background is framed for what happens on it. When a step is about a cup falling off a table, the frame is
@@ -180,7 +188,8 @@ steps: the film in order. Aim for six to eight steps and 400 to 600 spoken words
 - show: your direction to the scene writer, who sees only this step and its pictures. Say what the step is meant
   to do for the viewer, and what the screen shows as the narration goes. Tie each thing to the narration words it
   belongs with by quoting those words exactly: that is how it is timed. Name pictures and parts by id, a part as
-  picture.part. Put in quotes whatever is to be written on the screen, and say whether it is a small tag on a
+  picture.part. The scene writer has only the pictures in this step's "screen", so a direction that names any
+  other picture, or a thing no picture shows, is lost. Put in quotes whatever is to be written on the screen, and say whether it is a small tag on a
   thing or large words. It says what the voice says at that moment and nothing the voice does not, though a
   number may be written in figures and with its unit or sign.
   Ask only for what the screen section above describes.
@@ -367,6 +376,8 @@ words. Honour that intent. How to achieve it with what follows is your judgement
   largest things in the frame: a person stands a third to a half of the frame's height, and a cup the step is
   about is shown far larger than a real cup would be in that room, because true scale matters less than being
   able to see what happens to it. A cut-out under a fifth of the frame's height is hard to make out.
+- A cut-out placed later lies over one placed earlier, and both lie over the background. Two things the
+  viewer should see are put apart, where neither covers the other or the part of the background being shown.
 - When the camera moves in on a part, everything outside that part leaves the frame, cut-outs included. A
   cut-out the viewer should still see is inside the part the camera is on, or the camera stays wide.
 - Names, marks, speech bubbles and the camera are aimed at a background or one of its parts, never at a cut-out.
@@ -410,6 +421,11 @@ bottom-left or bottom-right. All four start hidden.
 A beat is one moment: the changes the viewer sees when the narrator reaches certain words. An action that
 leaves the screen as it was, such as the camera aimed where it already is, is not a change.
 
+The viewer's eye leaves a picture that has not changed for more than a sentence or two, about five seconds, so
+the beats run the whole length of the narration and none of it is spoken over a frame that stands still.
+What is written appears on the very words that say it, and stays long enough to be read: to the end of its
+sentence at least, and longer when the next sentence is still about it.
+
 - "id": lowercase letters, digits and hyphens.
 - "say": one to four words copied exactly from the narration: the words this moment belongs with. The first beat
   has no "say" and happens as the step begins. Every later beat has one, and they follow the order of the
@@ -432,7 +448,8 @@ leaves the screen as it was, such as the camera aimed where it already is, is no
   Shows a figure's own words in a speech bubble beside that part, at most 60 characters. One bubble at a time.
 {"do": "attention", "target": "<background>.<part>", "verb": "dim|encircle|pulse"}
   Draws the eye to a part: dim leaves it lit and lets everything else fall into shadow, encircle draws a ring
-  round it by hand, pulse sends two ripples out from it.
+  round it by hand, pulse sends two ripples out from it. A ring suits a small part. Round a part that fills
+  much of the frame, or a long thin one, it is a great loop that cuts across the picture.
 {"do": "show", "targets": ["<id>"], "entrance": "fade|slam|word-by-word"}
   Brings on words, a formula, a counter or a chart. fade is gentle, slam lands hard, word-by-word builds it up.
 {"do": "hide", "targets": ["<id>"]}
@@ -463,7 +480,8 @@ A <place> is one of:
 - "<background>.<part>": a listed part of the background on screen. "where" says how the cut-out sits against
   it. at puts its middle on the part's middle, for a thing in or against the part. on stands it on the part: on
   the upper surface of a table or a wall, in the middle of a floor or a road, at seat height along a sofa or a
-  bed. before stands it at the part's foot, in front of it. left-of and right-of stand it beside the part.
+  bed. before stands it at the part's foot, in front of it. left-of and right-of stand it beside the part. A
+  person at a table, a counter or a desk stands before it, on the floor; on would stand them on top of it.
 - a zone: one of the nine named above.
 - "off-left", "off-right", "off-top", "off-bottom": just outside that edge of the frame.
 - {"x": 0.42, "y": 0.71}: a point you can see in the picture, as shares of its width and height from the
@@ -487,6 +505,8 @@ on what the step is trying to make the viewer see.
 The film checks your scene. Anything below is dropped from it, and you are asked to write it again.
 
 - An id that is not one of this step's pictures, a part listed for it, or an object you declared.
+- More than 22 words of narration, eight or nine seconds, with no beat in them: a stretch spoken over a frame
+  that stands still.
 - A "say" that is not in the narration word for word, or that comes earlier in the narration than the beat
   before it.
 - A background declared hidden that nothing ever brings on, or a cut-out declared that is never placed.

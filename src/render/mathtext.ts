@@ -17,6 +17,7 @@ const SYMBOLS: Record<string, string> = {
   times: "×", cdot: "·", div: "÷", pm: "±", mp: "∓", leq: "≤", geq: "≥", neq: "≠", approx: "≈",
   equiv: "≡", to: "→", rightarrow: "→", Rightarrow: "⇒", leftarrow: "←", leftrightarrow: "↔",
   infty: "∞", partial: "∂", nabla: "∇", int: "∫", sum: "∑", prod: "∏", cdots: "⋯", ldots: "…",
+  ll: "≪", gg: "≫", le: "≤", ge: "≥", ne: "≠", sim: "∼",
   deg: "°", propto: "∝", in: "∈", forall: "∀", exists: "∃", angle: "∠", perp: "⊥", cup: "∪", cap: "∩",
 };
 
@@ -42,7 +43,13 @@ function tokenize(src: string): Token[] {
       let j = i + 1;
       let name = "";
       while (j < src.length && /[a-zA-Z]/.test(src[j])) name += src[j++];
-      if (name) {
+      if (/^(text|textrm|textbf|textit|mathrm|mathbf|operatorname)$/.test(name) && src[j] === "{") {
+        // Plain words inside a formula: kept as written, spaces and all, as one piece.
+        const end = src.indexOf("}", j);
+        const words = src.slice(j + 1, end < 0 ? src.length : end);
+        out.push({ kind: "char", v: ` ${words.trim()} `.replace(/ /g, "\u00a0") });
+        i = end < 0 ? src.length : end;
+      } else if (name) {
         out.push({ kind: "cmd", v: name });
         i = j - 1;
       } else if (j < src.length) {

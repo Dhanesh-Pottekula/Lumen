@@ -182,7 +182,8 @@ let zoneTaken: Rect[] = [];
 
 function zoneBox(zone: Zone | undefined, w: number, h: number): Rect {
   const m = 36;
-  const bottom = VIEW_H - 118;
+  // Clear of the subtitles, which run to two lines.
+  const bottom = VIEW_H - 150;
   const z = zone ?? "top";
   const x = z.includes("left") ? m : z.includes("right") ? VIEW_W - m - w : (VIEW_W - w) / 2;
   let y = z.startsWith("top") ? m : z.startsWith("bottom") ? bottom - h : (VIEW_H - h) / 2 - 20;
@@ -280,6 +281,9 @@ function drawCutouts(ctx: CanvasRenderingContext2D, scene: ResolvedScene, t: num
 function drawAttention(ctx: CanvasRenderingContext2D, verb: "dim" | "encircle" | "pulse", box: Rect, age: number, left: number) {
   const leaving = clamp01(left / 0.35);
   if (age <= 0 || leaving <= 0) return;
+  // A ring or a ripple round something that fills much of the frame is a great loop across the picture that
+  // points at nothing, so it is not drawn. Darkening everything else still works at any size.
+  if (verb !== "dim" && (box.w > VIEW_W * 0.45 || box.h > VIEW_H * 0.55)) return;
   const cx = box.x + box.w / 2;
   const cy = box.y + box.h / 2;
   // Room round the part: a share of its size, so a small part is not swamped and a large one is not hugged.

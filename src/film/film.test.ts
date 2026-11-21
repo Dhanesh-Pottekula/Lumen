@@ -292,3 +292,19 @@ describe("a figure's line and how a shot arrives", () => {
     expect(resolved.backdrops).toEqual([{ at: 0, picture: "room", entrance: "cut" }, { at: 10, picture: "street", entrance: "iris" }]);
   });
 });
+
+describe("a frame that stands still", () => {
+  const long = "The room is quiet tonight. " + "Nothing at all happens here for a very long while. ".repeat(4) + "Then the lamp goes out.";
+  const check = (beats: unknown[]) => validateScene({ objects: [{ id: "room", kind: "image" }], beats }, PICTURES, "s1", long).problems.filter((p) => p.startsWith("beats: nothing changes"));
+  const camera = { do: "camera", target: "room", shot: "wide" };
+
+  it("is reported when a long stretch of narration has no beat in it", () => {
+    const problems = check([{ id: "a", actions: [camera] }, { id: "b", say: "lamp goes out", actions: [camera] }]);
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toContain("Add beats inside that stretch");
+  });
+
+  it("is not reported when beats run the length of the narration", () => {
+    expect(check([{ id: "a", actions: [camera] }, { id: "b", say: "Nothing at all", actions: [camera] }, { id: "c", say: "very long while", actions: [camera] }, { id: "d", say: "lamp goes out", actions: [camera] }]).length).toBeLessThan(2);
+  });
+});

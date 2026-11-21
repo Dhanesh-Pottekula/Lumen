@@ -39,6 +39,9 @@ const isRecord = (v: unknown): v is Raw => typeof v === "object" && v !== null &
 const text = (v: unknown, max: number): string | null => (typeof v === "string" && v.trim() && v.length <= max ? v.trim() : null);
 
 /** Check `raw` against the pictures this step may name. `id` and `narration` come from the plan, not the writer. */
+/** The most words of narration that may pass with nothing changing on screen. */
+export const STILL_WORDS = 22;
+
 export function validateScene(raw: unknown, pictures: PictureRow[], id: string, narration: string): Verdict {
   const problems: string[] = [];
   const scene: FilmScene = { id, narration, objects: [], beats: [] };
@@ -162,6 +165,8 @@ export function validateScene(raw: unknown, pictures: PictureRow[], id: string, 
   const words = narrationWords(narration);
   const labels = new Set<string>();
   let spoken = 0;
+  /** The word each kept beat happens on, to find stretches of narration with nothing happening on screen. */
+  const changesAt: number[] = [0];
   const beatIds = new Set<string>();
 
   for (const [i, entry] of (Array.isArray(raw.beats) ? raw.beats : []).entries()) {
@@ -174,6 +179,7 @@ export function validateScene(raw: unknown, pictures: PictureRow[], id: string, 
     while (beatIds.has(beatId)) beatId += "x";
     beatIds.add(beatId);
     const beat: Beat = { id: beatId, actions: [] };
+    let pendingAt = -1;
     if (typeof entry.pace === "string" && PACES.has(entry.pace)) beat.pace = entry.pace as Beat["pace"];
 
     if (typeof entry.say === "string" && entry.say.trim()) {
@@ -183,6 +189,7 @@ export function validateScene(raw: unknown, pictures: PictureRow[], id: string, 
       } else {
         beat.say = entry.say.trim();
         spoken = at + 1;
+        pendingAt = at;
       }
     } else if (scene.beats.length > 0) {
       problems.push(`${where}: every beat after the first needs say, 1 to 4 words copied from the narration`);
@@ -199,6 +206,21 @@ export function validateScene(raw: unknown, pictures: PictureRow[], id: string, 
       continue;
     }
     scene.beats.push(beat);
+    if (pendingAt >= 0) changesAt.push(pendingAt);
+  }
+
+  // A stretch of narration with no beat in it is spoken over a frame that stands still. About 22 words is
+  // eight or nine seconds, which is where a viewer's eye has left the picture.
+  if (scene.beats.length) {
+    const ends = [...changesAt, words.length];
+    for (let n = 1; n < ends.length; n++) {
+      const still = ends[n] - ends[n - 1];
+      if (still > STILL_WORDS) {
+        const from = words.slice(ends[n - 1], ends[n - 1] + 4).join(" ");
+        const to = words.slice(Math.max(ends[n - 1], ends[n] - 4), ends[n]).join(" ");
+        problems.push(`beats: nothing changes on screen for ${still} words of narration, from "${from}" to "${to}": about ${Math.round(still / 2.6)} seconds on a still frame. Add beats inside that stretch, on the words where something is named, happens or changes`);
+      }
+    }
   }
 
   // A picture that is declared but never brought on would cost a drawing and never be seen.
