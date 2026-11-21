@@ -404,3 +404,107 @@ picture.
 - The still-frame check counts a beat only when it changes what is seen: aiming the camera where it already
   is does not count.
 - Sky film with all of this: 9 backgrounds and 5 cut-outs in 6 drawings, 13 places and 17 moves, $0.49.
+
+## 2026-11-21, evening: pictures only, eight to a drawing, and marks drawn by code
+
+Dhanesh's instruction: no more cut-out objects laid over a picture. Many pictures instead, one for each thing
+the voice says, drawn eight to one drawing; and the film's own drawn marks give the still pictures movement.
+Not yet tested or filmed when this was written: he asked to check the changes first.
+
+- **No cut-outs are made.** The planner has one kind of picture. `server/cutout.ts`, its tests and the two
+  try-scripts are gone; the "Cut-out look" prompt is gone. The player (`types`, `validate`, `resolve`,
+  `render`) still plays `place`, `move` and the rest, so films made before this still play. No new film can
+  contain them: the validator only accepts them for a picture the server marks as a cut-out, and it marks none.
+- **Eight pictures to a drawing** (`server/sheet.ts`, `sheetLayout`, `cutSheet`). Two columns of four wide
+  frames on an upright 1024x1536 sheet, with white gutters. Fewer: 2 or 3 in one column, 4 as two by two on
+  1536x1024, 5 to 7 as two columns (an odd count leaves the last place white). One left over is an ordinary
+  drawing. Gutters are looked for only near where an even grid has them, so a white sky is not taken for one.
+  A frame missing from a drawing fails the run; nothing is drawn again.
+- A group of eight is sent once a ninth picture is listed, so a later moment (`of`) is never cut off from the
+  picture it is a moment of. The first drawing has no reference; later ones are given the film's first frame
+  to match in style. A provider whose drawings cannot be cut sets `sheets: false` (the offline one).
+- **New actions, drawn by code on the picture** and following the camera: `arrow`, `line`, `box` (outline or
+  highlight), `point` (a pointer that glides from spot to spot), `stamp` (14 simple signs), `effect` (fire,
+  smoke, sparks, dust, confetti, energy, rain, snow). Each is aimed at a spot: a found part or an `{x, y}`
+  point. They stay until the picture changes or are hidden by id (`"pointer"` for the pointer).
+- **New objects:** `timeline` (2 to 6 moments in order), and text can take `near` (sit beside a spot in place
+  of a zone) and `underline`.
+- The planner is told: sixteen to twenty-four pictures, planned in eights, two to four a step; nothing can be
+  moved across a picture; marks are used where the sentence calls for them, not for their own sake.
+
+## 2026-11-21, night: only what films use is left
+
+Dhanesh asked for everything else to be removed from the code and the prompts. Not yet tested or filmed.
+
+- **Cut-outs are gone from the player too.** `place`, `move`, `swap`, `resize`, `turn`, `remove` and the
+  `cutout` flag no longer exist. The six films made before this play without their cut-out objects.
+- **The old lesson renderer is deleted:** `src/lessons`, `src/slides/compose.ts`, and from `src/render`:
+  callout, focus, geo, morph, reveal, storyboard, strokeVerbs, texture, timeline. In the files that remain,
+  every function nothing calls was removed, and the icon set is cut to the 14 stamps.
+- **Three additions:** `pan` (the camera travels from one spot to another), cut entrances `wipe`, `push` and
+  `zoom` beside cut, fade and iris, and `travel` (a glowing dot along a path of 2 to 6 spots, once or
+  repeating).
+- The whole vocabulary a film has: cut, camera, pan, arrow, line, box, point, stamp, effect, travel,
+  attention, label, speak, show, hide, shake, flash; objects image, text, equation, counter, chart, timeline.
+
+## 2026-11-21, night: prompts checked against the code
+
+A hand-written film using every element (`runs/verify-elements`, no model calls) was rendered and checked
+frame by frame, and an independent read compared each prompt with `validate.ts`, `resolve.ts`, `render.ts`,
+`film.ts` and `sheet.ts`. What changed as a result:
+- The picture look no longer asks for arrows in pictures (the film draws them). A sheet's frames are never
+  taller than 16:9; three pictures go two by two, because three full-width frames do not fit one column.
+- A name tag, ring or speech bubble for a picture that is not on screen is now refused, not silently lost.
+  A reused mark id and an over-long counter prefix or suffix are reported.
+- A pan or travelling dot that lasts until the next beat counts as movement for the still-frame check.
+- A picture is pulled onto a step's screen by its name in `show` only when the name could not be an ordinary
+  word: it has a hyphen or digit, or is written with a part (`sun.core`).
+- The zoom entrance drew the new picture as a small inset; fixed. The travelling dot and spot effects are larger.
+- Known weak spots: fire reads as glowing blobs; marks on the old picture vanish at once on a transition.
+
+## 2026-11-21, late: after the first film made this way (`…why-is-the-sky-blue-g1`, $0.29)
+
+The eight-picture drawing cut cleanly and the film used pans, dots, the pointer, arrows and lines. Changes
+Dhanesh chose after seeing it:
+- **Nine pictures to a drawing, three by three on the wide 1536x1024 sheet.** The image model filled each
+  place whatever shape it was asked for, and the old places were 4:3, so a quarter of every picture was cut
+  off. Places are now 3:2. Two to four pictures go two by two; places left over stay white. The planner is
+  told eighteen or twenty-seven.
+- **A picture dissolves in by default** (`fade`); an explicit `cut` is kept for a later moment of one shot.
+- **Words, numbers and charts leave with their picture.** One shown in the same beat as the cut stays.
+- An arrow, a line or a dot's path under 44 px on screen is not drawn.
+- Accepted as they are: keywords can still land on top of things, and briefs can still ask for rays or
+  arrows inside a picture.
+
+## 2026-11-21, late: the part finder adds what it sees
+
+Dhanesh's idea. The planner names parts before a picture exists, so it misses things. The part finder now also
+lists, in `also`, up to six other distinct things it sees in the finished picture, each with an id of its own,
+a few words and a box (`seenParts` in `server/film.ts`). They go to the scene writer with the planner's parts
+and can be aimed at the same way. Every picture is now looked at, even one the plan named no part in. Tried on
+two pictures of the g1 film: the sunset picture gained observer, molecules, white-beam, left-trees and grass;
+the eye picture gained none, because its three planned parts were all there was.
+
+## 2026-11-21, late: the part finder looks at one drawing's pictures in one call
+
+Dhanesh asked for it. `Provider.findParts(system, pictures, batchId)` now takes several pictures and answers
+for each by id; a note with the picture's id, size, brief and asked-for parts goes straight before each image.
+Parts are named `picture.part` in the answer and the schema only allows the names sent, so a box cannot be
+filed under the wrong picture by naming. The pipeline calls it once per drawing (`findPartsIn` in `film.ts`)
+and once for a picture drawn alone. It runs on Luna at medium, one attempt: a failed call leaves those
+pictures without parts and the film is still made.
+Tested on the g1 film's pictures, ten in one call, twice (no full film): 61 of 61 asked parts found, none
+filed under the wrong picture, boxes matching the one-picture boxes (overlap 0.93 or more on most; lower on a
+few loosely defined parts such as "black-sky" and the wave lines). About 21 s and $0.0013 to $0.0016 a call.
+It adds fewer extra parts than one-picture calls did: none on the eye picture, where a single call had added
+iris, pupil and glint.
+
+## 2026-11-21, late: one part-finder call for the whole film, on low
+
+Dhanesh's choice. The part finder now runs once per film (`partsOfFilm` in `film.ts`): it waits until the plan
+has named every picture and each is drawn, then sends them all in one call (split only past 30). It runs on
+Luna at low. Consequences he was told: no step can start until the last drawing is back, and on low with 20
+pictures the finder adds no parts of its own. Tested alone with 20 pictures in one call (16 of the g1 film plus
+4 sent again under new names): 59 of 59 asked parts, every box on the right thing when drawn on its picture,
+none on the wrong picture, 17.5 s, $0.0017. Not yet run with 27, and not yet through a whole film.
+`scripts/try-parts.mjs [run] [count] [out.json]` repeats the test.
